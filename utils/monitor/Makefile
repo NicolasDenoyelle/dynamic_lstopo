@@ -9,7 +9,10 @@ CURRENT_DIR = $(shell pwd)
 SRC=src
 BUILD=build
 
-all: main
+all: $(BUILD) main
+
+$(BUILD):
+	mkdir -p $@
 
 main: $(SRC)/main.c $(BUILD)/parser.o $(BUILD)/scanner.o $(BUILD)/monitor.o
 	$(CC) $(OPTIONS) $(CFLAGS) $^ -o $@ $(LFLAGS)
@@ -34,7 +37,7 @@ $(SRC)/scanner.c: $(SRC)/scanner.l
 $(BUILD)/scanner.o: $(SRC)/scanner.c
 	$(CC) $(OPTIONS) -Wno-unused-function $(CFLAGS) -c $^ -o $@ -lfl
 
-$(SRC)/parser.c: $(SRC)/parser.c
+$(SRC)/parser.c: $(SRC)/parser.y
 	$(YACC) -o $@ --defines=$(SRC)/parser.tab.h $^
 
 clean:
