@@ -1,0 +1,3 @@
+L1d_access_per_fp_flop{depth:3 , PAPI_L1_DCA/PAPI_DP_OPS} 
+L2_access_per_fp_flop{depth:2 , PAPI_L2_DCA/PAPI_DP_OPS} 
+

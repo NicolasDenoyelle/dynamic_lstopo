@@ -1,0 +1,3 @@
+#L2_DCA_per_DP_OPS{depth:4, PAPI_L2_DCA/PAPI_DP_OPS}
+L3_TCA_per_DP_OPS{depth:3, PAPI_L3_TCA/PAPI_DP_OPS}
+

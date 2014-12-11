@@ -1,0 +1,6 @@
+L2d_access_per_dp_flop
+{
+	depth:8 , 
+	PAPI_L2_DCA/PAPI_DP_OPS
+} 
+
