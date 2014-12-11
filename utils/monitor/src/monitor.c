@@ -84,7 +84,7 @@ delete_counters_output(struct counters_output * out)
 /***************************************************************************************************************/
 
 double no_fun(long long * in){return 0;}
-double flop_fp(long long * in){return (double)in[0];}
+double flop_fp(long long * in){return (double)(in[0]*1.0);}
 double L1d_access_per_fpops(long long * in){return (double)(in[0]==0?-1:in[1]/in[0]);}
 int  compareint(const void* a,const void* b ){return *(int*)a - *(int*)b;}
 
@@ -353,8 +353,12 @@ Monitors_thread(void* monitors){
     PAPI_read(eventset,PU_vals->counters_val);
     /* reduce counters for every monitors */
     for(i=0;i<m->count;i++){
-      if(m->depths[i]==(depth-1))
+      if(m->depths[i]==(depth-1)){
+	out = (struct counters_output *)(cpu->userdata);
+    	out->old_val = out->val;
+    	out->val=m->compute[i](out->counters_val);
     	continue;
+      }
       obj = hwloc_get_ancestor_obj_by_depth(m->topology,m->depths[i],cpu);
       out = (struct counters_output *)(obj->userdata);
       pthread_mutex_trylock(&(out->update_lock));
@@ -662,7 +666,6 @@ Monitors_update_counters(Monitors_t m){
     if(m->p_dir==NULL){
       char proc_dir_path[11+strlen("/proc//task")];
       sprintf(proc_dir_path,"/proc/%d/task",m->pid);
-      //fprintf(stderr,"opening proc dir: %s\n",proc_dir_path);
       m->p_dir = opendir(proc_dir_path);
       if(m->p_dir==NULL){
 	fprintf(stderr,"cannot open %s\n",proc_dir_path);
@@ -679,7 +682,7 @@ Monitors_update_counters(Monitors_t m){
     FILE * task;
     for(i=0;i<m->n_PU;i++)
       monitoring_core[i]=0;
-    /* look into each pid thread to stat file */
+    /* look into each pid's task's stat file */
     while((task_dir=readdir(m->p_dir))!=NULL){
       if(!strcmp(task_dir->d_name,".") || !strcmp(task_dir->d_name,".."))
 	continue;
@@ -694,6 +697,7 @@ Monitors_update_counters(Monitors_t m){
       for(i=0;i<38;i++){
 	while((c=fgetc(task))!=' ');
       }
+      /* read PU id */
       while((c=fgetc(task))!=' ')
 	strcat(pu_num,&c);
       fclose(task);
