@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sched.h>
+#include <dirent.h>
 #include "parser.h"
 #include "monitor.h"
 
@@ -16,6 +17,8 @@
 struct monitors{
   hwloc_topology_t  topology;
   unsigned int      pid;
+  DIR           *   p_dir;
+
   int               output_fd; 
   fd_set            output_fd_set; 
 
@@ -24,7 +27,8 @@ struct monitors{
   long long         real_usec, old_usec;
 
   unsigned int      n_PU;
-  pthread_t       * pthreads;           /* nb_PU */
+  pthread_t       * pthreads;                        /* nb_PU */
+  unsigned int    * monitoring_core;                 /* nb_PU */
   pthread_cond_t    cond;
   pthread_mutex_t   cond_mtx;
   pthread_mutex_t   update_mtx;
@@ -184,7 +188,7 @@ Monitors_t new_Monitors(unsigned int n_events, char ** event_names, const char *
   m->depths=NULL;
   FD_ZERO(&(m->output_fd_set));
   m->output_fd=0;
-
+  m->p_dir=NULL;
   /* set condition for reading counters */
   pthread_mutex_init(&(m->cond_mtx),NULL);
   pthread_mutex_init(&(m->update_mtx),NULL);
@@ -218,8 +222,12 @@ Monitors_t new_Monitors(unsigned int n_events, char ** event_names, const char *
   if((m->pthreads=malloc(sizeof(pthread_t)*m->n_PU))==NULL){
     delete_Monitors(m); return NULL;
   }
+  if((m->monitoring_core=malloc(sizeof(int)*m->n_PU))==NULL){
+    delete_Monitors(m); return NULL;
+  }
   for(i=0;i<m->n_PU;i++){
     m->pthreads[i]=0;
+    m->monitoring_core[i]=0;
     PU=hwloc_get_obj_by_depth(m->topology,depth-1,i);
     if(PU==NULL){
       fprintf(stderr,"hwloc returned a NULL object for PU[%d] at depth %d\n",i,depth-1);
@@ -334,12 +342,14 @@ Monitors_thread(void* monitors){
   struct counters_output * out, * PU_vals = (struct counters_output *) cpu->userdata;
   
   while(1){
-    /* if(m->pid!=0) */
+    /* A pid is specified */
+    if(m->pid!=0)
+      {
+	/* the pid isn't currently running or no pid child is running on the same PU as me */
+	if(!m->monitoring_core[tidx])
+	      goto next_loop;
+      }
     /* gathers counters */
-    if(tidx==0){
-      m->old_usec=m->real_usec;
-      m->real_usec=PAPI_get_real_usec();
-    }
     PAPI_read(eventset,PU_vals->counters_val);
     /* reduce counters for every monitors */
     for(i=0;i<m->count;i++){
@@ -362,11 +372,15 @@ Monitors_thread(void* monitors){
       if(out->uptodate==hwloc_bitmap_weight(obj->cpuset)){
     	out->old_val = out->val;
     	out->val=m->compute[i](out->counters_val);
+	/* I update time counter */
+	m->old_usec=m->real_usec;
+	m->real_usec=PAPI_get_real_usec();
     	pthread_mutex_unlock(&(out->update_lock));
       }
       pthread_mutex_unlock(&(out->read_lock));
     }
 
+      next_loop:;
     /* signal we achieved our update */
     pthread_mutex_lock(&(m->update_mtx));
     m->uptodate++;
@@ -601,7 +615,9 @@ delete_Monitors(Monitors_t m)
   pthread_mutex_destroy(&(m->cond_mtx));
   pthread_mutex_destroy(&(m->update_mtx));
   free(m->pthreads);
-
+  free(m->monitoring_core);
+  if(m->p_dir!=NULL)
+    closedir(m->p_dir);
   for(i=0;i<m->count;i++){
     free(m->names[i]);
     n_obj=hwloc_get_nbobjs_by_depth(m->topology,m->depths[i]);
@@ -640,6 +656,59 @@ Monitors_start(Monitors_t m)
 
 void
 Monitors_update_counters(Monitors_t m){
+  /* update threads which have to monitor */
+  if(m->pid!=0 && kill(m->pid,0)!=-1){
+    /* open proc dir it is not already openned*/
+    if(m->p_dir==NULL){
+      char proc_dir_path[11+strlen("/proc//task")];
+      sprintf(proc_dir_path,"/proc/%d/task",m->pid);
+      //fprintf(stderr,"opening proc dir: %s\n",proc_dir_path);
+      m->p_dir = opendir(proc_dir_path);
+      if(m->p_dir==NULL){
+	fprintf(stderr,"cannot open %s\n",proc_dir_path);
+	delete_Monitors(m);
+	exit(1);
+      }
+    }
+    /* update active cores list */
+    struct dirent * task_dir;
+    char c;
+    char pu_num[11];
+    int  pu_n;
+    unsigned int monitoring_core[m->n_PU],i;
+    FILE * task;
+    for(i=0;i<m->n_PU;i++)
+      monitoring_core[i]=0;
+    /* look into each pid thread to stat file */
+    while((task_dir=readdir(m->p_dir))!=NULL){
+      if(!strcmp(task_dir->d_name,".") || !strcmp(task_dir->d_name,".."))
+	continue;
+      memset(pu_num,0,11);
+      char file_name[11+strlen("/proc//task//stat")+strlen(task_dir->d_name)];
+      sprintf(file_name,"/proc/%d/task/%s/stat",m->pid,task_dir->d_name);
+      //fprintf(stderr,"looking in %s for thread PU\n",file_name);
+      task = fopen(file_name,"r");
+      if(task == NULL)
+	continue;
+      /* move cursor to PU id */
+      for(i=0;i<38;i++){
+	while((c=fgetc(task))!=' ');
+      }
+      while((c=fgetc(task))!=' ')
+	strcat(pu_num,&c);
+      fclose(task);
+      //fprintf(stderr,"monitoring core %d\n",atoi(pu_num));
+      pu_n=atoi(pu_num);
+      monitoring_core[pu_n]=1;
+    }
+    rewinddir(m->p_dir);
+    memcpy(m->monitoring_core,monitoring_core,sizeof(monitoring_core));
+    /* fprintf(stderr,"monitoring_PU: "); */
+    /* for(i=0;i<m->n_PU;i++) */
+    /*   fprintf(stderr,"%d ",monitoring_core[i]); */
+    /* fprintf(stderr,"\n"); */
+  }
+
   pthread_mutex_lock(&(m->update_mtx));
   if(m->uptodate==m->n_PU){
     m->uptodate=0;
