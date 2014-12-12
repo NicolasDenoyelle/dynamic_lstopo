@@ -10,7 +10,7 @@
   int yyerror(char * s);
   char * concat_expr(char* expr1, char sign, char* expr2);
   char * parenthesis(char* expr);
-  char * strsearch(char * key, char** array, unsigned int array_len);
+  int strsearch(char * key, char** array, unsigned int array_len);
   void print_func(char * name,char* code);
   unsigned int nb_counters, nb_monitors, topodepth, i;
   char * err;
@@ -41,7 +41,7 @@ monitor
   /* {{{ */
   if(nb_monitors==0 || 
      //     !bsearch(&tmp, monitors,nb_monitors,sizeof(Monitor_t),cmpmonitordepth) ||
-     !strsearch($1, monitor_names,nb_monitors)){
+     strsearch($1, monitor_names,nb_monitors)==-1){
     print_func($1,$5);
     monitor_names[nb_monitors]=strdup($1);
     nb_monitors++;
@@ -72,15 +72,15 @@ hwloc_obj_expr
 primary_expr 
 : NAME    {$$ = $1;}
 | COUNTER {
-   char * counter = NULL;
+   int counter_idx=-1;
    if(nb_counters==0){
      event_names[0] = strdup($1);
      nb_counters=1;
      $$=strdup("in[0]");
    }
    else{
-     counter = strsearch($1,event_names,nb_counters);
-     if(counter==NULL){
+     counter_idx = strsearch($1,event_names,nb_counters);
+     if(counter_idx==-1){
        if(nb_counters>=PAPI_MAX_MPX_CTRS){
        	 fprintf(stderr,"Too many counters, max=%d\n",PAPI_MAX_MPX_CTRS);
        	 free(event_names);
@@ -94,7 +94,7 @@ primary_expr
      }
      else{
        char var[1024];
-       sprintf(var,"in[%ld]",((char*)(counter)-*event_names)/sizeof(char *));
+       sprintf(var,"in[%d]",counter_idx);
        $$=strdup(var);
      }
    }
@@ -152,12 +152,12 @@ char * parenthesis(char* expr){
 /* }}} */
 }
 
-char * strsearch(char* key, char** array, unsigned int size){
+int strsearch(char* key, char** array, unsigned int size){
   while(size--){
     if(!strcmp(array[size],key))
-      return array[size];
+      return size;
   }
-  return NULL;
+  return -1;
 }
 
 int cmpstr(void const *a, void const *b) { 
