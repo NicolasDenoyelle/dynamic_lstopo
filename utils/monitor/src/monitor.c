@@ -24,7 +24,6 @@ struct monitors{
 
   int               n_events;    
   char        **    event_names;   /* n_events * strlen(event_name) */
-  long long         real_usec, old_usec;
 
   unsigned int      n_PU;
   pthread_t       * pthreads;                        /* nb_PU */
@@ -46,6 +45,7 @@ struct counters_output{
   double val;
   double old_val;
   int uptodate;
+  long long         real_usec, old_usec;
   pthread_mutex_t read_lock;
   pthread_mutex_t update_lock;
 };
@@ -65,6 +65,8 @@ new_counters_output(unsigned int n_events)
   }
   pthread_mutex_init(&(out->read_lock),NULL);
   pthread_mutex_init(&(out->update_lock),NULL);
+  out->real_usec=0;
+  out->old_usec=0;
   return out;
 }
 
@@ -176,8 +178,6 @@ Monitors_t new_Monitors(unsigned int n_events, char ** event_names, const char *
   m->n_events=0;
   m->pid=pid;
   m->event_names=NULL;
-  m->real_usec=0;
-  m->old_usec=0;
   m->n_PU=0;
   m->pthreads=NULL;
   m->count=0;
@@ -344,7 +344,8 @@ Monitors_thread(void* monitors){
   }
   
   struct counters_output * out, * PU_vals = (struct counters_output *) cpu->userdata;
-  
+  int weight;
+
   while(1){
     /* A pid is specified */
     if(m->pid!=0)
@@ -354,7 +355,10 @@ Monitors_thread(void* monitors){
 	      goto next_loop;
       }
     /* gathers counters */
+    PU_vals->old_usec=PU_vals->real_usec;
     PAPI_read(eventset,PU_vals->counters_val);
+    PU_vals->real_usec=PAPI_get_real_usec();
+
     /* reduce counters for every monitors */
     for(i=0;i<m->count;i++){
       if(m->depths[i]==(depth-1)){
@@ -365,24 +369,26 @@ Monitors_thread(void* monitors){
       }
       obj = hwloc_get_ancestor_obj_by_depth(m->topology,m->depths[i],cpu);
       out = (struct counters_output *)(obj->userdata);
+      weight = hwloc_bitmap_weight(obj->cpuset);
       pthread_mutex_trylock(&(out->update_lock));
       pthread_mutex_lock(&(out->read_lock));
       /* i am the first to acquire the lock, i reset values */
-      if(out->uptodate==hwloc_bitmap_weight(obj->cpuset)){
+      if(out->uptodate==weight){
     	out->uptodate=0;
     	memset(out->counters_val,0.0,sizeof(double)*m->n_events);
-	/* I update time counter */
-	m->old_usec=m->real_usec;
-	m->real_usec=PAPI_get_real_usec();
+	out->old_usec = out->real_usec;
+	out->real_usec = 0;
       }
       /* accumulate values */
       for(j=0;j<m->n_events;j++)
     	out->counters_val[j]+=PU_vals->counters_val[j];
+      out->real_usec += ((struct counters_output *)(cpu->userdata))->val;
       out->uptodate++;
       /* I am the last to update values, i update monitor value */
       if(out->uptodate==hwloc_bitmap_weight(obj->cpuset)){
     	out->old_val = out->val;
     	out->val=m->compute[i](out->counters_val);
+	out->real_usec/=weight;
     	pthread_mutex_unlock(&(out->update_lock));
       }
       pthread_mutex_unlock(&(out->read_lock));
@@ -767,10 +773,12 @@ Monitors_print(Monitors_t m)
   char string[9+21+(21*m->count)+2+(21*m->n_events)];
   char * str = string;
   unsigned int PU_idx,event_idx,monitor_idx,nobj;
+  hwloc_obj_t obj;
   for(PU_idx = 0; PU_idx<m->n_PU;PU_idx++){
+    obj = hwloc_get_obj_by_depth(m->topology, hwloc_topology_get_depth(m->topology)-1,PU_idx);
     str=string;
     str+=sprintf(str,"%8d ",PU_idx);
-    str+=sprintf(str,"%20lld ",m->real_usec);
+    str+=sprintf(str,"%20lld ",((struct counters_output *)(obj->userdata))->real_usec);
     for(event_idx=0;event_idx<m->n_events;event_idx++){
       str+=sprintf(str,"%20lld "  ,Monitors_get_counter_value(m,event_idx,PU_idx));
     }
