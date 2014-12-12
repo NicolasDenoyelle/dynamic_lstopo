@@ -160,7 +160,7 @@ Monitors_t new_Monitors(unsigned int n_events, char ** event_names, const char *
   if(event_names==NULL){
     return NULL;
   }
-
+  unsigned int i; int err;
   /* try to initialize an individual eventset to check counters availability */
   int eventset;
   if(init_eventset(&eventset,n_events,event_names)!=0){
@@ -168,7 +168,6 @@ Monitors_t new_Monitors(unsigned int n_events, char ** event_names, const char *
   }
   PAPI_destroy_eventset(&eventset);
 
-  unsigned int i; int err;
   Monitors_t m = malloc(sizeof(struct monitors));
   if(m==NULL){
     perror("malloc failed\n");
@@ -256,11 +255,15 @@ Monitors_t new_Monitors(unsigned int n_events, char ** event_names, const char *
 
   /* allocate event names and eventset*/
   m->n_events = n_events;
-  if((m->event_names = malloc(sizeof(event_names)))==NULL){
+  if((m->event_names = malloc(sizeof(char*)*n_events))==NULL){
     delete_Monitors(m); return NULL;
   }
-  for(i=0;i<m->n_events;i++)
+  for(i=0;i<m->n_events;i++){
     m->event_names[i]=strdup(event_names[i]);
+    if(strcmp(m->event_names[i],event_names[i])){
+      fprintf(stderr,"strdup_failed: %s -> %s\n",m->event_names[i], event_names[i]);
+    }
+  }
 
   /* allocate space for event values */
 
@@ -323,6 +326,7 @@ Monitors_thread(void* monitors){
     fprintf(stderr,"%d failed to init its eventset\n",tidx);
     exit(1);
   }
+
   /* bind my self to tidx core */
   int depth=hwloc_topology_get_depth(m->topology);
   hwloc_obj_t obj,cpu = hwloc_get_obj_by_depth(m->topology,depth-1,tidx);
@@ -367,6 +371,9 @@ Monitors_thread(void* monitors){
       if(out->uptodate==hwloc_bitmap_weight(obj->cpuset)){
     	out->uptodate=0;
     	memset(out->counters_val,0.0,sizeof(double)*m->n_events);
+	/* I update time counter */
+	m->old_usec=m->real_usec;
+	m->real_usec=PAPI_get_real_usec();
       }
       /* accumulate values */
       for(j=0;j<m->n_events;j++)
@@ -376,9 +383,6 @@ Monitors_thread(void* monitors){
       if(out->uptodate==hwloc_bitmap_weight(obj->cpuset)){
     	out->old_val = out->val;
     	out->val=m->compute[i](out->counters_val);
-	/* I update time counter */
-	m->old_usec=m->real_usec;
-	m->real_usec=PAPI_get_real_usec();
     	pthread_mutex_unlock(&(out->update_lock));
       }
       pthread_mutex_unlock(&(out->read_lock));
@@ -636,9 +640,9 @@ delete_Monitors(Monitors_t m)
   free(m->names);
 
   for(i=0;i<m->n_events;i++){
-    free(m->event_names[i]);
+    //free(m->event_names[i]);
   }
-  free(m->event_names);
+  //free(m->event_names);
   free(m);
 }
 
