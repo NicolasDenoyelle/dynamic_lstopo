@@ -348,7 +348,6 @@ Monitors_thread(void* monitors){
     if(m->pid!=0 && m->monitoring_state[tidx]!=STARTED)
       {
 	if(m->monitoring_state[tidx]==MUST_START){
-	  fprintf(stderr,"start counting on %d\n",tidx);
 	  PAPI_start(eventset);
 	  m->monitoring_state[tidx]=STARTED;
 	}
