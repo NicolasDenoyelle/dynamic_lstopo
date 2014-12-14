@@ -331,6 +331,9 @@ Monitors_thread(void* monitors){
     exit(1);
   }
 
+  if(m->pid==0)
+    PAPI_start(eventset);
+
   /* bind my self to tidx core */
   hwloc_obj_t obj,cpu = hwloc_get_obj_by_depth(m->topology,depth-1,tidx);
   if(cpu==NULL || cpu->cpuset==NULL){
@@ -358,7 +361,8 @@ Monitors_thread(void* monitors){
 	  goto next_loop;
 	}
       }
-
+    
+    
     /* gathers counters */
     PU_vals->old_usec=PU_vals->real_usec;
     PAPI_read(eventset,PU_vals->counters_val);
@@ -713,8 +717,8 @@ Monitors_update_counters(Monitors_t m){
       while((c=fgetc(task))!=' ')
 	strcat(pu_num,&c);
       fclose(task);
-      //fprintf(stderr,"monitoring core %d\n",atoi(pu_num));
       pu_n=atoi(pu_num);
+      //fprintf(stderr,"monitoring core %d\n",pu_n);
       if(m->monitoring_state[pu_n] < 0)
 	monitoring_state[pu_n]=MUST_START;
       else
