@@ -394,10 +394,6 @@ Monitors_thread(void* monitors){
       if(out->uptodate==weight){
     	out->old_val = out->val;
     	out->val=m->compute[i](out->counters_val);
-	if(isinf(out->val)){
-	  fprintf(stderr,"bad operation... / %lld\n",out->counters_val[1]); 
-	}
-
 	out->real_usec/=weight;
     	pthread_mutex_unlock(&(out->update_lock));
       }
@@ -785,10 +781,6 @@ Monitors_print(Monitors_t m)
     for(monitor_idx=0;monitor_idx<m->count;monitor_idx++){
       nobj = hwloc_get_nbobjs_by_depth(m->topology,m->depths[monitor_idx]);
       double val = Monitors_get_monitor_value(m,monitor_idx,(PU_idx*nobj/m->n_PU)%nobj);
-      if(isinf(val)){
-	fprintf(stderr,"2bad operation... / %lld\n",Monitors_get_counter_value(m,1,PU_idx)); 
-      }
-
       str+=sprintf(str,"%22lf "  ,val);
     }
     str+=sprintf(str,"\n");
