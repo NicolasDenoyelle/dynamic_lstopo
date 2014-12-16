@@ -2,8 +2,8 @@ $LEX=lex
 YACC=bison
 CFLAGS=-Wall
 CC=gcc 
-OPTIONS= -ggdb
-LFLAGS= -lhwloc -L/opt/papi-5.3.0/lib/ -lpapi -ldl -lpthread
+OPTIONS= -g
+LFLAGS= -lhwloc -L/opt/papi-5.3.0/lib/ -lpapi -ldl -lpthread -lm
 SCRIPTS_DIR=./scripts
 CURRENT_DIR = $(shell pwd)
 SRC=src
@@ -14,7 +14,7 @@ all: $(BUILD) main
 $(BUILD):
 	mkdir -p $@
 
-main: $(SRC)/main.c $(BUILD)/parser.o $(BUILD)/scanner.o $(BUILD)/monitor.o
+main: $(SRC)/main.c $(BUILD)/parser.o $(BUILD)/scanner.o $(BUILD)/monitor.o $(BUILD)/pwatch.o
 	$(CC) $(OPTIONS) $(CFLAGS) $^ -o $@ $(LFLAGS)
 
 parser: $(SRC)/parser.c $(BUILD)/scanner.o
@@ -22,6 +22,9 @@ parser: $(SRC)/parser.c $(BUILD)/scanner.o
 	$(CC) $(OPTIONS) -Wno-implicit-function-declaration $(CFLAGS) $(SRC)/parser.c $(BUILD)/scanner.o -o $@ $(LFLAGS)
 
 $(BUILD)/monitor.o: $(SRC)/monitor.c
+	$(CC) $(OPTIONS) $(CFLAGS) -c $^ -o $@ 
+
+$(BUILD)/pwatch.o: $(SRC)/pwatch.c
 	$(CC) $(OPTIONS) $(CFLAGS) -c $^ -o $@ 
 
 $(BUILD)/parser.o: $(SRC)/parser.c
