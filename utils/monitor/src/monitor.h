@@ -1,14 +1,15 @@
 #ifndef MONITOR_H
 #define MONITOR_H
 
+#include <hwloc.h>
 typedef struct monitors * Monitors_t;
 
-Monitors_t new_default_Monitors           (const char * output, unsigned int pid);
-Monitors_t load_Monitors                  (const char * perf_group_file, 
-					   const char * output,
+Monitors_t new_default_Monitors           (hwloc_topology_t topology, 
+					   const char * output, 
 					   unsigned int pid);
-Monitors_t load_Monitors                  (const char * perf_group_file, 
-					   const char * output,
+Monitors_t load_Monitors                  (hwloc_topology_t topology,
+					   const char * perf_group_file, 
+					   const char * output, 
 					   unsigned int pid);
 
 int        Monitors_start                 (Monitors_t m);

@@ -8,7 +8,7 @@
 #include <hwloc/linux.h>
 
 struct proc_watch{
-  hwloc_topology_t * topology;
+  hwloc_topology_t   topology;
   unsigned int       pid;
   char             * p_dir_path;
   DIR              * p_dir;
@@ -260,7 +260,7 @@ proc_watch_update_pu(struct proc_watch * pw, int physical_pu)
   hwloc_cpuset_t cpuset=hwloc_bitmap_alloc();
   unsigned int ** tasks = pw->tasks;
   for(i=2;i<pw->tasks[physical_pu][0];i++){
-    hwloc_linux_get_tid_cpubind(*(pw->topology),tasks[physical_pu][i],cpuset);
+    hwloc_linux_get_tid_cpubind(pw->topology,tasks[physical_pu][i],cpuset);
     pu=hwloc_bitmap_first(cpuset);
     if(pu!=physical_pu){
       proc_watch_add_task_on_pu(pw, tasks[physical_pu][i], pu);
@@ -284,7 +284,7 @@ proc_watch_update_tasks(struct proc_watch * pw)
 
 
 struct proc_watch *
-new_proc_watch(hwloc_topology_t * topo, unsigned int pid, unsigned int n_tasks)
+new_proc_watch(hwloc_topology_t topo, unsigned int pid, unsigned int n_tasks)
 {
   int i;
   char tmp [11+strlen("/proc//task")];
@@ -294,7 +294,7 @@ new_proc_watch(hwloc_topology_t * topo, unsigned int pid, unsigned int n_tasks)
     return NULL;
   }
   pw->topology = topo;
-  pw->n_PU=hwloc_get_nbobjs_by_depth(*topo,hwloc_topology_get_depth(*topo)-1);
+  pw->n_PU=hwloc_get_nbobjs_by_depth(topo,hwloc_topology_get_depth(topo)-1);
   pw->pid=pid;
   sprintf(tmp,"/proc/%d/task",pid);
   pw->p_dir_path = strdup(tmp);

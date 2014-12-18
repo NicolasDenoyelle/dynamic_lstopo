@@ -1,5 +1,4 @@
 #include <errno.h>
-#include <hwloc.h>
 #include <papi.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -171,7 +170,11 @@ init_eventset(int * eventset,unsigned int n_events,  char** event_names)
   return 0;
 }
 
-Monitors_t new_Monitors(unsigned int n_events, char ** event_names, const char * output, unsigned int pid){
+Monitors_t new_Monitors(hwloc_topology_t topology, 
+			unsigned int n_events, 
+			char ** event_names, 
+			const char * output, 
+			unsigned int pid){
   if(event_names==NULL){
     return NULL;
   }
@@ -230,16 +233,13 @@ Monitors_t new_Monitors(unsigned int n_events, char ** event_names, const char *
   }
 
   /* Initialize topology */
-  unsigned long flags = HWLOC_TOPOLOGY_FLAG_IO_DEVICES | HWLOC_TOPOLOGY_FLAG_ICACHES;
-  hwloc_topology_init(&(m->topology));
-  hwloc_topology_set_flags(m->topology, flags);
-  hwloc_topology_load(m->topology);
+  m->topology = topology;
 
   /* count core number */
   int depth = hwloc_topology_get_depth(m->topology);
   m->n_PU = hwloc_get_nbobjs_by_depth(m->topology, depth-1);
   if(pid!=0)
-    m->pw = new_proc_watch(&(m->topology), pid, m->n_PU);
+    m->pw = new_proc_watch(m->topology, pid, m->n_PU);
   m->count=0;
   m->allocated_count=4;
 
@@ -595,12 +595,12 @@ void print_Monitors_header(Monitors_t m){
 /*                                                   PUBLIC                                                    */
 /***************************************************************************************************************/
 Monitors_t
-new_default_Monitors(const char * output,unsigned int pid)
+new_default_Monitors(hwloc_topology_t topology, const char * output,unsigned int pid)
 {
   char ** event_names = malloc(sizeof(char*)*2);
   event_names[0]=strdup("PAPI_FP_OPS");
   event_names[1]=strdup("PAPI_L1_DCA");
-  Monitors_t m = new_Monitors(2,event_names,output,pid);
+  Monitors_t m = new_Monitors(topology, 2,event_names,output,pid);
   if(m==NULL){
     fprintf(stderr,"default monitors creation failed\n");
     free(event_names[0]); free(event_names[1]); free(event_names);
@@ -615,7 +615,7 @@ new_default_Monitors(const char * output,unsigned int pid)
 
 
 Monitors_t
-load_Monitors(const char * perf_group_file, const char * output, unsigned int pid)
+load_Monitors(hwloc_topology_t topology, const char * perf_group_file, const char * output, unsigned int pid)
 {
 
   if(perf_group_file==NULL){
@@ -664,7 +664,7 @@ load_Monitors(const char * perf_group_file, const char * output, unsigned int pi
     return NULL;
   }
 
-  Monitors_t m = new_Monitors(*n_events,event_names,output,pid);
+  Monitors_t m = new_Monitors(topology, *n_events,event_names,output,pid);
 
   char** monitor_names  = *(char***)dlsym(dlhandle,"monitor_names" );
   if(monitor_names==NULL){

@@ -9,7 +9,7 @@
 
 
 struct proc_watch;
-struct proc_watch *  new_proc_watch(hwloc_topology_t * topo, unsigned int pid, unsigned int initial_count);
+struct proc_watch *  new_proc_watch(hwloc_topology_t topology, unsigned int pid, unsigned int initial_count);
 void                 delete_proc_watch(struct proc_watch * pw);
 
 void                 proc_watch_add_task(struct proc_watch * pw, unsigned int tid);

@@ -57,8 +57,8 @@ static unsigned int legend = 1;
 static unsigned int top  = 0;
 
 static unsigned int perf = 0;
-static char * perf_output;
-static char * perf_input;
+static char * perf_output = NULL;
+static char * perf_input = NULL;
 static unsigned long refresh_usec=100000;
 
 FILE *open_output(const char *filename, int overwrite)
@@ -368,6 +368,79 @@ parse_output_format(const char *name, char *callname)
   exit(EXIT_FAILURE);
 }
 
+
+void output(int output_format){
+  switch (output_format) {
+  case LSTOPO_OUTPUT_DEFAULT:
+#ifdef LSTOPO_HAVE_GRAPHICS
+#if CAIRO_HAS_XLIB_SURFACE && defined HWLOC_HAVE_X11_KEYSYM
+    if (getenv("DISPLAY")) {
+      if (logical == -1)
+	logical = 0;
+      output_x11(topology, NULL, overwrite, logical, legend, verbose_mode);
+    } else
+#endif /* CAIRO_HAS_XLIB_SURFACE */
+#ifdef HWLOC_WIN_SYS
+      {
+        if (logical == -1)
+          logical = 0;
+        output_windows(topology, NULL, overwrite, logical, legend, verbose_mode);
+      }
+#endif
+#endif /* !LSTOPO_HAVE_GRAPHICS */
+#if !defined HWLOC_WIN_SYS || !defined LSTOPO_HAVE_GRAPHICS
+    {
+      if (logical == -1)
+	logical = 1;
+      output_console(topology, NULL, overwrite, logical, legend, verbose_mode);
+    }
+#endif
+    break;
+      
+  case LSTOPO_OUTPUT_CONSOLE:
+    output_console(topology, filename, overwrite, logical, legend, verbose_mode);
+    break;
+  case LSTOPO_OUTPUT_SYNTHETIC:
+    output_synthetic(topology, filename, overwrite, logical, legend, verbose_mode);
+    break;
+  case LSTOPO_OUTPUT_TEXT:
+    output_text(topology, filename, overwrite, logical, legend, verbose_mode);
+    break;
+  case LSTOPO_OUTPUT_FIG:
+    output_fig(topology, filename, overwrite, logical, legend, verbose_mode);
+    break;
+#ifdef LSTOPO_HAVE_GRAPHICS
+# if CAIRO_HAS_PNG_FUNCTIONS
+  case LSTOPO_OUTPUT_PNG:
+    output_png(topology, filename, overwrite, logical, legend, verbose_mode);
+    break;
+# endif /* CAIRO_HAS_PNG_FUNCTIONS */
+# if CAIRO_HAS_PDF_SURFACE
+  case LSTOPO_OUTPUT_PDF:
+    output_pdf(topology, filename, overwrite, logical, legend, verbose_mode);
+    break;
+# endif /* CAIRO_HAS_PDF_SURFACE */
+# if CAIRO_HAS_PS_SURFACE
+  case LSTOPO_OUTPUT_PS:
+    output_ps(topology, filename, overwrite, logical, legend, verbose_mode);
+    break;
+#endif /* CAIRO_HAS_PS_SURFACE */
+#if CAIRO_HAS_SVG_SURFACE
+  case LSTOPO_OUTPUT_SVG:
+    output_svg(topology, filename, overwrite, logical, legend, verbose_mode);
+    break;
+#endif /* CAIRO_HAS_SVG_SURFACE */
+#endif /* LSTOPO_HAVE_GRAPHICS */
+  case LSTOPO_OUTPUT_XML:
+    output_xml(topology, filename, overwrite, logical, legend, verbose_mode);
+    break;
+  default:
+    fprintf(stderr, "file format not supported\n");
+    usage(callname, stderr);
+    exit(EXIT_FAILURE);
+  }
+}
+
 #define LSTOPO_VERBOSE_MODE_DEFAULT 1
 
 int
@@ -645,8 +718,6 @@ main (int argc, char *argv[])
   if (top)
     add_process_objects(topology);
 
-
-
   if (restrictstring) {
     hwloc_bitmap_t restrictset = hwloc_bitmap_alloc();
     if (!strcmp (restrictstring, "binding")) {
@@ -696,77 +767,24 @@ main (int argc, char *argv[])
     else if (output_format != LSTOPO_OUTPUT_DEFAULT)
       logical = 0;
   }
-  
-  switch (output_format) {
-  case LSTOPO_OUTPUT_DEFAULT:
-#ifdef LSTOPO_HAVE_GRAPHICS
-#if CAIRO_HAS_XLIB_SURFACE && defined HWLOC_HAVE_X11_KEYSYM
-    if (getenv("DISPLAY")) {
-      if (logical == -1)
-	logical = 0;
-      output_x11(topology, NULL, overwrite, logical, legend, verbose_mode);
-    } else
-#endif /* CAIRO_HAS_XLIB_SURFACE */
-#ifdef HWLOC_WIN_SYS
-      {
-        if (logical == -1)
-          logical = 0;
-        output_windows(topology, NULL, overwrite, logical, legend, verbose_mode);
-      }
-#endif
-#endif /* !LSTOPO_HAVE_GRAPHICS */
-#if !defined HWLOC_WIN_SYS || !defined LSTOPO_HAVE_GRAPHICS
-    {
-      if (logical == -1)
-	logical = 1;
-      output_console(topology, NULL, overwrite, logical, legend, verbose_mode);
+
+  if(perf){
+    Monitors_t m;
+    if(perf_input!=NULL)
+      m = load_Monitors(perf_input,perf_output,lstopo_pid_number);
+    else
+      m = new_default_Monitors_Monitors(perf_output,lstopo_pid_number);
+
+    Monitors_start(m);
+    while(1){
+      Monitors_update_counters(m);
+      Monitors_wait_update(m);
+      output(output_format);
+      usleep(refresh.tv_usec);
     }
-#endif
-    break;
-      
-  case LSTOPO_OUTPUT_CONSOLE:
-    output_console(topology, filename, overwrite, logical, legend, verbose_mode);
-    break;
-  case LSTOPO_OUTPUT_SYNTHETIC:
-    output_synthetic(topology, filename, overwrite, logical, legend, verbose_mode);
-    break;
-  case LSTOPO_OUTPUT_TEXT:
-    output_text(topology, filename, overwrite, logical, legend, verbose_mode);
-    break;
-  case LSTOPO_OUTPUT_FIG:
-    output_fig(topology, filename, overwrite, logical, legend, verbose_mode);
-    break;
-#ifdef LSTOPO_HAVE_GRAPHICS
-# if CAIRO_HAS_PNG_FUNCTIONS
-  case LSTOPO_OUTPUT_PNG:
-    output_png(topology, filename, overwrite, logical, legend, verbose_mode);
-    break;
-# endif /* CAIRO_HAS_PNG_FUNCTIONS */
-# if CAIRO_HAS_PDF_SURFACE
-  case LSTOPO_OUTPUT_PDF:
-    output_pdf(topology, filename, overwrite, logical, legend, verbose_mode);
-    break;
-# endif /* CAIRO_HAS_PDF_SURFACE */
-# if CAIRO_HAS_PS_SURFACE
-  case LSTOPO_OUTPUT_PS:
-    output_ps(topology, filename, overwrite, logical, legend, verbose_mode);
-    break;
-#endif /* CAIRO_HAS_PS_SURFACE */
-#if CAIRO_HAS_SVG_SURFACE
-  case LSTOPO_OUTPUT_SVG:
-    output_svg(topology, filename, overwrite, logical, legend, verbose_mode);
-    break;
-#endif /* CAIRO_HAS_SVG_SURFACE */
-#endif /* LSTOPO_HAVE_GRAPHICS */
-  case LSTOPO_OUTPUT_XML:
-    output_xml(topology, filename, overwrite, logical, legend, verbose_mode);
-    break;
-  default:
-    fprintf(stderr, "file format not supported\n");
-    usage(callname, stderr);
-    exit(EXIT_FAILURE);
   }
 
+  output(output_format);
   hwloc_topology_destroy (topology);
 
   for(i=0; i<lstopo_append_legends_nr; i++)

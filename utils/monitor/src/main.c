@@ -44,11 +44,17 @@ main(int argc, char** argv)
     }
   }
 
+  hwloc_topology_t topology;
+  unsigned long flags = HWLOC_TOPOLOGY_FLAG_IO_DEVICES | HWLOC_TOPOLOGY_FLAG_ICACHES;
+  hwloc_topology_init(&(topology));
+  hwloc_topology_set_flags(topology, flags);
+  hwloc_topology_load(topology);
+
   /* creating monitors */
-  Monitors_t m = load_Monitors(in,out,pid);
+  Monitors_t m = load_Monitors(topology,in,out,pid);
   if(m==NULL){
     /* default monitors creation */
-    m = new_default_Monitors(out,pid);
+    m = new_default_Monitors(topology,out,pid);
   }
   unsigned int i;
 
