@@ -176,6 +176,17 @@ Monitors_t new_Monitors(unsigned int n_events, char ** event_names, const char *
     return NULL;
   }
   unsigned int i; int err;
+
+  err = PAPI_is_initialized();
+  if (err != PAPI_LOW_LEVEL_INITED){
+    err = PAPI_library_init(PAPI_VER_CURRENT);
+    if (err != PAPI_VER_CURRENT && err > 0) {
+      fprintf(stderr,"PAPI library version mismatch!\en");
+      exit(1); 
+    }
+    PAPI_multiplex_init();
+  }
+
   /* try to initialize an individual eventset to check counters availability */
   int eventset;
   if(init_eventset(&eventset,n_events,event_names)!=0){
@@ -275,11 +286,6 @@ Monitors_t new_Monitors(unsigned int n_events, char ** event_names, const char *
 int add_Monitor(Monitors_t m, const char * name, unsigned int depth, double (*fun)(long long *)){
   if(m==NULL)
     return 1;
-  int n_obj=hwloc_get_nbobjs_by_depth(m->topology,depth);
-  if(n_obj==0){
-    fprintf(stderr,"No object in topology at depth %d\n",depth);
-    return 1;
-  }
   if(m->allocated_count<=m->count){
     m->allocated_count*=2;
     if((m->names=realloc(m->names, sizeof(char*)*m->allocated_count))==NULL)
@@ -295,12 +301,19 @@ int add_Monitor(Monitors_t m, const char * name, unsigned int depth, double (*fu
     memset(&(m->max[m->count]),0.0,(m->allocated_count-m->count)*sizeof(double));
     memset(&(m->min[m->count]),0.0,(m->allocated_count-m->count)*sizeof(double));
   }
-  if(bsearch(&depth,m->depths,m->count,sizeof(unsigned int),compareint)){
-    fprintf(stderr,"cannot insert monitor %s at depth %d because another monitor already exists at this depth\n",
-	    name,depth);
-    return 1;
+  int i;
+  for(i=0;i<m->count;i++){
+    if(m->depths[i]==depth){
+      fprintf(stderr,"cannot insert monitor %s at depth %d because another monitor already exists at this depth\n",name,depth);
+      return 1;
+    }
   }
   hwloc_obj_t PU;
+  int n_obj=hwloc_get_nbobjs_by_depth(m->topology,depth);
+  if(n_obj==0){
+    fprintf(stderr,"No object in topology at depth %d\n",depth);
+    return 1;
+  }
   while(n_obj--){
     PU=hwloc_get_obj_by_depth(m->topology,depth,n_obj);
     PU->userdata = new_counters_output(m->n_events);
@@ -312,7 +325,6 @@ int add_Monitor(Monitors_t m, const char * name, unsigned int depth, double (*fu
   m->depths[m->count] = depth;
   m->compute[m->count] = fun;
   m->count++;
-  qsort(m->depths,m->count,sizeof(int),compareint);
   return 0;
 }
 
@@ -365,8 +377,10 @@ void* Monitors_thread_with_pid(void* monitors){
     /* reduce counters for every monitors */
     for(i=0;i<m->count;i++){
       if(m->depths[i]==(depth)){
-	PU_vals->old_val = out->val;
-	PU_vals->val = m->compute[i](out->counters_val);
+	PU_vals->old_val = PU_vals->val;
+	PU_vals->val = m->compute[i](PU_vals->counters_val);
+	if(isinf(m->max[i]) || m->max[i]<PU_vals->val) m->max[i]= PU_vals->val;
+	if(isinf(m->min[i]) || m->min[i]>PU_vals->val) m->min[i]= PU_vals->val;
     	continue;
       }
       obj = hwloc_get_ancestor_obj_by_depth(m->topology,m->depths[i],cpu);
@@ -453,8 +467,10 @@ Monitors_thread(void* monitors){
     /* reduce counters for every monitors */
     for(i=0;i<m->count;i++){
       if(m->depths[i]==(depth)){
-	PU_vals->old_val = out->val;
-	PU_vals->val = m->compute[i](out->counters_val);
+	PU_vals->old_val = PU_vals->val;
+	PU_vals->val = m->compute[i](PU_vals->counters_val);
+	if(isinf(m->max[i]) || m->max[i]<PU_vals->val) m->max[i]= PU_vals->val;
+	if(isinf(m->min[i]) || m->min[i]>PU_vals->val) m->min[i]= PU_vals->val;
     	continue;
       }
       obj = hwloc_get_ancestor_obj_by_depth(m->topology,m->depths[i],cpu);
@@ -476,7 +492,7 @@ Monitors_thread(void* monitors){
       out->real_usec += ((struct node_box *)(cpu->userdata))->real_usec;
       out->uptodate++;
       /* I am the last to update values, i update monitor value */
-      if(out->uptodate>=weight){
+      if(out->uptodate==weight){
     	out->uptodate=0;
 	out->old_val = out->val;
 	out->val = m->compute[i](out->counters_val);
@@ -592,29 +608,6 @@ void print_Monitors_header(Monitors_t m){
 /***************************************************************************************************************/
 /*                                                   PUBLIC                                                    */
 /***************************************************************************************************************/
-int
-Monitors_init()
-{
-  /* initialize PAPI lib */
-  int retval;
-  retval = PAPI_library_init(PAPI_VER_CURRENT);
-  if (retval != PAPI_VER_CURRENT && retval > 0) {
-    fprintf(stderr,"PAPI library version mismatch!\en");
-    return 1; 
-  }
-  if (retval < 0)
-    handle_error(retval);
-  retval = PAPI_is_initialized();
-  if (retval != PAPI_LOW_LEVEL_INITED)
-    handle_error(retval) ;
-  PAPI_multiplex_init();
-  if(PAPI_thread_init(pthread_self)!=PAPI_OK){
-    perror("could not initialize PAPI_threads\n");
-    return 1;
-  }
-  return 0;
-}  
-
 Monitors_t
 new_default_Monitors(const char * output,unsigned int pid)
 {
@@ -837,7 +830,7 @@ Monitors_print(Monitors_t m)
   char string[9+21+(69*m->count)+2+(21*m->n_events)];
   char * str = string;
   unsigned int p_idx,l_idx,event_idx,monitor_idx,nobj;
-  hwloc_bitmap_t cpuset = hwloc_topology_get_topology_cpuset(m->topology);
+  hwloc_bitmap_t cpuset = (hwloc_bitmap_t)hwloc_topology_get_topology_cpuset(m->topology);
   if(m->pw!=NULL)
     cpuset = proc_watch_get_watched_in_cpuset(m->pw, cpuset);
   hwloc_obj_t obj;
