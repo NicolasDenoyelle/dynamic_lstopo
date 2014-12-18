@@ -760,13 +760,13 @@ Monitors_print(Monitors_t m)
   char string[9+21+(69*m->count)+2+(21*m->n_events)];
   char * str = string;
   unsigned int PU_idx,event_idx,monitor_idx,nobj;
-  const hwloc_bitmap_t PUs = hwloc_topology_get_topology_cpuset(m->topology);
+  hwloc_bitmap_t cpuset = hwloc_topology_get_topology_cpuset(m->topology);
   if(m->pw!=NULL){
-    proc_watch_get_watched_pu_in_cpuset(m->pw, PUs);
+    cpuset = proc_watch_get_watched_pu_in_cpuset(m->pw, cpuset);
   }
   hwloc_obj_t obj;
 
-  hwloc_bitmap_foreach_begin(PU_idx,PUs){
+  hwloc_bitmap_foreach_begin(PU_idx,cpuset){
     obj = hwloc_get_obj_by_depth(m->topology, hwloc_topology_get_depth(m->topology)-1,PU_idx);
     str=string;
     str+=sprintf(str,"%8d ",PU_idx);
