@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <string.h>
+#include <papi.h>
 #include <unistd.h>
 #include "monitor.h"
 
@@ -20,7 +21,7 @@ main(int argc, char** argv)
     print_usage(argv[0]);
   }
   struct timeval refresh; refresh.tv_usec=0;
-  while((opt=getopt(argc,argv,"r:i:t:h"))!=-1){
+  while((opt=getopt(argc,argv,"r:i:p:t:h"))!=-1){
     switch(opt){
     case 'i':
       in = strdup(optarg);
@@ -43,16 +44,13 @@ main(int argc, char** argv)
     }
   }
 
-  if(Monitors_init()!=0){
-    return EXIT_FAILURE;
-  }
-
   /* creating monitors */
   Monitors_t m = load_Monitors(in,out,pid);
   if(m==NULL){
     /* default monitors creation */
     m = new_default_Monitors(out,pid);
   }
+  unsigned int i;
 
   if(m==NULL){
     return EXIT_FAILURE;
@@ -61,7 +59,7 @@ main(int argc, char** argv)
   if(out) free(out);
   Monitors_start(m);
 
-  unsigned int i = 3;
+  i = 3;
   if(refresh.tv_usec==0)
     while(--i)
       {
@@ -77,6 +75,7 @@ main(int argc, char** argv)
     }
 
   delete_Monitors(m);
+  PAPI_shutdown();
   return 0;
 }
 

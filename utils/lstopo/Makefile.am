@@ -8,10 +8,10 @@
 
 AM_CFLAGS = $(HWLOC_CFLAGS)
 # Add -I of utils/hwloc for misc.h
-AM_CPPFLAGS = $(HWLOC_CPPFLAGS) -I$(top_srcdir)/utils/hwloc
+AM_CPPFLAGS = $(HWLOC_CPPFLAGS) -I$(top_srcdir)/utils/hwloc -I$(top_srcdir)/utils/monitor/src
 AM_LDFLAGS = $(HWLOC_LDFLAGS)
 
-LDADD = $(HWLOC_top_builddir)/hwloc/libhwloc.la
+LDADD = $(HWLOC_top_builddir)/hwloc/libhwloc.la $(HWLOC_top_builddir)/utils/monitor/libmonitor.la
 
 bin_PROGRAMS = \
         lstopo-no-graphics

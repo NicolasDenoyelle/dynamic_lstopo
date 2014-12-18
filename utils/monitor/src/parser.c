@@ -79,7 +79,7 @@
   int yyerror(char * s);
   char * concat_expr(char* expr1, char sign, char* expr2);
   char * parenthesis(char* expr);
-  char * strsearch(char * key, char** array, unsigned int array_len);
+  int strsearch(char * key, char** array, unsigned int array_len);
   void print_func(char * name,char* code);
   unsigned int nb_counters, nb_monitors, topodepth, i;
   char * err;
@@ -1387,7 +1387,7 @@ yyreduce:
   /* {{{ */
   if(nb_monitors==0 || 
      //     !bsearch(&tmp, monitors,nb_monitors,sizeof(Monitor_t),cmpmonitordepth) ||
-     !strsearch((yyvsp[(1) - (6)].str), monitor_names,nb_monitors)){
+     strsearch((yyvsp[(1) - (6)].str), monitor_names,nb_monitors)==-1){
     print_func((yyvsp[(1) - (6)].str),(yyvsp[(5) - (6)].str));
     monitor_names[nb_monitors]=strdup((yyvsp[(1) - (6)].str));
     nb_monitors++;
@@ -1460,15 +1460,15 @@ yyreduce:
 /* Line 1806 of yacc.c  */
 #line 74 "src/parser.y"
     {
-   char * counter = NULL;
+   int counter_idx=-1;
    if(nb_counters==0){
      event_names[0] = strdup((yyvsp[(1) - (1)].str));
      nb_counters=1;
      (yyval.str)=strdup("in[0]");
    }
    else{
-     counter = strsearch((yyvsp[(1) - (1)].str),event_names,nb_counters);
-     if(counter==NULL){
+     counter_idx = strsearch((yyvsp[(1) - (1)].str),event_names,nb_counters);
+     if(counter_idx==-1){
        if(nb_counters>=PAPI_MAX_MPX_CTRS){
        	 fprintf(stderr,"Too many counters, max=%d\n",PAPI_MAX_MPX_CTRS);
        	 free(event_names);
@@ -1482,7 +1482,7 @@ yyreduce:
      }
      else{
        char var[1024];
-       sprintf(var,"in[%ld]",((char*)(counter)-*event_names)/sizeof(char *));
+       sprintf(var,"in[%d]",counter_idx);
        (yyval.str)=strdup(var);
      }
    }
@@ -1787,12 +1787,12 @@ char * parenthesis(char* expr){
 /* }}} */
 }
 
-char * strsearch(char* key, char** array, unsigned int size){
+int strsearch(char* key, char** array, unsigned int size){
   while(size--){
     if(!strcmp(array[size],key))
-      return array[size];
+      return size;
   }
-  return NULL;
+  return -1;
 }
 
 int cmpstr(void const *a, void const *b) { 

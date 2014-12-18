@@ -322,6 +322,7 @@ EOF
         hwloc_config_prefix[utils/Makefile]
         hwloc_config_prefix[utils/hwloc/Makefile]
         hwloc_config_prefix[utils/lstopo/Makefile]
+        hwloc_config_prefix[utils/monitor/Makefile]
         hwloc_config_prefix[hwloc.pc]
 
         hwloc_config_prefix[utils/lsmap/Makefile]

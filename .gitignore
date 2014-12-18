@@ -240,3 +240,5 @@ test-suite.log
 /tests/netloc/embedded/main
 /tests/netloc/embedded/make.out
 /tests/netloc/embedded/netloc-tree
+
+/utils/monitor/src/custom_monitors.c
