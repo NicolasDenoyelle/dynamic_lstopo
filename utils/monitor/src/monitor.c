@@ -190,7 +190,7 @@ Monitors_t new_Monitors(unsigned int n_events, char ** event_names, const char *
   /* try to initialize an individual eventset to check counters availability */
   int eventset;
   if(init_eventset(&eventset,n_events,event_names)!=0){
-    return NULL;
+    exit(1);;
   }
   PAPI_destroy_eventset(&eventset);
 
@@ -566,9 +566,6 @@ void print_Monitors_header(Monitors_t m){
     for(j=0;j<22;j++)
       dprintf(m->output_fd,"-");
     dprintf(m->output_fd,"+");
-    for(j=0;j<47;j++)
-      dprintf(m->output_fd,"-");
-    dprintf(m->output_fd,"+");
   }
   dprintf(m->output_fd,"\n");
 
@@ -577,14 +574,6 @@ void print_Monitors_header(Monitors_t m){
     dprintf(m->output_fd,"%20s ",m->event_names[i]);
   for(i=0;i<m->count;i++){
     dprintf(m->output_fd,"%22s ",m->names[i]);
-    dprintf(m->output_fd,"[");
-    for(j=0;j<19;j++)
-      dprintf(m->output_fd," ");
-      dprintf(m->output_fd,"min,");
-    for(j=0;j<19;j++)
-      dprintf(m->output_fd," ");
-      dprintf(m->output_fd,"max");
-      dprintf(m->output_fd,"] ");
   }
   dprintf(m->output_fd,"\n");
 
@@ -596,9 +585,6 @@ void print_Monitors_header(Monitors_t m){
   }
   for(i=0;i<m->count;i++){
     for(j=0;j<22;j++)
-      dprintf(m->output_fd,"-");
-    dprintf(m->output_fd,"+");
-    for(j=0;j<47;j++)
       dprintf(m->output_fd,"-");
     dprintf(m->output_fd,"+");
   }
@@ -847,9 +833,7 @@ Monitors_print(Monitors_t m)
     for(monitor_idx=0;monitor_idx<m->count;monitor_idx++){
       nobj = hwloc_get_nbobjs_by_depth(m->topology,m->depths[monitor_idx]);
       double val = Monitors_get_monitor_value(m,monitor_idx,(l_idx*nobj/m->n_PU)%nobj);
-      double max = Monitors_get_monitor_max(m,monitor_idx);
-      double min = Monitors_get_monitor_min(m,monitor_idx);
-      str+=sprintf(str,"%22lf [%22lf,%22lf] ",val,min,max);
+      str+=sprintf(str,"%22lf",val);
     }
     str+=sprintf(str,"\n");
     write(m->output_fd, string, strlen(string));

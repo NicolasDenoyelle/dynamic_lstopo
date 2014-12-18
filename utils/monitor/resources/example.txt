@@ -1,6 +1,6 @@
-L2d_access_per_dp_flop
+L1d_access_per_dp_flop
 {
 	depth:8 , 
-	PAPI_L2_DCA/PAPI_DP_OPS
+	PAPI_L1_DCM/PAPI_DP_OPS
 } 
 
