@@ -10,16 +10,23 @@
 #include <fcntl.h>
 #include <sched.h>
 #include <math.h>
-#include "parser.h"
 #include "pwatch.h"
+#include "parser.h"
 #include "monitor.h"
 
-
-
 struct monitors{
+  /**
+   * In hwloc topology tree at each monitor depth, every sibling stores a struct node_box in its userdata
+   */
   hwloc_topology_t  topology;
+
+  /**
+   * When -p option is used, the structure holds in a PU array pid childrens task id; 
+   *
+   */
   struct proc_watch *pw;
 
+  
   int               output_fd; 
 
   int               n_events;    
@@ -191,7 +198,7 @@ Monitors_t new_Monitors(unsigned int n_events, char ** event_names, const char *
   m->names=NULL;
   m->depths=NULL;
   m->output_fd=0;
-
+  m->pw=NULL;
   /* set condition for reading counters */
   pthread_mutex_init(&(m->cond_mtx),NULL);
   pthread_mutex_init(&(m->update_mtx),NULL);
@@ -219,8 +226,9 @@ Monitors_t new_Monitors(unsigned int n_events, char ** event_names, const char *
 
   /* count core number */
   int depth = hwloc_topology_get_depth(m->topology);
-  m->n_PU = hwloc_get_nbobjs_by_depth(m->topology, depth-1);  
-  m->pw = new_proc_watch(pid, m->n_PU);
+  m->n_PU = hwloc_get_nbobjs_by_depth(m->topology, depth-1);
+  if(pid!=0)
+    m->pw = new_proc_watch(&(m->topology), pid, m->n_PU);
   m->count=0;
   m->allocated_count=4;
 
@@ -315,7 +323,7 @@ Monitors_thread(void* monitors){
   Monitors_t m = (Monitors_t)monitors;
   pthread_t tid = pthread_self();
   unsigned int i,j;
-  int weight, tidx=-1, eventset=PAPI_NULL, depth=hwloc_topology_get_depth(m->topology)-1;
+  int weight=0, tidx=-1, eventset=PAPI_NULL, depth=hwloc_topology_get_depth(m->topology)-1;
   for(i=0;i<m->n_PU;i++){
     if(m->pthreads[i]==tid){
       tidx=i;
@@ -327,7 +335,9 @@ Monitors_thread(void* monitors){
     fprintf(stderr,"%d failed to init its eventset\n",tidx);
     exit(1);
   }
-
+  
+  if(m->pw==NULL)
+    PAPI_start(eventset);
   /* bind my self to tidx core */
   hwloc_obj_t obj,cpu = hwloc_get_obj_by_depth(m->topology,depth,tidx);
   if(cpu==NULL || cpu->cpuset==NULL){
@@ -338,29 +348,24 @@ Monitors_thread(void* monitors){
   struct node_box * out, * PU_vals = (struct node_box *) cpu->userdata;
 
   while(1){
-    /* A pid is specified */
-    if(m->pw->monitoring_state[tidx]!=STARTED)
-      {
-	if((m->pw->monitoring_state)[tidx]==MUST_START){
-	  //PAPI_write(eventset,PU_vals->counters_val);
-	  PAPI_start(eventset);
-	  (m->pw->monitoring_state)[tidx]=STARTED;
-	}
-	/* the pid isn't currently running or no pid child is running on the same PU as me */
-	else if((m->pw->monitoring_state)[tidx]==STOPPED)
-	  goto next_loop;
-	else if((m->pw->monitoring_state)[tidx]==MUST_STOP){
-	  PAPI_stop(eventset,PU_vals->counters_val);
-	  (m->pw->monitoring_state)[tidx]=STOPPED;
-	  goto next_loop;
-	}
-      }
-    
-    
-    /* gathers counters */
+    /* update time stamp*/
     PU_vals->old_usec=PU_vals->real_usec;
-    PAPI_read(eventset,PU_vals->counters_val);
     PU_vals->real_usec=PAPI_get_real_usec();
+
+    /* A pid is specified */
+    if(m->pw!=NULL){
+      if(proc_watch_check_start_pu(m->pw,tidx))
+	PAPI_start(eventset);
+      else if(proc_watch_check_stop_pu(m->pw,tidx)){
+	PAPI_stop(eventset,PU_vals->counters_val);
+	goto next_loop;
+      }
+      else if(!proc_watch_get_pu_state(m->pw,tidx))
+	goto next_loop;
+    }
+
+    /* gathers counters */
+    PAPI_read(eventset,PU_vals->counters_val);
 
     /* reduce counters for every monitors */
     for(i=0;i<m->count;i++){
@@ -371,12 +376,19 @@ Monitors_thread(void* monitors){
       }
       obj = hwloc_get_ancestor_obj_by_depth(m->topology,m->depths[i],cpu);
       out = (struct node_box *)(obj->userdata);
-      weight = hwloc_bitmap_weight(obj->cpuset);
+
+      if(m->pw!=NULL){
+	hwloc_bitmap_t b = proc_watch_get_watched_pu_in_cpuset(m->pw,obj->cpuset);
+	weight = hwloc_bitmap_weight(proc_watch_get_watched_pu_in_cpuset(m->pw,obj->cpuset));
+	hwloc_bitmap_free(b);
+      }
+      else
+	weight = hwloc_bitmap_weight(obj->cpuset);
+
       pthread_mutex_trylock(&(out->update_lock));
       pthread_mutex_lock(&(out->read_lock));
       /* i am the first to acquire the lock, i reset values */
-      if(out->uptodate==weight){
-    	out->uptodate=0;
+      if(out->uptodate==0){
     	memset(out->counters_val,0.0,sizeof(double)*m->n_events);
 	out->old_usec = out->real_usec;
 	out->real_usec = 0;
@@ -389,6 +401,7 @@ Monitors_thread(void* monitors){
       out->uptodate++;
       /* I am the last to update values, i update monitor value */
       if(out->uptodate==weight){
+    	out->uptodate=0;
 	out->old_val = out->val;
 	out->val = m->compute[i](out->counters_val);
 	if(isinf(m->max[i]) || m->max[i]<out->val) m->max[i]= out->val;
@@ -679,16 +692,14 @@ Monitors_start(Monitors_t m)
  return 0;
 }
 
-
 void
 Monitors_update_counters(Monitors_t m){
-  /* update threads which have to monitor */
-  proc_watch_update(m->pw);
-
   if(m->uptodate==m->n_PU){
     m->uptodate=0;
     pthread_cond_broadcast(&(m->cond));
   }
+  if(m->pw!=NULL)
+    proc_watch_update(m->pw);
 }
 
 inline void
@@ -722,7 +733,7 @@ Monitors_get_monitor_variation(Monitors_t m, unsigned int m_idx, unsigned int si
 }
 
 
-double
+inline double
 Monitors_wait_monitor_value(Monitors_t m, unsigned int m_idx, unsigned int sibling_idx)
 {
   hwloc_obj_t obj = hwloc_get_obj_by_depth(m->topology,m->depths[m_idx],sibling_idx);
@@ -732,7 +743,7 @@ Monitors_wait_monitor_value(Monitors_t m, unsigned int m_idx, unsigned int sibli
   return val;
 }
 
-double
+inline double
 Monitors_wait_monitor_variation(Monitors_t m, unsigned int m_idx, unsigned int sibling_idx)
 {
   hwloc_obj_t obj = hwloc_get_obj_by_depth(m->topology,m->depths[m_idx],sibling_idx);
@@ -749,8 +760,13 @@ Monitors_print(Monitors_t m)
   char string[9+21+(69*m->count)+2+(21*m->n_events)];
   char * str = string;
   unsigned int PU_idx,event_idx,monitor_idx,nobj;
+  const hwloc_bitmap_t PUs = hwloc_topology_get_topology_cpuset(m->topology);
+  if(m->pw!=NULL){
+    proc_watch_get_watched_pu_in_cpuset(m->pw, PUs);
+  }
   hwloc_obj_t obj;
-  for(PU_idx = 0; PU_idx<m->n_PU;PU_idx++){
+
+  hwloc_bitmap_foreach_begin(PU_idx,PUs){
     obj = hwloc_get_obj_by_depth(m->topology, hwloc_topology_get_depth(m->topology)-1,PU_idx);
     str=string;
     str+=sprintf(str,"%8d ",PU_idx);
@@ -768,6 +784,7 @@ Monitors_print(Monitors_t m)
     str+=sprintf(str,"\n");
     write(m->output_fd, string, strlen(string));
   }
+  hwloc_bitmap_foreach_end();
 }
 
 
