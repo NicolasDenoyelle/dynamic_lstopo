@@ -1,35 +1,28 @@
 #ifndef PWATCH_H
 #define PWATCH_H
 
-#include <poll.h>
+/**
+ * methods are thread_safe.
+ */
+
 #include <hwloc.h>
 
-#define MUST_STOP -2
-#define STOPPED   -1
-#define STARTED    1
-#define MUST_START 2
+struct proc_watch;
 
-struct task_info{
-  int wd;
-  int PU;
-  char * name;
-};
-
-struct proc_watch{
-  unsigned int       pid;
-  char             * proc_dir_path;
-  int                proc_wd;
-  struct pollfd      notify_fd;
-  int                nb_tasks ,alloc_tasks, n_PU;
-  struct task_info * tinfo;             /* nb_tasks */
-  int              * monitoring_state;  /* n_PU */
-  int              * n_running;         /* n_PU */
-};
-
-struct proc_watch *  new_proc_watch   (unsigned int pid, unsigned int initial_count);
+struct proc_watch *  new_proc_watch(hwloc_topology_t * topo, unsigned int pid, unsigned int initial_count);
 void                 delete_proc_watch(struct proc_watch * pw);
-int                  proc_watch_update(struct proc_watch * pw);
 
+void                 proc_watch_add_task(struct proc_watch * pw, unsigned int tid);
+void                 proc_watch_add_task_on_pu(struct proc_watch * pw, unsigned int tid, unsigned int logical_PU);
+int                  proc_watch_rm_task(struct proc_watch * pw, unsigned int tid);
+int                  proc_watch_rm_task_on_pu(struct proc_watch * pw, unsigned int tid, unsigned int logical_PU);
 
+void                 proc_watch_update(struct proc_watch * pw);
+void                 proc_watch_update_pu(struct proc_watch * pw, int logical_pu);
+
+int                  proc_watch_check_start_pu(struct proc_watch * pw,unsigned int logical_PU);
+int                  proc_watch_check_stop_pu(struct proc_watch * pw, unsigned int logical_PU);
+int                  proc_watch_get_pu_state(struct proc_watch * pw, unsigned int logical_PU);
+hwloc_bitmap_t       proc_watch_get_watched_pu_in_cpuset(struct proc_watch * pw, hwloc_cpuset_t cpuset);
 
 #endif
