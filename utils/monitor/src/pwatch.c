@@ -13,10 +13,10 @@ struct proc_watch{
   char             * p_dir_path;
   DIR              * p_dir;
   int                n_PU;
-  unsigned int    ** tasks;
-  hwloc_bitmap_t     state;       /* 0 = stopped,   1 = started */
-  hwloc_bitmap_t     query_state; /* 0 = must stop, 1 = must start */
-  pthread_mutex_t  * lock;              /* n_PU */
+  unsigned int    ** tasks;       /* physical n_PU*tasks[n_PU][0] */
+  hwloc_bitmap_t     state;       /* physical */ /* 0 = stopped,   1 = started */
+  hwloc_bitmap_t     query_state; /* physical */ /* 0 = must stop, 1 = must start */
+  pthread_mutex_t  * lock;        /* physical n_PU */
 };
 
 #define EVENT_SIZE  (sizeof(struct inotify_event))
@@ -83,12 +83,51 @@ physical_to_logical(hwloc_topology_t topology, int physical_idx){
   return hwloc_get_pu_obj_by_os_index(topology,physical_idx)->logical_index;
 }
 
+inline int
+logical_to_physical(hwloc_topology_t topology, int logical_idx){
+  return hwloc_bitmap_first(hwloc_get_obj_by_depth(topology,hwloc_topology_get_depth(topology)-1,logical_idx)->cpuset);
+}
+
+int
+proc_watch_check_start_pu(struct proc_watch * pw,unsigned int physical_PU)
+{
+  if(!hwloc_bitmap_isset(pw->state,physical_PU) && hwloc_bitmap_isset(pw->query_state,physical_PU)){
+    hwloc_bitmap_set(pw->state,physical_PU);
+    return 1;
+  }
+  return 0;
+}
+
+int
+proc_watch_check_stop_pu(struct proc_watch * pw, unsigned int physical_PU)
+{
+  if(hwloc_bitmap_isset(pw->state,physical_PU) && !hwloc_bitmap_isset(pw->query_state,physical_PU)){
+    hwloc_bitmap_clr(pw->state,physical_PU);
+    return 1;
+  }
+  return 0;
+}
+
+inline int 
+proc_watch_get_pu_state(struct proc_watch * pw, unsigned int physical_PU)
+{
+  return hwloc_bitmap_isset(pw->state,physical_PU);
+}
+
+inline hwloc_bitmap_t
+proc_watch_get_watched_in_cpuset(struct proc_watch * pw, hwloc_cpuset_t cpuset)
+{
+  hwloc_bitmap_t ret = hwloc_bitmap_dup(cpuset);
+  hwloc_bitmap_and(ret,ret,pw->state);
+  return ret;
+}
+
 void
 proc_watch_add_task(struct proc_watch * pw, unsigned int task)
 {
   char file_name[22+strlen("/proc//task//stat")];
   sprintf(file_name,"/proc/%d/task/%d/stat",pw->pid,task);
-  int pu=physical_to_logical(*(pw->topology),read_task_core(file_name));
+  int pu = read_task_core(file_name);
   if(pu==-1)
     return;
   pthread_mutex_lock(&(pw->lock[pu]));
@@ -102,79 +141,45 @@ proc_watch_add_task(struct proc_watch * pw, unsigned int task)
   pthread_mutex_unlock(&(pw->lock[pu]));
 }
 
-int
-proc_watch_check_start_pu(struct proc_watch * pw,unsigned int logical_PU)
-{
-  if(!hwloc_bitmap_isset(pw->state,logical_PU) && hwloc_bitmap_isset(pw->query_state,logical_PU)){
-    hwloc_bitmap_set(pw->state,logical_PU);
-    return 1;
-  }
-  return 0;
-}
-
-int
-proc_watch_check_stop_pu(struct proc_watch * pw, unsigned int logical_PU)
-{
-  if(hwloc_bitmap_isset(pw->state,logical_PU) && !hwloc_bitmap_isset(pw->query_state,logical_PU)){
-    hwloc_bitmap_clr(pw->state,logical_PU);
-    return 1;
-  }
-  return 0;
-}
-
-inline int 
-proc_watch_get_pu_state(struct proc_watch * pw, unsigned int logical_PU)
-{
-  return hwloc_bitmap_isset(pw->state,logical_PU);
-}
-
-inline hwloc_bitmap_t
-proc_watch_get_watched_pu_in_cpuset(struct proc_watch * pw, hwloc_cpuset_t cpuset)
-{
-  hwloc_bitmap_t ret = hwloc_bitmap_alloc();
-  hwloc_bitmap_and(ret,cpuset,pw->state);
-  return ret;
-}
-
 void
-proc_watch_add_task_on_pu(struct proc_watch * pw, unsigned int task, unsigned int logical_PU)
+proc_watch_add_task_on_pu(struct proc_watch * pw, unsigned int task, unsigned int physical_PU)
 {
-  pthread_mutex_lock(&(pw->lock[logical_PU]));
-  pw->tasks[logical_PU][pw->tasks[logical_PU][0]]=task;
-  hwloc_bitmap_set(pw->query_state,logical_PU);
-  if((++pw->tasks[logical_PU][0])>pw->tasks[logical_PU][1]){
-    pw->tasks[logical_PU][1]*=2;
-    pw->tasks[logical_PU] = realloc(pw->tasks[logical_PU],sizeof(int)*pw->tasks[logical_PU][1]);
+  pthread_mutex_lock(&(pw->lock[physical_PU]));
+  pw->tasks[physical_PU][pw->tasks[physical_PU][0]]=task;
+  hwloc_bitmap_set(pw->query_state,physical_PU);
+  if((++pw->tasks[physical_PU][0])>pw->tasks[physical_PU][1]){
+    pw->tasks[physical_PU][1]*=2;
+    pw->tasks[physical_PU] = realloc(pw->tasks[physical_PU],sizeof(int)*pw->tasks[physical_PU][1]);
   }
-  qsort(&(pw->tasks[logical_PU][2]),pw->tasks[logical_PU][0],sizeof(int),compareuint);
-  pthread_mutex_unlock(&(pw->lock[logical_PU]));
+  qsort(&(pw->tasks[physical_PU][2]),pw->tasks[physical_PU][0],sizeof(int),compareuint);
+  pthread_mutex_unlock(&(pw->lock[physical_PU]));
 }
 
 int
-proc_watch_rm_task_on_pu(struct proc_watch * pw, unsigned int task, unsigned int logical_PU)
+proc_watch_rm_task_on_pu(struct proc_watch * pw, unsigned int task, unsigned int physical_PU)
 {
-  if(pw->tasks[logical_PU][0]<=2)
+  if(pw->tasks[physical_PU][0]<=2)
     return -1;
-  if(pw->tasks[logical_PU][0]==3){
-    if(pw->tasks[logical_PU][2] == task){
-      pthread_mutex_lock(&(pw->lock[logical_PU]));
-      pw->tasks[logical_PU][0]=2;
-      hwloc_bitmap_clr(pw->query_state,logical_PU);
-      pthread_mutex_unlock(&(pw->lock[logical_PU]));
+  if(pw->tasks[physical_PU][0]==3){
+    if(pw->tasks[physical_PU][2] == task){
+      pthread_mutex_lock(&(pw->lock[physical_PU]));
+      pw->tasks[physical_PU][0]=2;
+      hwloc_bitmap_clr(pw->query_state,physical_PU);
+      pthread_mutex_unlock(&(pw->lock[physical_PU]));
       return 2;
     }
     else {
       return -1;
     }
   }
-  unsigned int * t = bsearch(&task,&(pw->tasks[logical_PU][2]),pw->tasks[logical_PU][0],sizeof(int),compareuint);
+  unsigned int * t = bsearch(&task,&(pw->tasks[physical_PU][2]),pw->tasks[physical_PU][0],sizeof(int),compareuint);
   if(t==NULL)
     return -1;
-  unsigned int tidx = (t-pw->tasks[logical_PU])/sizeof(int);
-  pthread_mutex_lock(&(pw->lock[logical_PU]));
-  memcpy(&(pw->tasks[logical_PU][tidx]),&(pw->tasks[logical_PU][tidx+1]),pw->tasks[logical_PU][0]-tidx-1);
-  pw->tasks[logical_PU][0]--;
-  pthread_mutex_unlock(&(pw->lock[logical_PU]));
+  unsigned int tidx = (t-pw->tasks[physical_PU])/sizeof(int);
+  pthread_mutex_lock(&(pw->lock[physical_PU]));
+  memcpy(&(pw->tasks[physical_PU][tidx]),&(pw->tasks[physical_PU][tidx+1]),pw->tasks[physical_PU][0]-tidx-1);
+  pw->tasks[physical_PU][0]--;
+  pthread_mutex_unlock(&(pw->lock[physical_PU]));
   return tidx;
 }
 
@@ -223,7 +228,7 @@ proc_watch_update(struct proc_watch * pw)
 	continue;
       char file_name[11+strlen("/proc//task//stat")+strlen(task_dir->d_name)];
       sprintf(file_name,"/proc/%d/task/%s/stat",pw->pid,task_dir->d_name);
-      pu=physical_to_logical(*(pw->topology),read_task_core(file_name));
+      pu=read_task_core(file_name);
       tasks[pu][tasks[pu][0]]=atoi(task_dir->d_name);
       if((++tasks[pu][0])>tasks[pu][1]){
 	tasks[pu][1]*=2;
@@ -247,26 +252,36 @@ proc_watch_update(struct proc_watch * pw)
   rewinddir(pw->p_dir);
 }
 
+
 void 
-proc_watch_update_pu(struct proc_watch * pw, int logical_pu)
+proc_watch_update_pu(struct proc_watch * pw, int physical_pu)
 {
   unsigned int i,pu;
   hwloc_cpuset_t cpuset=hwloc_bitmap_alloc();
   unsigned int ** tasks = pw->tasks;
-  for(i=2;i<pw->tasks[logical_pu][0];i++){
-    hwloc_linux_get_tid_cpubind(*(pw->topology),tasks[logical_pu][i],cpuset);
-    pu=physical_to_logical(*(pw->topology),hwloc_bitmap_first(cpuset));
-    if(pu!=logical_pu){
-      proc_watch_add_task_on_pu(pw, tasks[logical_pu][i], pu);
-      pthread_mutex_lock(&(pw->lock[logical_pu]));
-      memcpy(&(tasks[logical_pu][i]),&(tasks[logical_pu][i+1]),tasks[logical_pu][0]-i-1);
-      if(--tasks[logical_pu][0]==2)
-	hwloc_bitmap_clr(pw->query_state,logical_pu);
-      pthread_mutex_unlock(&(pw->lock[logical_pu]));
+  for(i=2;i<pw->tasks[physical_pu][0];i++){
+    hwloc_linux_get_tid_cpubind(*(pw->topology),tasks[physical_pu][i],cpuset);
+    pu=hwloc_bitmap_first(cpuset);
+    if(pu!=physical_pu){
+      proc_watch_add_task_on_pu(pw, tasks[physical_pu][i], pu);
+      pthread_mutex_lock(&(pw->lock[physical_pu]));
+      memcpy(&(tasks[physical_pu][i]),&(tasks[physical_pu][i+1]),tasks[physical_pu][0]-i-1);
+      if(--tasks[physical_pu][0]==2)
+	hwloc_bitmap_clr(pw->query_state,physical_pu);
+      pthread_mutex_unlock(&(pw->lock[physical_pu]));
     }
   }
   hwloc_bitmap_free(cpuset);
 }
+
+void 
+proc_watch_update_tasks(struct proc_watch * pw)
+{
+  unsigned int i;
+  for(i=0;i<pw->n_PU;i++)
+    proc_watch_update_pu(pw,i);
+}
+
 
 struct proc_watch *
 new_proc_watch(hwloc_topology_t * topo, unsigned int pid, unsigned int n_tasks)
