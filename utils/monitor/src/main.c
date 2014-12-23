@@ -65,9 +65,9 @@ main(int argc, char** argv)
   if(out) free(out);
   Monitors_start(m);
 
-  i = 3;
+  i = 4;
   if(refresh.tv_usec==0)
-    while(--i)
+    while(i--)
       {
 	Monitors_update_counters(m);
 	Monitors_wait_update(m);
@@ -77,11 +77,12 @@ main(int argc, char** argv)
     while(1){
       Monitors_update_counters(m);
       usleep(refresh.tv_usec);
+      Monitors_wait_update(m);
       Monitors_print(m);
     }
 
   delete_Monitors(m);
-  PAPI_shutdown();
+  hwloc_topology_destroy(topology);
   return 0;
 }
 

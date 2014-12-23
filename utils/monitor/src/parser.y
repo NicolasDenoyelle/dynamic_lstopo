@@ -15,7 +15,7 @@
   unsigned int nb_counters, nb_monitors, topodepth, i;
   char * err;
   char ** event_names, ** monitor_names;
-  int * monitor_depths;
+  unsigned int * monitor_depths;
   
 
 %}
@@ -185,7 +185,7 @@ void print_func(char * name,char* code){
 
 
 
-int parser(const char * file_name) {
+struct parsed_names * parser(const char * file_name) {
   hwloc_topology_t topology;
   /* Allocate and initialize topology object. */
   hwloc_topology_init(&topology);
@@ -207,14 +207,6 @@ int parser(const char * file_name) {
     fprintf (stderr, "%s: Could not create %s\n", file_name,PARSED_CODE_SRC);
     exit(1);
   }
-  fprintf(output,"#include <stdlib.h>\n");
-  fprintf(output,"#include <stdio.h>\n");
-  fprintf(output,"#include <string.h>\n");
-  fprintf(output,"char ** event_names;\n");
-  fprintf(output,"unsigned int n_events;\n");
-  fprintf(output,"unsigned int n_monitors;\n");
-  fprintf(output,"char ** monitor_names;\n");
-  fprintf(output,"int  *  monitor_depths;\n");
   fflush(output);
 
   /* parsing input file and creating functions.c file */
@@ -227,51 +219,34 @@ int parser(const char * file_name) {
     }
     else {
       fprintf (stderr, "Could not open %s\n", file_name);
-      return 1;
+      return NULL;
     }
   }
   else {
     fprintf (stderr, "error: invalid input file name\n");
-    return 1;
+    return NULL;
   }
 
-  /* print into shared lib the initialization and cleanup functions */
-  fprintf(output,"void __attribute__ ((constructor)) monitorlib_init(void){\n");
-  fprintf(output,"\tn_events = %d;\n",nb_counters);
-  fprintf(output,"\tn_monitors = %d;\n",nb_monitors);
-  fprintf(output,"\tevent_names = malloc(sizeof(char*)*%d);\n",nb_counters);
-  fprintf(output,"\tmonitor_names = malloc(sizeof(char*)*%d);\n",nb_monitors);
-  fprintf(output,"\tmonitor_depths = malloc(sizeof(int)*%d);\n",nb_monitors);
-  fprintf(output,"\tif(event_names==NULL || monitor_names ==NULL || monitor_depths==NULL){\n");
-  fprintf(output,"\t\tfprintf(stderr,\"nb_counters:%d\\n\");\n",nb_counters);
-  fprintf(output,"\t\tfprintf(stderr,\"nb_monitors:%d\\n\");\n",nb_monitors);
-  fprintf(output,"\t\tfprintf(stderr,\"malloc error\\n\");\n");
-  fprintf(output,"\t\texit(EXIT_FAILURE);\n");
-  fprintf(output,"\t}\n");
-  for(i=0;i<nb_counters;i++){
-    fprintf(output,"\tevent_names[%d]=strdup(\"%s\");\n",i, event_names[i]);
+  struct parsed_names * pn = malloc(sizeof(*pn));
+  if(pn==NULL){
+    perror("malloc");
+    exit(1);
   }
-  for(i=0;i<nb_monitors;i++){
-    fprintf(output,"\tmonitor_names[%d]=strdup(\"%s\");\n",i, monitor_names[i]);
-  }
-  for(i=0;i<nb_monitors;i++){
-    fprintf(output,"\tmonitor_depths[%d]=%d;\n",i, monitor_depths[i]);
-  }
-  fprintf(output,"}\n\n");
+  pn->n_events = nb_counters;
+  pn->n_monitors = nb_monitors;
+  pn->monitor_names = monitor_names;
+  pn->event_names = event_names;
+  pn->depths = monitor_depths;
 
-  /* a bit of cleanup */
-  free(event_names);
-  free(monitor_names);
-  free(monitor_depths);
   fclose(output);
 
   /* create shared library with monitors.c */
   char command[1024]; command[0]='\0'; 
-  sprintf(command,"gcc -shared -fpic %s -o %s",PARSED_CODE_SRC,PARSED_CODE_LIB);
+  sprintf(command,"gcc -shared -fpic -rdynamic %s -o %s",PARSED_CODE_SRC,PARSED_CODE_LIB);
   system(command);
 
   hwloc_topology_destroy(topology);
-  return 0;
+  return pn;
 }
 
 /**

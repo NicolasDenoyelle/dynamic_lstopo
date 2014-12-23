@@ -334,12 +334,14 @@ delete_proc_watch(struct proc_watch * pw){
   unsigned int i;
   for(i=0;i<pw->n_PU;i++){
     pthread_mutex_destroy(&(pw->lock[i]));
-    free(pw->tasks[i]);
+    if(pw->tasks!=NULL)
+      free(pw->tasks[i]);
   }
   hwloc_bitmap_free(pw->state);
   hwloc_bitmap_free(pw->query_state);
   free(pw->lock);
-  free(pw->tasks);
+  if(pw->tasks!=NULL)
+    free(pw->tasks);
   free(pw->p_dir_path);
   closedir(pw->p_dir);
   free(pw);

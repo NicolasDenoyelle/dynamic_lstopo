@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <assert.h>
 #include <papi.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,7 +26,6 @@ struct monitors{
    */
   struct proc_watch *pw;
 
-  
   int               output_fd; 
 
   int               n_events;    
@@ -33,9 +33,11 @@ struct monitors{
 
   unsigned int      n_PU;
   pthread_t       * pthreads;          /* nb_PU */
+  pthread_barrier_t barrier;
+
   pthread_cond_t    cond;
   pthread_mutex_t   cond_mtx;
-  pthread_mutex_t   update_mtx;
+
   unsigned int      uptodate;
 
   unsigned int      count;             /* nb_monitors */
@@ -64,21 +66,34 @@ struct node_box{
     return NULL;					\
   }							
 
+
+inline void zerof(double * array, unsigned int size){
+  unsigned int i = size;
+  for(i=0;i<size;i++) array[i]=0;
+}
+
+inline void zerod(long long * array, unsigned int size){
+  unsigned int i = size;
+  for(i=0;i<size;i++) array[i]=0;
+}
+
 struct node_box *
 new_counters_output(unsigned int n_events)
 {
-  struct node_box * out = malloc(sizeof(struct node_box));
+  struct node_box * out = malloc(sizeof(*out));
   if(out==NULL){
     perror("malloc failed\n");
     return NULL;
   }
-  M_alloc(out,free,out->counters_val,n_events,sizeof(double));
-  memset(out->counters_val,0.0,n_events*sizeof(double));
+  out->counters_val = calloc(n_events,sizeof(long long));
+  zerod(out->counters_val,n_events);
   pthread_mutex_init(&(out->read_lock),NULL);
   pthread_mutex_init(&(out->update_lock),NULL);
   out->real_usec=0;
   out->old_usec=0;
   out->uptodate=0;
+  out->val=0;
+  out->old_val=0;
   return out;
 }
 
@@ -175,7 +190,8 @@ Monitors_t new_Monitors(hwloc_topology_t topology,
 			char ** event_names, 
 			const char * output, 
 			unsigned int pid){
-  if(event_names==NULL){
+  assert(hwloc_get_api_version()==HWLOC_API_VERSION);
+  if(event_names==NULL || topology==NULL){
     return NULL;
   }
   unsigned int i; int err;
@@ -187,13 +203,18 @@ Monitors_t new_Monitors(hwloc_topology_t topology,
       fprintf(stderr,"PAPI library version mismatch!\en");
       exit(1); 
     }
+    if(PAPI_is_initialized()!=PAPI_LOW_LEVEL_INITED){
+      fprintf(stderr,"PAPI library init failed!\n");
+      exit(1);
+    }
+    PAPI_thread_init(pthread_self);
     PAPI_multiplex_init();
   }
 
   /* try to initialize an individual eventset to check counters availability */
   int eventset;
   if(init_eventset(&eventset,n_events,event_names)!=0){
-    exit(1);;
+    return NULL;
   }
   PAPI_destroy_eventset(&eventset);
 
@@ -213,13 +234,8 @@ Monitors_t new_Monitors(hwloc_topology_t topology,
   m->depths=NULL;
   m->output_fd=0;
   m->pw=NULL;
-  /* set condition for reading counters */
-  pthread_mutex_init(&(m->cond_mtx),NULL);
-  pthread_mutex_init(&(m->update_mtx),NULL);
-  if((err=pthread_cond_init(&(m->cond),NULL))!=0){
-    fprintf(stderr,"failed to initialize mutex\n");
-    return NULL;
-  }
+  m->topology = topology;
+
   /* Initialize output */
   if(output==NULL)
     m->output_fd=1;
@@ -232,12 +248,17 @@ Monitors_t new_Monitors(hwloc_topology_t topology,
     }
   }
 
-  /* Initialize topology */
-  m->topology = topology;
+  /* set condition for reading counters */
+  pthread_mutex_init(&m->cond_mtx,NULL);
+  if((err=pthread_cond_init(&(m->cond),NULL))!=0){
+    fprintf(stderr,"failed to initialize mutex\n");
+    return NULL;
+  }
 
   /* count core number */
   int depth = hwloc_topology_get_depth(m->topology);
   m->n_PU = hwloc_get_nbobjs_by_depth(m->topology, depth-1);
+  pthread_barrier_init(&m->barrier,NULL,m->n_PU);
   if(pid!=0)
     m->pw = new_proc_watch(m->topology, pid, m->n_PU);
   m->count=0;
@@ -250,10 +271,9 @@ Monitors_t new_Monitors(hwloc_topology_t topology,
   M_alloc(m,delete_Monitors,m->compute,m->allocated_count,sizeof(double (*)(long long*)));
   M_alloc(m,delete_Monitors,m->names,m->allocated_count,sizeof(char *));
   M_alloc(m,delete_Monitors,m->event_names,n_events,sizeof(char*));
-  M_alloc(m,delete_Monitors,m->event_names,n_events,sizeof(char*));
 
-  memset(m->max,0.0,m->allocated_count*sizeof(double));
-  memset(m->min,0.0,m->allocated_count*sizeof(double));
+  zerof(m->max,m->allocated_count);
+  zerof(m->min,m->allocated_count);
 
   hwloc_obj_t PU;
   for(i=0;i<m->n_PU;i++){
@@ -298,8 +318,8 @@ int add_Monitor(Monitors_t m, const char * name, unsigned int depth, double (*fu
       return 1;
     if((m->max=realloc(m->max, sizeof(double)*m->allocated_count))==NULL)
       return 1;
-    memset(&(m->max[m->count]),0.0,(m->allocated_count-m->count)*sizeof(double));
-    memset(&(m->min[m->count]),0.0,(m->allocated_count-m->count)*sizeof(double));
+    zerof(&(m->max[m->count]),m->allocated_count-m->count);
+    zerof(&(m->min[m->count]),m->allocated_count-m->count);
   }
   int i;
   for(i=0;i<m->count;i++){
@@ -308,19 +328,21 @@ int add_Monitor(Monitors_t m, const char * name, unsigned int depth, double (*fu
       return 1;
     }
   }
-  hwloc_obj_t PU;
+
+  hwloc_obj_t node;
   int n_obj=hwloc_get_nbobjs_by_depth(m->topology,depth);
   if(n_obj==0){
     fprintf(stderr,"No object in topology at depth %d\n",depth);
     return 1;
   }
-  while(n_obj--){
-    PU=hwloc_get_obj_by_depth(m->topology,depth,n_obj);
-    PU->userdata = new_counters_output(m->n_events);
-    if(PU->userdata==NULL)
-      return 1;
+
+  if(depth!=hwloc_topology_get_depth(m->topology)-1){
+    while(n_obj--){
+      node=hwloc_get_obj_by_depth(m->topology,depth,n_obj);
+      node->userdata = new_counters_output(m->n_events);
+    }
   }
-  
+
   m->names[m->count] = strdup(name);
   m->depths[m->count] = depth;
   m->compute[m->count] = fun;
@@ -328,106 +350,12 @@ int add_Monitor(Monitors_t m, const char * name, unsigned int depth, double (*fu
   return 0;
 }
 
-void* Monitors_thread_with_pid(void* monitors){
-  if(monitors==NULL)
-    pthread_exit(NULL);
-  Monitors_t m = (Monitors_t)monitors;
-  pthread_t tid = pthread_self();
-  unsigned int i,j;
-  int weight=0, l_tidx=-1, p_tidx=-1, eventset=PAPI_NULL, depth=hwloc_topology_get_depth(m->topology)-1;
-  for(i=0;i<m->n_PU;i++){
-    if(m->pthreads[i]==tid){
-      l_tidx=i;
-      break;
-    }
-  }
-  /* bind my self to tidx core */
-  hwloc_obj_t obj,cpu = hwloc_get_obj_by_depth(m->topology,depth,l_tidx);
-  struct node_box * out, * PU_vals = (struct node_box *) cpu->userdata;
-  p_tidx=hwloc_bitmap_first(cpu->cpuset);
-  if(cpu==NULL || cpu->cpuset==NULL){
-    fprintf(stderr,"obj[%d] at depth %d is null\n",l_tidx,depth);
-    exit(1);
-  }
-  hwloc_set_cpubind(m->topology, cpu->cpuset, HWLOC_CPUBIND_STRICT|HWLOC_CPUBIND_PROCESS|HWLOC_CPUBIND_NOMEMBIND);
-
-  if(init_eventset(&eventset,m->n_events,m->event_names)!=0){
-    fprintf(stderr,"%d failed to init its eventset\n",l_tidx);
-    exit(1);
-  }
-
-  while(1){
-    /* update time stamp*/
-    PU_vals->old_usec=PU_vals->real_usec;
-    PU_vals->real_usec=PAPI_get_real_usec();
-
-    /* A pid is specified */
-    if(proc_watch_check_start_pu(m->pw,p_tidx))
-      PAPI_start(eventset);
-    else if(proc_watch_check_stop_pu(m->pw,p_tidx)){
-      PAPI_stop(eventset,PU_vals->counters_val);
-      goto next_loop;
-    }
-    else if(!proc_watch_get_pu_state(m->pw,p_tidx))
-      goto next_loop;
-
-    /* gathers counters */
-    PAPI_read(eventset,PU_vals->counters_val);
-
-    /* reduce counters for every monitors */
-    for(i=0;i<m->count;i++){
-      if(m->depths[i]==(depth)){
-	PU_vals->old_val = PU_vals->val;
-	PU_vals->val = m->compute[i](PU_vals->counters_val);
-	if(isinf(m->max[i]) || m->max[i]<PU_vals->val) m->max[i]= PU_vals->val;
-	if(isinf(m->min[i]) || m->min[i]>PU_vals->val) m->min[i]= PU_vals->val;
-    	continue;
-      }
-      obj = hwloc_get_ancestor_obj_by_depth(m->topology,m->depths[i],cpu);
-      out = (struct node_box *)(obj->userdata);
-      
-      hwloc_bitmap_t b = proc_watch_get_watched_in_cpuset(m->pw,obj->cpuset);
-      weight = hwloc_bitmap_weight(b);
-      hwloc_bitmap_free(b);
-
-      pthread_mutex_trylock(&(out->update_lock));
-      pthread_mutex_lock(&(out->read_lock));
-      /* i am the first to acquire the lock, i reset values */
-      if(out->uptodate==0){
-    	memset(out->counters_val,0.0,sizeof(double)*m->n_events);
-	out->old_usec = out->real_usec;
-	out->real_usec = 0;
-      }
-      /* accumulate values */
-      for(j=0;j<m->n_events;j++)
-	out->counters_val[j]+=PU_vals->counters_val[j];
-
-      out->real_usec += ((struct node_box *)(cpu->userdata))->real_usec;
-      out->uptodate++;
-
-      /* I am the last to update values, i update monitor value */
-      if(out->uptodate>=weight){
-    	out->uptodate=0;
-	out->old_val = out->val;
-	out->val = m->compute[i](out->counters_val);
-	if(isinf(m->max[i]) || m->max[i]<out->val) m->max[i]= out->val;
-	if(isinf(m->min[i]) || m->min[i]>out->val) m->min[i]= out->val;
-	out->real_usec/=weight;
-    	pthread_mutex_unlock(&(out->update_lock));
-      }
-      pthread_mutex_unlock(&(out->read_lock));
-    }
-
-  next_loop:;
-    /* signal we achieved our update */
-    m->uptodate++;
-    pthread_cond_wait(&(m->cond),&(m->cond_mtx));
-  }
-  return NULL;
+void Monitors_thread_stop(void * eventset){
+  if( eventset==NULL) return;
+  PAPI_destroy_eventset((int*)eventset);
 }
 
-void*
-Monitors_thread(void* monitors){
+void * Monitors_thread(void* monitors){
   if(monitors==NULL)
     pthread_exit(NULL);
   Monitors_t m = (Monitors_t)monitors;
@@ -448,20 +376,41 @@ Monitors_thread(void* monitors){
   }
   hwloc_set_cpubind(m->topology, cpu->cpuset, HWLOC_CPUBIND_STRICT|HWLOC_CPUBIND_PROCESS|HWLOC_CPUBIND_NOMEMBIND);
 
+  int p_tidx = hwloc_bitmap_first(cpu->cpuset);
   if(init_eventset(&eventset,m->n_events,m->event_names)!=0){
     fprintf(stderr,"%d failed to init its eventset\n",tidx);
     exit(1);
   }
+
+  pthread_cleanup_push(Monitors_thread_stop,&eventset);
+  pthread_setcancelstate(PTHREAD_CANCEL_ENABLE,NULL);
   
   PAPI_start(eventset);
 
   struct node_box * out, * PU_vals = (struct node_box *) cpu->userdata;
 
-  while(1){
+  pthread_barrier_wait(&(m->barrier));
+
+  for(;;){
+    pthread_mutex_lock(&m->cond_mtx);
+    m->uptodate=1;
+    pthread_cond_wait(&(m->cond),&m->cond_mtx);
+    pthread_mutex_unlock(&m->cond_mtx);
     /* update time stamp*/
     PU_vals->old_usec=PU_vals->real_usec;
     PU_vals->real_usec=PAPI_get_real_usec();
     /* gathers counters */
+    if(m->pw!=NULL){
+      /* A pid is specified */
+      if(proc_watch_check_start_pu(m->pw,p_tidx))
+	PAPI_start(eventset);
+      else if(proc_watch_check_stop_pu(m->pw,p_tidx)){
+	PAPI_stop(eventset,PU_vals->counters_val);
+	goto next_loop;
+      }
+      else if(!proc_watch_get_pu_state(m->pw,p_tidx))
+	goto next_loop;
+    }
     PAPI_read(eventset,PU_vals->counters_val);
 
     /* reduce counters for every monitors */
@@ -471,17 +420,22 @@ Monitors_thread(void* monitors){
 	PU_vals->val = m->compute[i](PU_vals->counters_val);
 	if(isinf(m->max[i]) || m->max[i]<PU_vals->val) m->max[i]= PU_vals->val;
 	if(isinf(m->min[i]) || m->min[i]>PU_vals->val) m->min[i]= PU_vals->val;
-    	continue;
+	continue;
       }
       obj = hwloc_get_ancestor_obj_by_depth(m->topology,m->depths[i],cpu);
       out = (struct node_box *)(obj->userdata);
-      weight = hwloc_bitmap_weight(obj->cpuset);
+      
+      if(m->pw!=NULL){
+	hwloc_bitmap_t b = proc_watch_get_watched_in_cpuset(m->pw,obj->cpuset);
+	weight = hwloc_bitmap_weight(b);
+	hwloc_bitmap_free(b);
+      } else weight = hwloc_bitmap_weight(obj->cpuset);
 
       pthread_mutex_trylock(&(out->update_lock));
       pthread_mutex_lock(&(out->read_lock));
       /* i am the first to acquire the lock, i reset values */
       if(out->uptodate==0){
-    	memset(out->counters_val,0.0,sizeof(double)*m->n_events);
+	zerod(out->counters_val,m->n_events);
 	out->old_usec = out->real_usec;
 	out->real_usec = 0;
       }
@@ -493,21 +447,21 @@ Monitors_thread(void* monitors){
       out->uptodate++;
       /* I am the last to update values, i update monitor value */
       if(out->uptodate==weight){
-    	out->uptodate=0;
+	out->uptodate=0;
 	out->old_val = out->val;
 	out->val = m->compute[i](out->counters_val);
 	if(isinf(m->max[i]) || m->max[i]<out->val) m->max[i]= out->val;
 	if(isinf(m->min[i]) || m->min[i]>out->val) m->min[i]= out->val;
 	out->real_usec/=weight;
-    	pthread_mutex_unlock(&(out->update_lock));
+	pthread_mutex_unlock(&(out->update_lock));
       }
       pthread_mutex_unlock(&(out->read_lock));
     }
     /* signal we achieved our update */
-    m->uptodate++;
-    pthread_cond_wait(&(m->cond),&(m->cond_mtx));
+  next_loop:;
+    pthread_barrier_wait(&(m->barrier));
   }
-  return NULL;
+  pthread_cleanup_pop(0);
 }
 
 int
@@ -625,10 +579,9 @@ load_Monitors(hwloc_topology_t topology, const char * perf_group_file, const cha
     fprintf(stderr,"perf group file:%s cannot be accessed;_n",perf_group_file);
     return NULL;
   }
-  /* create the dynamic library if it does not exists */
-  if(!chk_monitors_lib(perf_group_file)){
-    parser(perf_group_file);
-  }
+
+  struct parsed_names * pn;
+  pn = parser(perf_group_file);
 
   /* get current working dir */
   char cwd[1024];
@@ -639,55 +592,38 @@ load_Monitors(hwloc_topology_t topology, const char * perf_group_file, const cha
   char * lib = malloc(strlen(PARSED_CODE_LIB)+strlen(cwd)+2);
   lib[0]='\0';
   strcat(strcat(strcat(lib,cwd),"/"),PARSED_CODE_LIB);
+
   /* load shared libraries */
   dlerror();
-  void * dlhandle = dlopen(lib,RTLD_NOW | RTLD_GLOBAL);
-  free(lib);
+  void * dlhandle = dlopen(lib,RTLD_NOW);
   if(dlhandle==NULL){
     fprintf(stderr,"loading error:%s\n",dlerror());
     return NULL;
   }  
-  char** event_names    = *(char***)dlsym(dlhandle,"event_names"   );
-  if(event_names==NULL){
-    fprintf(stderr,"could not load event_names: %s\n",dlerror());
-    return NULL;
-  }
-  unsigned int * n_events = (unsigned int *)dlsym(dlhandle,"n_events");
-  if(n_events==NULL){
-    fprintf(stderr,"could not load n_events: %s\n",dlerror());
-    return NULL;
-  }
+  dlerror();
 
-  unsigned int * n_monitors = (unsigned int *)dlsym(dlhandle,"n_monitors");
-  if(n_monitors==NULL){
-    fprintf(stderr,"could not load n_monitors: %s\n",dlerror());
-    return NULL;
-  }
-
-  Monitors_t m = new_Monitors(topology, *n_events,event_names,output,pid);
-
-  char** monitor_names  = *(char***)dlsym(dlhandle,"monitor_names" );
-  if(monitor_names==NULL){
-    fprintf(stderr,"could not load monitor_names: %s\n",dlerror());
-    return NULL;
-  }
-
-  int *  monitor_depths = *(int**)  dlsym(dlhandle,"monitor_depths");
-  if(monitor_depths==NULL){
-    fprintf(stderr,"could not load monitor_depths: %s\n",dlerror());
-    return NULL;
-  }
+  Monitors_t m = new_Monitors(topology, pn->n_events,pn->event_names,output,pid);
+  free(lib);
 
   unsigned int i;
-  for(i=0;i<*n_monitors;i++){
-    double (*fun)(long long*) = (double (*)(long long*))dlsym(dlhandle,monitor_names[i]);
+  for(i=0;i<pn->n_events;i++)
+    free(pn->event_names[i]);
+  
+  for(i=0;i<pn->n_monitors;i++){
+    double (*fun)(long long*) = dlsym(dlhandle,(pn->monitor_names)[i]);
     if(fun==NULL){
-      fprintf(stderr,"could not load monitor function %s : %s\n",monitor_names[i],dlerror());
-      add_Monitor(m,monitor_names[i],monitor_depths[i],no_fun);
+      fprintf(stderr,"could not load monitor function %s : %s\n",(pn->monitor_names)[i],dlerror());
+      add_Monitor(m,(pn->monitor_names)[i],(pn->depths)[i],no_fun);
     }
     else
-      add_Monitor(m,monitor_names[i],monitor_depths[i],fun);
+      add_Monitor(m,(pn->monitor_names)[i],(pn->depths)[i],*fun);
+    free(pn->monitor_names[i]);
   }
+  
+  free(pn->monitor_names);
+  free(pn->event_names);
+  free(pn->depths);
+  free(pn);
   return m;
 }
 
@@ -700,19 +636,32 @@ delete_Monitors(Monitors_t m)
   hwloc_obj_t PU;
   int n_obj;
 
-  for(i=0;i<m->n_PU;i++){
+  for(i=0;i<m->n_PU;i++)
     pthread_cancel(m->pthreads[i]);
-  }
+
+  /** BLOCK ON JOIN even when every thread is waiting on cond_wait ! **/
+  /* for(i=0;i<m->n_PU;i++){ */
+  /*   pthread_join(m->pthreads[i],NULL); */
+  /* } */
+
   pthread_cond_destroy(&(m->cond));
   pthread_mutex_destroy(&(m->cond_mtx));
-  pthread_mutex_destroy(&(m->update_mtx));
+  pthread_barrier_destroy(&(m->barrier));
   free(m->pthreads);
+
+  for(i=0;i<m->n_PU;i++){
+    PU=hwloc_get_obj_by_depth(m->topology,hwloc_topology_get_depth(m->topology)-1,i);
+    delete_counters_output((struct node_box *)PU->userdata);
+  }
+  
   for(i=0;i<m->count;i++){
     free(m->names[i]);
-    n_obj=hwloc_get_nbobjs_by_depth(m->topology,m->depths[i]);
-    while(n_obj--){
-      PU=hwloc_get_obj_by_depth(m->topology,m->depths[i],n_obj);
-      delete_counters_output((struct node_box *)PU->userdata);
+    if(m->depths[i]!=hwloc_topology_get_depth(m->topology)-1){
+      n_obj=hwloc_get_nbobjs_by_depth(m->topology,m->depths[i]);
+      while(n_obj--){
+	PU=hwloc_get_obj_by_depth(m->topology,m->depths[i],n_obj);
+	delete_counters_output((struct node_box *)PU->userdata);
+      }
     }
   }
 
@@ -736,31 +685,29 @@ Monitors_start(Monitors_t m)
  print_Monitors_header(m);
  unsigned int i; int err;
  for(i=0;i<m->n_PU;i++){
-   if(m->pw!=NULL)
-     err=pthread_create(&(m->pthreads[i]),NULL,Monitors_thread_with_pid,(void*)m);
-   else
-     err=pthread_create(&(m->pthreads[i]),NULL,Monitors_thread,(void*)m);
+   err=pthread_create(&(m->pthreads[i]),NULL,Monitors_thread,(void*)m);
    if(err!=0){
      fprintf(stderr,"pthread create failed with err: %d\n",err);
-     return 1;
+     exit(1);
    }
  }
+ Monitors_wait_update(m);
  return 0;
 }
 
 void
 Monitors_update_counters(Monitors_t m){
-  if(m->uptodate==m->n_PU){
-    m->uptodate=0;
-    pthread_cond_broadcast(&(m->cond));
-  }
+  pthread_mutex_lock(&m->cond_mtx);
+  m->uptodate=0;
+  pthread_cond_broadcast(&(m->cond));
+  pthread_mutex_unlock(&m->cond_mtx);
   if(m->pw!=NULL)
     proc_watch_update(m->pw);
 }
 
 inline void
 Monitors_wait_update(Monitors_t m){
-  while(m->uptodate<m->n_PU) sched_yield();
+  while(!m->uptodate) sched_yield();
 }
 
 inline long long
@@ -813,34 +760,64 @@ Monitors_wait_monitor_variation(Monitors_t m, unsigned int m_idx, unsigned int s
 void 
 Monitors_print(Monitors_t m)
 {
-  char string[9+21+(69*m->count)+2+(21*m->n_events)];
-  char * str = string;
-  unsigned int p_idx,l_idx,event_idx,monitor_idx,nobj;
+  double val;
+  unsigned int p_idx,l_idx,i,nobj, depth = hwloc_topology_get_depth(m->topology)-1;
   hwloc_bitmap_t cpuset = (hwloc_bitmap_t)hwloc_topology_get_topology_cpuset(m->topology);
+  hwloc_obj_t obj;
+
   if(m->pw!=NULL)
     cpuset = proc_watch_get_watched_in_cpuset(m->pw, cpuset);
-  hwloc_obj_t obj;
 
   hwloc_bitmap_foreach_begin(p_idx,cpuset){
     l_idx=physical_to_logical(m->topology,p_idx);
-    obj = hwloc_get_obj_by_depth(m->topology, hwloc_topology_get_depth(m->topology)-1,l_idx);
-    str=string;
-    str+=sprintf(str,"%8d ",l_idx);
-    str+=sprintf(str,"%20lld ",((struct node_box *)(obj->userdata))->real_usec);
-    for(event_idx=0;event_idx<m->n_events;event_idx++){
-      str+=sprintf(str,"%20lld "  ,Monitors_get_counter_value(m,event_idx,l_idx));
+    obj = hwloc_get_obj_by_depth(m->topology, depth,l_idx);
+    dprintf(m->output_fd,"%8d ",l_idx);
+    dprintf(m->output_fd,"%20lld ",((struct node_box *)(obj->userdata))->real_usec);
+    for(i=0;i<m->n_events;i++){
+      dprintf(m->output_fd,"%20lld "  ,Monitors_get_counter_value(m,i,l_idx));
     }
-    for(monitor_idx=0;monitor_idx<m->count;monitor_idx++){
-      nobj = hwloc_get_nbobjs_by_depth(m->topology,m->depths[monitor_idx]);
-      double val = Monitors_get_monitor_value(m,monitor_idx,(l_idx*nobj/m->n_PU)%nobj);
-      str+=sprintf(str,"%22lf",val);
+    for(i=0;i<m->count;i++){
+      nobj = hwloc_get_nbobjs_by_depth(m->topology,m->depths[i]);
+      val = Monitors_get_monitor_value(m,i,(l_idx*nobj/m->n_PU)%nobj);
+      dprintf(m->output_fd,"%22lf",val); 
     }
-    str+=sprintf(str,"\n");
-    write(m->output_fd, string, strlen(string));
+    dprintf(m->output_fd,"\n");
   }
   hwloc_bitmap_foreach_end();
+  
   if(m->pw!=NULL)
     hwloc_bitmap_free(cpuset);
+}
+
+
+void Monitors_insert_print_in_topology(Monitors_t m){
+  char string_counter[2*24*m->count];
+  int monitor_idx, nobj;
+  hwloc_obj_t obj;
+  for(monitor_idx=0;monitor_idx<m->count;monitor_idx++){
+    nobj = hwloc_get_nbobjs_by_depth(m->topology,m->depths[monitor_idx]);
+    while(nobj--){
+      obj = hwloc_get_obj_by_depth(m->topology, m->depths[monitor_idx], nobj);
+      double val = Monitors_get_monitor_value(m,monitor_idx,nobj);
+      sprintf(string_counter,"%ss: %22lf",m->names[monitor_idx],val);
+      if(!hwloc_topology_insert_misc_object_by_parent(m->topology, obj, string_counter)){
+	fprintf(stderr, "Failed to insert counter %s\n", m->names[monitor_idx]);
+      }
+    }
+  }      
+}
+
+void Monitors_print_in_topology(Monitors_t m){
+  int monitor_idx, nobj;
+  hwloc_obj_t obj;
+  for(monitor_idx=0;monitor_idx<m->count;monitor_idx++){
+    nobj = hwloc_get_nbobjs_by_depth(m->topology,m->depths[monitor_idx]);
+    while(nobj--){
+      obj = hwloc_get_obj_by_depth(m->topology, m->depths[monitor_idx], nobj)->children[1];
+      double val = Monitors_get_monitor_value(m,monitor_idx,nobj);
+      sprintf(&(obj->name[0]),"%ss: %22lf",m->names[monitor_idx],val);
+    }
+  }      
 }
 
 

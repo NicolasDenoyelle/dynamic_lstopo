@@ -369,7 +369,7 @@ parse_output_format(const char *name, char *callname)
 }
 
 
-void output(int output_format){
+void output(hwloc_topology_t topology, const char * filename, int verbose_mode, char* callname, int output_format){
   switch (output_format) {
   case LSTOPO_OUTPUT_DEFAULT:
 #ifdef LSTOPO_HAVE_GRAPHICS
@@ -769,22 +769,28 @@ main (int argc, char *argv[])
   }
 
   if(perf){
-    Monitors_t m;
+    Monitors_t m=NULL;
     if(perf_input!=NULL)
-      m = load_Monitors(perf_input,perf_output,lstopo_pid_number);
+      m = load_Monitors(topology,perf_input,perf_output,lstopo_pid);
     else
-      m = new_default_Monitors_Monitors(perf_output,lstopo_pid_number);
-
+      m = new_default_Monitors(topology,perf_output,lstopo_pid);
+    if(!m)
+      goto exit;
     Monitors_start(m);
-    while(1){
+    Monitors_insert_print_in_topology(m);
+    for(;;){
       Monitors_update_counters(m);
       Monitors_wait_update(m);
-      output(output_format);
-      usleep(refresh.tv_usec);
+      Monitors_print_in_topology(m);
+      //Monitors_print(m);
+      output(topology, filename, verbose_mode, callname, output_format);
+      usleep(refresh_usec);
     }
+    delete_Monitors(m);
   }
 
-  output(output_format);
+  output(topology, filename, verbose_mode, callname, output_format);
+ exit:;
   hwloc_topology_destroy (topology);
 
   for(i=0; i<lstopo_append_legends_nr; i++)

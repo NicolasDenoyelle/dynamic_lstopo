@@ -5,7 +5,7 @@
  * methods are thread_safe.
  */
 
-#include <hwloc.h>
+#include "hwloc.h"
 
 
 struct proc_watch;

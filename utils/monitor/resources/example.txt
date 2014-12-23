@@ -1,6 +1,6 @@
 L1d_access_per_dp_flop
 {
-	depth:8 , 
+	depth:5 , 
 	PAPI_L1_DCM/PAPI_DP_OPS
 } 
 
