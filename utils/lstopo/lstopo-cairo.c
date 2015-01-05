@@ -9,6 +9,7 @@
 #include <private/autogen/config.h>
 
 #include <cairo.h>
+#include <sys/time.h>
 
 #if CAIRO_HAS_PDF_SURFACE
 #include <cairo-pdf.h>
@@ -45,6 +46,7 @@
 #include <limits.h>
 
 #include "lstopo.h"
+#include "monitor.h"
 
 #if (CAIRO_HAS_XLIB_SURFACE + CAIRO_HAS_PNG_FUNCTIONS + CAIRO_HAS_PDF_SURFACE + CAIRO_HAS_PS_SURFACE + CAIRO_HAS_SVG_SURFACE)
 /* Cairo methods */
@@ -247,127 +249,161 @@ move_x11(struct display *disp, int logical, int legend, hwloc_topology_t topolog
   }
 }
 
-void
-output_x11(hwloc_topology_t topology, const char *filename __hwloc_attribute_unused, int overwrite __hwloc_attribute_unused, int logical, int legend, int verbose_mode __hwloc_attribute_unused)
-{
-  struct display *disp = output_draw_start(&x11_draw_methods, logical, legend, topology, NULL);
-  int finish = 0;
+int handle_xDisplay(struct display *disp, hwloc_topology_t topology, int logical, int legend){
+  XEvent e;
+  int finish=0;
   int state = 0;
   int x = 0, y = 0; /* shut warning down */
   int lastx = disp->x, lasty = disp->y;
 
-  topo_cairo_paint(&x11_draw_methods, logical, legend, topology, disp->cs);
-
-  while (!finish) {
-    XEvent e;
-    if (!XEventsQueued(disp->dpy, QueuedAfterFlush)) {
-      /* No pending event, flush moving windows before waiting for next event */
-      if (disp->x != lastx || disp->y != lasty) {
-	XMoveWindow(disp->dpy, disp->win, -disp->x, -disp->y);
-	lastx = disp->x;
-	lasty = disp->y;
-      }
-    }
-    XNextEvent(disp->dpy, &e);
-    switch (e.type) {
-      case Expose:
-	if (e.xexpose.count < 1)
-	  topo_cairo_paint(&x11_draw_methods, logical, legend, topology, disp->cs);
-	break;
-      case MotionNotify:
-	if (state) {
-	  disp->x -= e.xmotion.x_root - x;
-	  disp->y -= e.xmotion.y_root - y;
-	  x = e.xmotion.x_root;
-	  y = e.xmotion.y_root;
-          move_x11(disp, logical, legend, topology);
-	}
-	break;
-      case ConfigureNotify:
-	disp->screen_width = e.xconfigure.width;
-	disp->screen_height = e.xconfigure.height;
-        move_x11(disp, logical, legend, topology);
-	if (disp->x != lastx || disp->y != lasty)
-	  XMoveWindow(disp->dpy, disp->win, -disp->x, -disp->y);
-	break;
-      case ButtonPress:
-	  if (e.xbutton.button == Button1) {
-	  state = 1;
-	  x = e.xbutton.x_root;
-	  y = e.xbutton.y_root;
-	}
-	break;
-      case ButtonRelease:
-	if (e.xbutton.button == Button1)
-	  state = 0;
-	break;
-      case MappingNotify:
-	XRefreshKeyboardMapping(&e.xmapping);
-	break;
-      case KeyPress: {
-	KeySym keysym;
-	XLookupString(&e.xkey, NULL, 0, &keysym, NULL);
-        switch (keysym) {
-          case XK_q:
-          case XK_Q:
-          case XK_Escape:
-            finish = 1;
-            break;
-          case XK_Left:
-            disp->x -= disp->screen_width/10;
-            move_x11(disp, logical, legend, topology);
-            break;
-          case XK_Right:
-            disp->x += disp->screen_width/10;
-            move_x11(disp, logical, legend, topology);
-            break;
-          case XK_Up:
-            disp->y -= disp->screen_height/10;
-            move_x11(disp, logical, legend, topology);
-            break;
-          case XK_Down:
-            disp->y += disp->screen_height/10;
-            move_x11(disp, logical, legend, topology);
-            break;
-          case XK_Page_Up:
-            if (e.xkey.state & ControlMask) {
-              disp->x -= disp->screen_width;
-              move_x11(disp, logical, legend, topology);
-            } else {
-              disp->y -= disp->screen_height;
-              move_x11(disp, logical, legend, topology);
-            }
-            break;
-          case XK_Page_Down:
-            if (e.xkey.state & ControlMask) {
-              disp->x += disp->screen_width;
-              move_x11(disp, logical, legend, topology);
-            } else {
-              disp->y += disp->screen_height;
-              move_x11(disp, logical, legend, topology);
-            }
-            break;
-          case XK_Home:
-            disp->x = 0;
-            disp->y = 0;
-            move_x11(disp, logical, legend, topology);
-            break;
-          case XK_End:
-            disp->x = INT_MAX;
-            disp->y = INT_MAX;
-            move_x11(disp, logical, legend, topology);
-            break;
-        }
-	break;
-      }
+  if (!XEventsQueued(disp->dpy, QueuedAfterFlush)) {
+    /* No pending event, flush moving windows before waiting for next event */
+    if (disp->x != lastx || disp->y != lasty) {
+      XMoveWindow(disp->dpy, disp->win, -disp->x, -disp->y);
+      lastx = disp->x;
+      lasty = disp->y;
     }
   }
+  XNextEvent(disp->dpy, &e);
+  switch (e.type) {
+  case Expose:
+    if (e.xexpose.count < 1)
+      topo_cairo_paint(&x11_draw_methods, logical, legend, topology, disp->cs);
+    break;
+  case MotionNotify:
+    if (state) {
+      disp->x -= e.xmotion.x_root - x;
+      disp->y -= e.xmotion.y_root - y;
+      x = e.xmotion.x_root;
+      y = e.xmotion.y_root;
+      move_x11(disp, logical, legend, topology);
+    }
+    break;
+  case ConfigureNotify:
+    disp->screen_width = e.xconfigure.width;
+    disp->screen_height = e.xconfigure.height;
+    move_x11(disp, logical, legend, topology);
+    if (disp->x != lastx || disp->y != lasty)
+      XMoveWindow(disp->dpy, disp->win, -disp->x, -disp->y);
+    break;
+  case ButtonPress:
+    if (e.xbutton.button == Button1) {
+      state = 1;
+      x = e.xbutton.x_root;
+      y = e.xbutton.y_root;
+    }
+    break;
+  case ButtonRelease:
+    if (e.xbutton.button == Button1)
+      state = 0;
+    break;
+  case MappingNotify:
+    XRefreshKeyboardMapping(&e.xmapping);
+    break;
+  case KeyPress: {
+    KeySym keysym;
+    XLookupString(&e.xkey, NULL, 0, &keysym, NULL);
+    switch (keysym) {
+    case XK_q:
+    case XK_Q:
+    case XK_Escape:
+      finish = 1;
+      break;
+    case XK_Left:
+      disp->x -= disp->screen_width/10;
+      move_x11(disp, logical, legend, topology);
+      break;
+    case XK_Right:
+      disp->x += disp->screen_width/10;
+      move_x11(disp, logical, legend, topology);
+      break;
+    case XK_Up:
+      disp->y -= disp->screen_height/10;
+      move_x11(disp, logical, legend, topology);
+      break;
+    case XK_Down:
+      disp->y += disp->screen_height/10;
+      move_x11(disp, logical, legend, topology);
+      break;
+    case XK_Page_Up:
+      if (e.xkey.state & ControlMask) {
+	disp->x -= disp->screen_width;
+	move_x11(disp, logical, legend, topology);
+      } else {
+	disp->y -= disp->screen_height;
+	move_x11(disp, logical, legend, topology);
+      }
+      break;
+    case XK_Page_Down:
+      if (e.xkey.state & ControlMask) {
+	disp->x += disp->screen_width;
+	move_x11(disp, logical, legend, topology);
+      } else {
+	disp->y += disp->screen_height;
+	move_x11(disp, logical, legend, topology);
+      }
+      break;
+    case XK_Home:
+      disp->x = 0;
+      disp->y = 0;
+      move_x11(disp, logical, legend, topology);
+      break;
+    case XK_End:
+      disp->x = INT_MAX;
+      disp->y = INT_MAX;
+      move_x11(disp, logical, legend, topology);
+      break;
+    }
+    break;
+  }
+  }
+    return finish;
+}
+
+
+void
+output_x11(hwloc_topology_t topology, const char *filename __hwloc_attribute_unused, int overwrite __hwloc_attribute_unused, int logical, int legend, int verbose_mode __hwloc_attribute_unused)
+{
+  struct display *disp = output_draw_start(&x11_draw_methods, logical, legend, topology, NULL);
+  topo_cairo_paint(&x11_draw_methods, logical, legend, topology, disp->cs);
+
+  while (!handle_xDisplay(disp,topology,logical,legend));
+ 
   x11_destroy(disp);
   XDestroyWindow(disp->dpy, disp->top);
   XFreeCursor(disp->dpy, disp->hand);
   XCloseDisplay(disp->dpy);
   free(disp);
 }
+
+void
+output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_attribute_unused, int overwrite __hwloc_attribute_unused, int logical, int legend, int verbose_mode __hwloc_attribute_unused, Monitors_t monitors, unsigned long refresh_usec)
+{
+  struct display *disp = output_draw_start(&x11_draw_methods, logical, legend, topology, NULL);
+  topo_cairo_paint(&x11_draw_methods, logical, legend, topology, disp->cs);
+  struct timeval time;
+  time.tv_sec=0; 
+  time.tv_usec=0; 
+  unsigned long old_usec;
+  old_usec=time.tv_usec;
+  Monitors_start(monitors);
+  while (!handle_xDisplay(disp,topology,logical,legend)){
+    gettimeofday(&time,NULL);
+    if(time.tv_usec-old_usec>=refresh_usec){
+      old_usec=time.tv_usec;
+      Monitors_update_counters(monitors);
+      Monitors_print(monitors);
+    }
+  }
+ 
+  x11_destroy(disp);
+  XDestroyWindow(disp->dpy, disp->top);
+  XFreeCursor(disp->dpy, disp->hand);
+  XCloseDisplay(disp->dpy);
+  free(disp);
+}
+
+
 #endif /* CAIRO_HAS_XLIB_SURFACE */
 
 

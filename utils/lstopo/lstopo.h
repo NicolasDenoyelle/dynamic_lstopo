@@ -10,6 +10,7 @@
 #define UTILS_LSTOPO_H
 
 #include <hwloc.h>
+#include "monitor.h"
 
 extern int lstopo_ignore_pus;
 extern hwloc_obj_type_t lstopo_show_only;
@@ -23,9 +24,13 @@ extern unsigned long lstopo_export_synthetic_flags;
 
 typedef void output_method (struct hwloc_topology *topology, const char *output, int overwrite, int logical, int legend, int verbose_mode);
 
+typedef void output_perf_method (struct hwloc_topology *topology, const char *output, int overwrite, int logical, int legend, int verbose_mode, Monitors_t monitors, unsigned long refrsh_usec);
+
 FILE *open_output(const char *filename, int overwrite) __hwloc_attribute_malloc;
 
 extern output_method output_console, output_synthetic, output_text, output_x11, output_fig, output_png, output_pdf, output_ps, output_svg, output_windows, output_xml;
+
+extern output_perf_method output_x11_perf;
 
 struct draw_methods {
   void* (*start) (void *output, int width, int height);
