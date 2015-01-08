@@ -1,6 +1,6 @@
-L1d_access_per_fp_flop
+L1ICM_per_CYC
 {
-	depth:5 , 
-	PAPI_L1_DCM/PAPI_FP_OPS
+	depth:8, 
+	PAPI_L1_ICM/PAPI_TOT_CYC
 } 
 

@@ -357,6 +357,8 @@ RECURSE_BEGIN(obj, border) \
 
 /* Per-object data: width and height of drawing for this object and sub-objects */
 struct dyna_save {
+  unsigned x;
+  unsigned y;
   unsigned width;
   unsigned height;
   unsigned fontsize;
@@ -371,6 +373,8 @@ struct dyna_save {
     save->height = *retheight; \
     save->fontsize = fontsize; \
     save->gridsize = gridsize; \
+    save->x = x;	       \
+    save->y = y;	       \
     level->userdata = save; \
   } \
 } while (0)
@@ -817,6 +821,7 @@ pu_draw(hwloc_topology_t topology, struct draw_methods *methods, int logical, hw
 
   DYNA_SAVE();
 }
+
 
 static void
 cache_draw(hwloc_topology_t topology, struct draw_methods *methods, int logical, hwloc_obj_t level, void *output, unsigned depth, unsigned x, unsigned *retwidth, unsigned y, unsigned *retheight)
@@ -1290,3 +1295,21 @@ output_draw(struct draw_methods *methods, int logical, int legend, hwloc_topolog
 {
 	fig(topology, methods, logical, legend, hwloc_get_root_obj(topology), output, 100, 0, 0);
 }
+
+void
+perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj_t level, void *output, unsigned depth, struct node_box * box){
+  struct dyna_save * ds = (struct dyna_save *) level->userdata;
+  struct style style;
+  lstopo_set_object_color(methods, topology, level, 0 /* node */, &style);
+
+  unsigned height = ds->height*box->val/(box->max - box->min);
+  unsigned draw_value = (float)box->val*(float)ds->height/(float)(box->max - box->min);
+  unsigned draw_color_red = 255*(float)box->val/(float)(box->max - box->min);
+  unsigned draw_color_blue = 255*(1-(float)box->val/(float)(box->max - box->min));
+  methods->box(output,draw_color_red,0,draw_color_blue,depth,ds->x,ds->width,ds->y,ds->height);
+
+  char text[64];
+  sprintf(text,"%lf",box->val);
+  methods->text(output, style.t2.r, style.t2.g, style.t2.b, ds->fontsize, depth-2, ds->x+ds->gridsize, ds->y+ds->gridsize, text);
+}
+

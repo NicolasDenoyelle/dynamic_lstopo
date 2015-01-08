@@ -6,10 +6,10 @@
 
 # This makefile is only reached when building in standalone mode
 
-AM_CFLAGS = $(HWLOC_CFLAGS)
+AM_CFLAGS = $(HWLOC_CFLAGS) -g3
 # Add -I of utils/hwloc for misc.h
 AM_CPPFLAGS = $(HWLOC_CPPFLAGS) -I$(top_srcdir)/utils/hwloc -I$(top_srcdir)/utils/monitor/src
-AM_LDFLAGS = $(HWLOC_LDFLAGS)
+AM_LDFLAGS = $(HWLOC_LDFLAGS) -L/opt/papi-5.3.0/lib/ -lpapi
 
 LDADD = $(HWLOC_top_builddir)/hwloc/libhwloc.la $(HWLOC_top_builddir)/utils/monitor/libmonitor.la
 

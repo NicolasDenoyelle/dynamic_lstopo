@@ -20,6 +20,7 @@
 #endif
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <assert.h>
 
 #ifdef LSTOPO_HAVE_GRAPHICS
@@ -447,6 +448,7 @@ output(hwloc_topology_t topology, const char * filename, int verbose_mode, char*
 void 
 output_perf(hwloc_topology_t topology, const char * filename, int verbose_mode, char* callname, int output_format, Monitors_t monitors, unsigned long r_usec)
 {
+
   switch (output_format) {
   case LSTOPO_OUTPUT_DEFAULT:
 #ifdef LSTOPO_HAVE_GRAPHICS
@@ -847,12 +849,10 @@ main (int argc, char *argv[])
   }
 
   if(perf){
-    Monitors_t m=NULL;
-    if(perf_input!=NULL)
-      m = load_Monitors(topology,perf_input,perf_output,lstopo_pid);
-    else
-      m = new_default_Monitors(topology,perf_output,lstopo_pid);
-    if(!m)
+    Monitors_t m=load_Monitors(topology,perf_input,perf_output,lstopo_pid);
+    if(m==NULL)
+      m=new_default_Monitors(topology,perf_output,lstopo_pid);
+    if(m==NULL)
       goto exit;
     output_perf(topology, filename, verbose_mode, callname, output_format, m, refresh_usec);
     delete_Monitors(m);

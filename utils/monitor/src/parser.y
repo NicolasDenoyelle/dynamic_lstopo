@@ -43,30 +43,31 @@ monitor
      //     !bsearch(&tmp, monitors,nb_monitors,sizeof(Monitor_t),cmpmonitordepth) ||
      strsearch($1, monitor_names,nb_monitors)==-1){
     print_func($1,$5);
-    monitor_names[nb_monitors]=strdup($1);
+    monitor_names[nb_monitors]=$1;
     nb_monitors++;
   }
   else{
     fprintf(stderr,"monitor \"%s\" ignored because its name is already used by another one\n",$1);
   }
+  free($5);
   /* }}} */
  }
 ;
 
 add_expr
 : mul_expr              {$$ = $1;}
-| add_expr '+' mul_expr {$$=concat_expr($1,'+',$3);}
-| add_expr '-' mul_expr {$$=concat_expr($1,'-',$3);}
+| add_expr '+' mul_expr {$$=concat_expr($1,'+',$3); free($1); free($3);}
+| add_expr '-' mul_expr {$$=concat_expr($1,'-',$3); free($1); free($3);}
 ;
    
  mul_expr
 : primary_expr              {$$ = $1;}
-| mul_expr '*' primary_expr {$$=concat_expr($1,'*',$3);}
-| mul_expr '/' primary_expr {$$=concat_expr($1,'/',$3);}
+| mul_expr '*' primary_expr {$$=concat_expr($1,'*',$3); free($1); free($3);}
+| mul_expr '/' primary_expr {$$=concat_expr($1,'/',$3); free($1); free($3);}
 ;
 
 hwloc_obj_expr
-: DEPTH ':' INTEGER {monitor_depths[nb_monitors]=atoi($3);}
+: DEPTH ':' INTEGER {monitor_depths[nb_monitors]=atoi($3); free($1); free($3);}
 ;
 
 primary_expr 
@@ -74,7 +75,7 @@ primary_expr
 | COUNTER {
    int counter_idx=-1;
    if(nb_counters==0){
-     event_names[0] = strdup($1);
+     event_names[0] = $1;
      nb_counters=1;
      $$=strdup("in[0]");
    }
@@ -86,7 +87,7 @@ primary_expr
        	 free(event_names);
        	 exit(1);
        }
-       event_names[nb_counters]=strdup($1);
+       event_names[nb_counters]=$1;
        char var[1024];
        sprintf(var,"in[%d]",nb_counters);
        $$=strdup(var);
@@ -96,6 +97,7 @@ primary_expr
        char var[1024];
        sprintf(var,"in[%d]",counter_idx);
        $$=strdup(var);
+       free($1);
      }
    }
   }
@@ -123,16 +125,14 @@ int yyerror (char *s) {
 char * concat_expr(char* expr1, char sign, char* expr2){
   /* {{{ */
 
-  char* str =  malloc(strlen(expr1)+strlen(expr2)+2); 
+  char* str =  malloc(strlen(expr1)+strlen(expr2)+2);
   if(str==NULL)
-    return NULL;
-  str[0]='\0';  
-  strcat(str,expr1);
-  str[strlen(expr1)]=sign;
-  str[strlen(expr1)+1]='\0';
-  strcat(str,expr2);
-  free(expr1);
-  free(expr2);
+    {
+      perror("malloc failed");
+      exit(EXIT_FAILURE);
+    }
+  memset(str,0,strlen(expr1)+strlen(expr2)+2);
+  sprintf(str,"%s%c%s",expr1,sign,expr2);
   return str;
 
   /* }}} */
@@ -143,11 +143,8 @@ char * parenthesis(char* expr){
   char * str = malloc(strlen(expr)+3);
   if(str==NULL)
     return NULL;
-  str[0]='(';
-  str[1]='\0';
-  strcat(str,expr);
-  str[strlen(expr)+1]=')';
-  str[strlen(expr)+2]='\0';
+  memset(str,0,strlen(expr)+3);
+  sprintf(str,"(%s)",expr);
   return str;
 /* }}} */
 }
@@ -181,10 +178,6 @@ void print_func(char * name,char* code){
   /* }}} */
 }
 
-
-
-
-
 struct parsed_names * parser(const char * file_name) {
   hwloc_topology_t topology;
   /* Allocate and initialize topology object. */
@@ -216,6 +209,7 @@ struct parsed_names * parser(const char * file_name) {
     if (input) {
       yyin = input;
       yyparse();
+      fclose(input);
     }
     else {
       fprintf (stderr, "Could not open %s\n", file_name);
@@ -260,17 +254,8 @@ int main_parser(int argc, char* argv[]){
   }
   parser(argv[1]);
 
-  /* get current working dir */
-  char cwd[1024];
-  if (getcwd(cwd, sizeof(cwd)) == NULL){
-    perror("getcwd() error");
-    return 1;
-  }
-  char * lib = malloc(strlen(PARSED_CODE_LIB)+strlen(cwd)+2);
-  lib[0]='\0';
-  strcat(strcat(strcat(lib,cwd),"/"),PARSED_CODE_LIB);
   /* load shared libraries */
-  void * dlhandle = dlopen(lib,RTLD_NOW | RTLD_GLOBAL);
+  void * dlhandle = dlopen(PARSED_CODE_LIB,RTLD_NOW | RTLD_GLOBAL);
   //  free(lib);
   if(dlhandle==NULL){
     fprintf(stderr,"%s\n",dlerror());

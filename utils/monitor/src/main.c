@@ -44,17 +44,11 @@ main(int argc, char** argv)
     }
   }
 
-  hwloc_topology_t topology;
-  unsigned long flags = HWLOC_TOPOLOGY_FLAG_IO_DEVICES | HWLOC_TOPOLOGY_FLAG_ICACHES;
-  hwloc_topology_init(&(topology));
-  hwloc_topology_set_flags(topology, flags);
-  hwloc_topology_load(topology);
-
   /* creating monitors */
-  Monitors_t m = load_Monitors(topology,in,out,pid);
+  Monitors_t m = load_Monitors(NULL,in,out,pid);
   if(m==NULL){
     /* default monitors creation */
-    m = new_default_Monitors(topology,out,pid);
+    m = new_default_Monitors(NULL,out,pid);
   }
   unsigned int i;
 
@@ -69,20 +63,17 @@ main(int argc, char** argv)
   if(refresh.tv_usec==0)
     while(i--)
       {
-	Monitors_update_counters(m);
-	Monitors_wait_update(m);
-	Monitors_print(m);
+  	Monitors_update_counters(m);
+  	Monitors_wait_update(m);
       }
   else
     while(1){
       Monitors_update_counters(m);
       usleep(refresh.tv_usec);
       Monitors_wait_update(m);
-      Monitors_print(m);
     }
 
   delete_Monitors(m);
-  hwloc_topology_destroy(topology);
   return 0;
 }
 

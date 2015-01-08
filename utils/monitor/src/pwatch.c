@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <dirent.h>
-#include <hwloc/linux.h>
+#include "hwloc/linux.h"
 
 struct proc_watch{
   hwloc_topology_t   topology;
@@ -22,7 +22,7 @@ struct proc_watch{
 #define EVENT_SIZE  (sizeof(struct inotify_event))
 #define BUF_LEN     (1024 * (EVENT_SIZE + 16))
 
-int  compareuint(const void* a,const void* b ){return *(unsigned int *)a - *(unsigned int *)b;}
+int  compareuint(const void* a,const void* b ){return (int)(*(unsigned int *)a - *(unsigned int *)b);}
 
 int
 read_task_core(const char * task_path)
@@ -125,9 +125,11 @@ proc_watch_get_watched_in_cpuset(struct proc_watch * pw, hwloc_cpuset_t cpuset)
 void
 proc_watch_add_task(struct proc_watch * pw, unsigned int task)
 {
-  char file_name[22+strlen("/proc//task//stat")];
+  char file_name[128];
+  int pu;
+
   sprintf(file_name,"/proc/%d/task/%d/stat",pw->pid,task);
-  int pu = read_task_core(file_name);
+  pu = read_task_core(file_name);
   if(pu==-1)
     return;
   pthread_mutex_lock(&(pw->lock[pu]));
@@ -158,6 +160,8 @@ proc_watch_add_task_on_pu(struct proc_watch * pw, unsigned int task, unsigned in
 int
 proc_watch_rm_task_on_pu(struct proc_watch * pw, unsigned int task, unsigned int physical_PU)
 {
+  unsigned int tidx, *t;
+
   if(pw->tasks[physical_PU][0]<=2)
     return -1;
   if(pw->tasks[physical_PU][0]==3){
@@ -172,10 +176,11 @@ proc_watch_rm_task_on_pu(struct proc_watch * pw, unsigned int task, unsigned int
       return -1;
     }
   }
-  unsigned int * t = bsearch(&task,&(pw->tasks[physical_PU][2]),pw->tasks[physical_PU][0],sizeof(int),compareuint);
+  
+  t = bsearch(&task,&(pw->tasks[physical_PU][2]),pw->tasks[physical_PU][0],sizeof(int),compareuint);
   if(t==NULL)
     return -1;
-  unsigned int tidx = (t-pw->tasks[physical_PU])/sizeof(int);
+  tidx = (t-pw->tasks[physical_PU])/sizeof(int);
   pthread_mutex_lock(&(pw->lock[physical_PU]));
   memcpy(&(pw->tasks[physical_PU][tidx]),&(pw->tasks[physical_PU][tidx+1]),pw->tasks[physical_PU][0]-tidx-1);
   pw->tasks[physical_PU][0]--;
@@ -197,6 +202,10 @@ proc_watch_rm_task(struct proc_watch * pw, unsigned int task)
 void 
 proc_watch_update(struct proc_watch * pw)
 {
+  struct dirent * task_dir;
+  unsigned int  **old_tasks, ** tasks, i, pu;
+  hwloc_bitmap_t query_state;
+  char * file_name;
   if(kill(pw->pid,0)!=0){
     hwloc_bitmap_zero(pw->query_state);
     return;
@@ -207,10 +216,6 @@ proc_watch_update(struct proc_watch * pw)
       return;
     }
   }
-
-  struct dirent * task_dir;
-  unsigned int  **old_tasks, ** tasks, i, pu;
-  hwloc_bitmap_t query_state;
 
   old_tasks = pw->tasks;
 
@@ -226,9 +231,10 @@ proc_watch_update(struct proc_watch * pw)
   while((task_dir=readdir(pw->p_dir))!=NULL){
       if(!strcmp(task_dir->d_name,".") || !strcmp(task_dir->d_name,".."))
 	continue;
-      char file_name[11+strlen("/proc//task//stat")+strlen(task_dir->d_name)];
+      file_name = malloc(11+strlen("/proc//task//stat")+strlen(task_dir->d_name));
       sprintf(file_name,"/proc/%d/task/%s/stat",pw->pid,task_dir->d_name);
       pu=read_task_core(file_name);
+      free(file_name);
       tasks[pu][tasks[pu][0]]=atoi(task_dir->d_name);
       if((++tasks[pu][0])>tasks[pu][1]){
 	tasks[pu][1]*=2;
@@ -257,8 +263,11 @@ void
 proc_watch_update_pu(struct proc_watch * pw, int physical_pu)
 {
   unsigned int i,pu;
-  hwloc_cpuset_t cpuset=hwloc_bitmap_alloc();
-  unsigned int ** tasks = pw->tasks;
+  hwloc_cpuset_t cpuset; 
+  unsigned int ** tasks;
+
+  cpuset=hwloc_bitmap_alloc();
+  tasks= pw->tasks;
   for(i=2;i<pw->tasks[physical_pu][0];i++){
     hwloc_linux_get_tid_cpubind(pw->topology,tasks[physical_pu][i],cpuset);
     pu=hwloc_bitmap_first(cpuset);
@@ -288,10 +297,11 @@ new_proc_watch(hwloc_topology_t topo, unsigned int pid, unsigned int n_tasks)
 {
   int i;
   char tmp [11+strlen("/proc//task")];
-  struct proc_watch * pw = malloc(sizeof (struct proc_watch));
+  struct proc_watch * pw;
+  pw = malloc(sizeof (struct proc_watch));
   if(pw==NULL){
     perror("malloc");
-    return NULL;
+    exit(EXIT_FAILURE);
   }
   pw->topology = topo;
   pw->n_PU=hwloc_get_nbobjs_by_depth(topo,hwloc_topology_get_depth(topo)-1);
@@ -304,20 +314,20 @@ new_proc_watch(hwloc_topology_t topo, unsigned int pid, unsigned int n_tasks)
   if((pw->state = hwloc_bitmap_alloc())==NULL){
     perror("hwloc_bitmap_alloc()");
     free(pw); 
-    return NULL;
+    exit(EXIT_FAILURE);
   }
   if((pw->query_state = hwloc_bitmap_alloc())==NULL){
     perror("hwloc_bitmap_alloc()");
     free(pw->state); 
     free(pw); 
-    return NULL;
+    exit(EXIT_FAILURE);
   }
   if((pw->lock = calloc(pw->n_PU,sizeof(pthread_mutex_t)))==NULL){
     perror("calloc");
     free(pw->state); 
     free(pw->query_state);
     free(pw); 
-    return NULL;
+    exit(EXIT_FAILURE);
   }
 
   for(i=0;i<pw->n_PU;i++){
@@ -329,9 +339,9 @@ new_proc_watch(hwloc_topology_t topo, unsigned int pid, unsigned int n_tasks)
 
 void
 delete_proc_watch(struct proc_watch * pw){
+  unsigned int i;
   if(pw==NULL)
     return;
-  unsigned int i;
   for(i=0;i<pw->n_PU;i++){
     pthread_mutex_destroy(&(pw->lock[i]));
     if(pw->tasks!=NULL)

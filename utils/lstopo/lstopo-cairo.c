@@ -255,7 +255,7 @@ int handle_xDisplay(struct display *disp, hwloc_topology_t topology, int logical
   int state = 0;
   int x = 0, y = 0; /* shut warning down */
   int lastx = disp->x, lasty = disp->y;
-
+  
   if (!XEventsQueued(disp->dpy, QueuedAfterFlush)) {
     /* No pending event, flush moving windows before waiting for next event */
     if (disp->x != lastx || disp->y != lasty) {
@@ -263,6 +263,7 @@ int handle_xDisplay(struct display *disp, hwloc_topology_t topology, int logical
       lastx = disp->x;
       lasty = disp->y;
     }
+    return 0;
   }
   XNextEvent(disp->dpy, &e);
   switch (e.type) {
@@ -356,6 +357,8 @@ int handle_xDisplay(struct display *disp, hwloc_topology_t topology, int logical
     }
     break;
   }
+  default:
+    break;
   }
     return finish;
 }
@@ -379,23 +382,43 @@ output_x11(hwloc_topology_t topology, const char *filename __hwloc_attribute_unu
 void
 output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_attribute_unused, int overwrite __hwloc_attribute_unused, int logical, int legend, int verbose_mode __hwloc_attribute_unused, Monitors_t monitors, unsigned long refresh_usec)
 {
+  unsigned int i, nobj,retwidth, retheight;
+  hwloc_obj_t obj;
+  struct node_box * box;
+  unsigned int height, box_height, width;
+
   struct display *disp = output_draw_start(&x11_draw_methods, logical, legend, topology, NULL);
   topo_cairo_paint(&x11_draw_methods, logical, legend, topology, disp->cs);
+
   struct timeval time;
   time.tv_sec=0; 
   time.tv_usec=0; 
   unsigned long old_usec;
   old_usec=time.tv_usec;
+  
+  cairo_t *c;
+  c = cairo_create(disp->cs);
+
   Monitors_start(monitors);
   while (!handle_xDisplay(disp,topology,logical,legend)){
     gettimeofday(&time,NULL);
     if(time.tv_usec-old_usec>=refresh_usec){
       old_usec=time.tv_usec;
       Monitors_update_counters(monitors);
-      Monitors_print(monitors);
+      for(i=0;i<monitors->count;i++){
+	nobj = hwloc_get_nbobjs_by_depth(monitors->topology,monitors->depths[i]);
+	while(nobj--){
+	  struct node_box * box=(struct node_box *)(hwloc_get_obj_by_depth(monitors->topology,monitors->depths[i],nobj)->userdata);;
+	  obj = hwloc_get_obj_by_depth(topology,monitors->depths[i],nobj);
+	  
+	  perf_box_draw(topology, &x11_draw_methods, obj, c, obj->depth, box);
+	  cairo_copy_page(c);
+	}
+      }
     }
   }
  
+  cairo_destroy(c);
   x11_destroy(disp);
   XDestroyWindow(disp->dpy, disp->top);
   XFreeCursor(disp->dpy, disp->hand);
@@ -406,7 +429,6 @@ output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_attribut
 
 #endif /* CAIRO_HAS_XLIB_SURFACE */
 
-
 #if CAIRO_HAS_PNG_FUNCTIONS
 /* PNG back-end */
 static void *

@@ -1,4 +1,4 @@
-AM_CFLAGS= -g
+AM_CFLAGS= -g -O0
 
 lib_LTLIBRARIES = libmonitor.la
 
