@@ -243,7 +243,7 @@ Monitors_t new_Monitors(hwloc_topology_t topology,
 }
 
 int add_Monitor(Monitors_t m, const char * name, unsigned int depth, double (*fun)(long long *)){
-  unsigned int i, n_obj;
+  unsigned int i,j, n_obj;
   hwloc_obj_t node;
   
   if(m==NULL)
@@ -258,12 +258,24 @@ int add_Monitor(Monitors_t m, const char * name, unsigned int depth, double (*fu
       exit(EXIT_FAILURE);
   }
 
-  for(i=0;i<m->count;i++){
-    if(m->depths[i]==depth){
-      fprintf(stderr,"cannot insert monitor %s at depth %u because another monitor already exists at this depth\n",name,depth);
-      return 1;
-    }
+  i=0;
+  while (i<m->count && m->depths[i] < depth ) i++;
+  if(m->depths[i]==depth){
+    fprintf(stderr,"cannot insert monitor %s at depth %u because another monitor already exists at this depth\n",name,depth);
+    return 1;
   }
+
+  /* insert sorted */
+  for(j=m->count;j>i;j--){
+    m->names[j] = m->names[j-1];
+    m->depths[j] = m->depths[j-1];
+    m->compute[j] = m->compute[j-1];
+  }
+
+  m->names[i] = strdup(name);
+  m->depths[i] = depth;
+  m->compute[i] = fun;
+  m->count++;
 
   n_obj=hwloc_get_nbobjs_by_depth(m->topology,depth);
   if(n_obj==0){
@@ -276,10 +288,6 @@ int add_Monitor(Monitors_t m, const char * name, unsigned int depth, double (*fu
     node->userdata = new_node_box(m->n_events);
   }
   
-  m->names[m->count] = strdup(name);
-  m->depths[m->count] = depth;
-  m->compute[m->count] = fun;
-  m->count++;
   return 0;
 }
 
@@ -430,7 +438,8 @@ void * Monitors_thread(void* monitors){
 	exit(EXIT_FAILURE);
       }
       out = (struct node_box *)(obj->userdata);
-      
+      if(out==NULL)
+	continue;
       if(m->pw!=NULL){
 	b = proc_watch_get_watched_in_cpuset(m->pw,obj->cpuset);
 	weight = hwloc_bitmap_weight(b);

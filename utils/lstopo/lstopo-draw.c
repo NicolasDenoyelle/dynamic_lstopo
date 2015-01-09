@@ -361,22 +361,35 @@ struct dyna_save {
   unsigned y;
   unsigned width;
   unsigned height;
+  unsigned mywidth;
+  unsigned myheight;
+  unsigned totwidth;
+  unsigned totheight;
   unsigned fontsize;
   unsigned gridsize;
+  struct style style;
 };
 
 /* Save the computed size */
 #define DYNA_SAVE() do { \
   if (!level->userdata) { \
     struct dyna_save *save = malloc(sizeof(*save)); \
-    save->width = *retwidth; \
-    save->height = *retheight; \
-    save->fontsize = fontsize; \
-    save->gridsize = gridsize; \
-    save->x = x;	       \
-    save->y = y;	       \
-    level->userdata = save; \
-  } \
+    save->width = *retwidth;			    \
+    save->height = *retheight;			    \
+    save->mywidth = mywidth;			    \
+    save->myheight =myheight;			    \
+    save->totwidth = totwidth;			    \
+    save->totheight =totheight;			    \
+    save->fontsize = fontsize;			    \
+    save->gridsize = gridsize;			    \
+    save->x = x;				    \
+    save->y = y;				    \
+    save->style.bg = style.bg;			    \
+    save->style.bg = style.t;			    \
+    save->style.bg = style.bg2;			    \
+    save->style.bg = style.t2;			    \
+    level->userdata = save;			    \
+  }						    \
 } while (0)
 
 /* Check whether we already computed the size and we are not actually drawing, in that case return it */
@@ -734,6 +747,7 @@ bridge_draw(hwloc_topology_t topology, struct draw_methods *methods, int logical
   unsigned totwidth, totheight;
   struct style style;
   unsigned center;
+  char text[4];
 
   DYNA_CHECK();
 
@@ -765,7 +779,6 @@ bridge_draw(hwloc_topology_t topology, struct draw_methods *methods, int logical
         if (subobjs[i]->type == HWLOC_OBJ_BRIDGE && subobjs[i]->attr->bridge.upstream_type == HWLOC_OBJ_BRIDGE_PCI)
           speed = subobjs[i]->attr->bridge.upstream.pci.linkspeed;
         if (speed != 0.) {
-          char text[4];
           if (speed >= 10.)
 	    snprintf(text, sizeof(text), "%.0f", subobjs[i]->attr->pcidev.linkspeed);
 	  else
@@ -795,6 +808,7 @@ pu_draw(hwloc_topology_t topology, struct draw_methods *methods, int logical, hw
   unsigned mywidth = 0, totwidth;
   struct style style;
   int colorarg;
+  char text[64];
 
   DYNA_CHECK();
 
@@ -812,7 +826,6 @@ pu_draw(hwloc_topology_t topology, struct draw_methods *methods, int logical, hw
   methods->box(output, style.bg.r, style.bg.g, style.bg.b, depth, x, *retwidth, y, *retheight);
 
   if (fontsize) {
-    char text[64];
     lstopo_obj_snprintf(text, sizeof(text), level, logical);
     methods->text(output, style.t.r, style.t.g, style.t.b, fontsize, depth-1, x + gridsize, y + gridsize, text);
   }
@@ -832,6 +845,7 @@ cache_draw(hwloc_topology_t topology, struct draw_methods *methods, int logical,
   /* Do not separate objects when in L1 (SMT) */
   unsigned separator = level->attr->cache.depth > 1 ? gridsize : 0;
   struct style style;
+  char text[64];
 
   DYNA_CHECK();
 
@@ -841,8 +855,6 @@ cache_draw(hwloc_topology_t topology, struct draw_methods *methods, int logical,
   methods->box(output, style.bg.r, style.bg.g, style.bg.b, depth, x, totwidth, y, myheight - gridsize);
 
   if (fontsize) {
-    char text[64];
-
     lstopo_obj_snprintf(text, sizeof(text), level, logical);
     methods->text(output, style.t.r, style.t.g, style.t.b, fontsize, depth-1, x + gridsize, y + gridsize, text);
   }
@@ -859,6 +871,7 @@ core_draw(hwloc_topology_t topology, struct draw_methods *methods, int logical, 
   unsigned mywidth = 0, totwidth;
   unsigned textwidth = fontsize ? 8*fontsize : gridsize;
   struct style style;
+  char text[64];
 
   DYNA_CHECK();
 
@@ -868,7 +881,6 @@ core_draw(hwloc_topology_t topology, struct draw_methods *methods, int logical, 
   methods->box(output, style.bg.r, style.bg.g, style.bg.b, depth, x, totwidth, y, totheight);
 
   if (fontsize) {
-    char text[64];
     lstopo_obj_snprintf(text, sizeof(text), level, logical);
     methods->text(output, style.t.r, style.t.g, style.t.b, fontsize, depth-1, x + gridsize, y + gridsize, text);
   }
@@ -885,7 +897,8 @@ package_draw(hwloc_topology_t topology, struct draw_methods *methods, int logica
   unsigned mywidth = 0, totwidth;
   unsigned textwidth = 6*fontsize;
   struct style style;
-
+  char text[64];
+    
   DYNA_CHECK();
 
   RECURSE_RECT(level, &null_draw_methods, gridsize, gridsize);
@@ -894,7 +907,6 @@ package_draw(hwloc_topology_t topology, struct draw_methods *methods, int logica
   methods->box(output, style.bg.r, style.bg.g, style.bg.b, depth, x, totwidth, y, totheight);
 
   if (fontsize) {
-    char text[64];
     lstopo_obj_snprintf(text, sizeof(text), level, logical);
     methods->text(output, style.t.r, style.t.g, style.t.b, fontsize, depth-1, x + gridsize, y + gridsize, text);
   }
@@ -918,6 +930,7 @@ node_draw(hwloc_topology_t topology, struct draw_methods *methods, int logical, 
   /* Width of the heading text, thus minimal width */
   unsigned textwidth = 16*fontsize;
   struct style style;
+  char text[64];
 
   /* Check whether dynamic programming can save us time */
   DYNA_CHECK();
@@ -932,7 +945,6 @@ node_draw(hwloc_topology_t topology, struct draw_methods *methods, int logical, 
   methods->box(output, style.bg2.r, style.bg2.g, style.bg2.b, depth-1, x + gridsize, totwidth - 2 * gridsize, y + gridsize, myheight - gridsize);
 
   if (fontsize) {
-    char text[64];
     /* Output text */
     lstopo_obj_snprintf(text, sizeof(text), level, logical);
     methods->text(output, style.t2.r, style.t2.g, style.t2.b, fontsize, depth-2, x + 2 * gridsize, y + 2 * gridsize, text);
@@ -952,7 +964,8 @@ machine_draw(hwloc_topology_t topology, struct draw_methods *methods, int logica
   unsigned mywidth = 0, totwidth;
   unsigned textwidth = 8*fontsize;
   struct style style;
-
+  char text[64];
+    
   DYNA_CHECK();
 
   RECURSE_RECT(level, &null_draw_methods, gridsize, gridsize);
@@ -961,7 +974,6 @@ machine_draw(hwloc_topology_t topology, struct draw_methods *methods, int logica
   methods->box(output, style.bg.r, style.bg.g, style.bg.b, depth, x, totwidth, y, totheight);
 
   if (fontsize) {
-    char text[64];
     lstopo_obj_snprintf(text, sizeof(text), level, logical);
     methods->text(output, style.t.r, style.t.g, style.t.b, fontsize, depth-1, x + gridsize, y + gridsize, text);
   }
@@ -1020,6 +1032,7 @@ system_draw(hwloc_topology_t topology, struct draw_methods *methods, int logical
   unsigned textwidth = 10*fontsize;
   int vert = prefer_vert(topology, logical, level, output, depth, x, y, gridsize);
   struct style style;
+  char text[64];
 
   DYNA_CHECK();
 
@@ -1032,7 +1045,6 @@ system_draw(hwloc_topology_t topology, struct draw_methods *methods, int logical
   methods->box(output, style.bg.r, style.bg.g, style.bg.b, depth, x, totwidth, y, totheight);
 
   if (fontsize) {
-    char text[64];
     lstopo_obj_snprintf(text, sizeof(text), level, logical);
     methods->text(output, style.t.r, style.t.g, style.t.b, fontsize, depth-1, x + gridsize, y + gridsize, text);
   }
@@ -1053,6 +1065,7 @@ group_draw(hwloc_topology_t topology, struct draw_methods *methods, int logical,
   unsigned textwidth = level->name ? strlen(level->name) * fontsize : 6*fontsize;
   int vert = prefer_vert(topology, logical, level, output, depth, x, y, gridsize);
   struct style style;
+  char text[64];
 
   DYNA_CHECK();
 
@@ -1075,7 +1088,6 @@ group_draw(hwloc_topology_t topology, struct draw_methods *methods, int logical,
     if (level->name) {
       methods->text(output, style.t.r, style.t.g, style.t.b, fontsize, depth-1, x + gridsize, y + gridsize, level->name);
     } else {
-      char text[64];
       lstopo_obj_snprintf(text, sizeof(text), level, logical);
       methods->text(output, style.t.r, style.t.g, style.t.b, fontsize, depth-1, x + gridsize, y + gridsize, text);
     }
@@ -1098,6 +1110,7 @@ misc_draw(hwloc_topology_t topology, struct draw_methods *methods, int logical, 
   unsigned textwidth = level->name ? strlen(level->name) * fontsize : 6*fontsize;
   int vert = prefer_vert(topology, logical, level, output, depth, x, y, gridsize);
   struct style style;
+  char text[64];
 
   DYNA_CHECK();
 
@@ -1113,7 +1126,6 @@ misc_draw(hwloc_topology_t topology, struct draw_methods *methods, int logical, 
     if (level->name) {
       methods->text(output, style.t.r, style.t.g, style.t.b, fontsize, depth-1, x + gridsize, y + gridsize, level->name);
     } else {
-      char text[64];
       lstopo_obj_snprintf(text, sizeof(text), level, logical);
       methods->text(output, style.t.r, style.t.g, style.t.b, fontsize, depth-1, x + gridsize, y + gridsize, text);
     }
@@ -1301,15 +1313,86 @@ perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj
   struct dyna_save * ds = (struct dyna_save *) level->userdata;
   struct style style;
   lstopo_set_object_color(methods, topology, level, 0 /* node */, &style);
-
-  unsigned height = ds->height*box->val/(box->max - box->min);
+  
+  unsigned myheight, mywidth, x,y;
+  switch(level->type){
+  case HWLOC_OBJ_SYSTEM: 
+    myheight = ds->totheight; 
+    mywidth = ds->totwidth; 
+    x = ds->x + ds->gridsize;
+    y = ds->y + ds->gridsize;
+    break;
+  case HWLOC_OBJ_MACHINE:
+    myheight = ds->totheight;
+    mywidth = ds->totwidth - 2 * ds->gridsize;
+    x = ds->x + ds->gridsize;
+    y = ds->y + ds->gridsize;
+    break;
+  case HWLOC_OBJ_NUMANODE:
+    myheight = ds->myheight - ds->gridsize;
+    mywidth = ds->totwidth;
+    x = ds->x + 2*ds->gridsize;
+    y = ds->y + 2*ds->gridsize;
+    break;
+  case HWLOC_OBJ_PACKAGE:
+    myheight = ds->totheight;
+    mywidth = ds->totwidth - 2 * ds->gridsize;
+    x = ds->x + ds->gridsize;
+    y = ds->y + ds->gridsize;
+    break;
+  case HWLOC_OBJ_CACHE:
+    myheight = ds->myheight - ds->gridsize;
+    mywidth = ds->totwidth;
+    x = ds->x + ds->gridsize;
+    y = ds->y + ds->gridsize;
+    break;
+  case HWLOC_OBJ_CORE:
+    myheight = ds->totheight;
+    mywidth = ds->totwidth;
+    x = ds->x + ds->gridsize;
+    y = ds->y + ds->gridsize;
+    break;
+  case HWLOC_OBJ_PU:
+    myheight = ds->height;
+    mywidth = ds->width;
+    x = ds->x + ds->gridsize;
+    y = ds->y + ds->gridsize;
+    break;
+  case HWLOC_OBJ_GROUP:
+    myheight = ds->totheight;
+    mywidth = ds->totwidth;
+    x = ds->x + ds->gridsize;
+    y = ds->y + ds->gridsize;
+    break;
+  case HWLOC_OBJ_PCI_DEVICE:
+    myheight = ds->height;
+    mywidth = ds->width;
+    x = ds->x + ds->gridsize;
+    y = ds->y + ds->gridsize;
+    break;
+  case HWLOC_OBJ_OS_DEVICE:
+    myheight = ds->height;
+    mywidth = ds->width;
+    x = ds->x + ds->gridsize;
+    y = ds->y + ds->gridsize;
+    break;
+  case HWLOC_OBJ_BRIDGE:
+    myheight = ds->gridsize;
+    mywidth = ds->gridsize;
+    x = ds->x + 3*ds->gridsize;
+    y = ds->y + ds->totheight;
+    break;
+  }
+  unsigned height = myheight*box->val/(box->max - box->min);
   unsigned draw_value = (float)box->val*(float)ds->height/(float)(box->max - box->min);
   unsigned draw_color_red = 255*(float)box->val/(float)(box->max - box->min);
   unsigned draw_color_blue = 255*(1-(float)box->val/(float)(box->max - box->min));
-  methods->box(output,draw_color_red,0,draw_color_blue,depth,ds->x,ds->width,ds->y,ds->height);
+  unsigned draw_color_green = draw_color_blue / 2;
+  methods->box(output,style.bg.r,style.bg.g,style.bg.b,depth,ds->x,mywidth,ds->y,myheight);
+  methods->box(output,draw_color_red,draw_color_green,draw_color_blue,depth,ds->x,mywidth,ds->y,height);
 
   char text[64];
   sprintf(text,"%lf",box->val);
-  methods->text(output, style.t2.r, style.t2.g, style.t2.b, ds->fontsize, depth-2, ds->x+ds->gridsize, ds->y+ds->gridsize, text);
+  methods->text(output, style.t2.r, style.t2.g, style.t2.b, ds->fontsize, depth-2, ds->x+ds->fontsize, ds->y+ds->fontsize, text);
 }
 

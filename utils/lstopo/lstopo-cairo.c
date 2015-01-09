@@ -412,7 +412,7 @@ output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_attribut
 	  obj = hwloc_get_obj_by_depth(topology,monitors->depths[i],nobj);
 	  
 	  perf_box_draw(topology, &x11_draw_methods, obj, c, obj->depth, box);
-	  cairo_copy_page(c);
+	  cairo_show_page(c);
 	}
       }
     }
