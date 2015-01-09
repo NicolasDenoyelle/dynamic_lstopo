@@ -4,7 +4,7 @@
 #include <string.h>     
 #include <dlfcn.h>
 #include <papi.h>
-#include <hwloc.h>
+#include "hwloc.h"
 #include "parser.h"
 
   int yyerror(char * s);

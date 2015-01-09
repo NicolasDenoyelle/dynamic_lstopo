@@ -28,52 +28,12 @@ int
 read_task_core(const char * task_path)
 {
   FILE * task = fopen(task_path, "r");
-  int pu_n;
+  int pu_n=-1;
   void * nul;
   if(task == NULL)
     return -1;
   
-  fscanf(task,
-	 "%d %s %c %d %d %d %d %d %u %lu %lu %lu %lu %lu %lu %ld %ld %ld %ld %ld %ld %llu %lu %ld %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu %d %d",
-	 (int*)&nul,
-	 (char*)&nul,
-	 (char*)&nul,
-	 (int*)&nul,
-	 (int*)&nul,
-	 (int*)&nul,
-	 (int*)&nul,
-	 (int*)&nul,
-	 (unsigned int*)&nul,
-	 (unsigned long*)&nul,
-	 (unsigned long*)&nul,
-	 (unsigned long*)&nul,
-	 (unsigned long*)&nul,
-	 (unsigned long*)&nul,
-	 (unsigned long*)&nul,
-	 (long*)&nul,
-	 (long*)&nul,
-	 (long*)&nul,
-	 (long*)&nul,
-	 (long*)&nul,
-	 (long*)&nul,
-	 (unsigned long long*)&nul,
-	 (unsigned long *)&nul,
-	 (long*)&nul,
-	 (unsigned long *)&nul,
-	 (unsigned long *)&nul,
-	 (unsigned long *)&nul,
-	 (unsigned long *)&nul,
-	 (unsigned long *)&nul,
-	 (unsigned long *)&nul,
-	 (unsigned long *)&nul,
-	 (unsigned long *)&nul,
-	 (unsigned long *)&nul,
-	 (unsigned long *)&nul,
-	 (unsigned long *)&nul,
-	 (unsigned long *)&nul,
-	 (unsigned long *)&nul,
-	 (int *)&nul,
-	 &pu_n);
+  fscanf(task,"%**d %**s %**c %**d %**d %**d %**d %**d %**u %**lu %*lu %*lu %*lu %*lu %*lu %*ld %*ld %*ld %*ld %*ld %*ld %*llu %*lu %*ld %*lu %*lu %*lu %*lu %*lu %*lu %*lu %*lu %*lu %*lu %*lu %*lu %*lu %*d %d",&pu_n);
   fclose(task);
   return pu_n;
 }

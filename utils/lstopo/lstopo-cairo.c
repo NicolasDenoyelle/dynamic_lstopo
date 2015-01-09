@@ -393,8 +393,11 @@ output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_attribut
   struct timeval time;
   time.tv_sec=0; 
   time.tv_usec=0; 
+  unsigned long old_sec;
   unsigned long old_usec;
   old_usec=time.tv_usec;
+  old_sec =time.tv_sec;
+
   
   cairo_t *c;
   c = cairo_create(disp->cs);
@@ -405,10 +408,11 @@ output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_attribut
     if(time.tv_usec-old_usec>=refresh_usec){
       old_usec=time.tv_usec;
       Monitors_update_counters(monitors);
+      Monitors_wait_update(monitors);
       for(i=0;i<monitors->count;i++){
 	nobj = hwloc_get_nbobjs_by_depth(monitors->topology,monitors->depths[i]);
 	while(nobj--){
-	  struct node_box * box=(struct node_box *)(hwloc_get_obj_by_depth(monitors->topology,monitors->depths[i],nobj)->userdata);;
+	  struct node_box * box=(struct node_box *)(hwloc_get_obj_by_depth(monitors->topology,monitors->depths[i],nobj)->userdata);
 	  obj = hwloc_get_obj_by_depth(topology,monitors->depths[i],nobj);
 	  
 	  perf_box_draw(topology, &x11_draw_methods, obj, c, obj->depth, box);

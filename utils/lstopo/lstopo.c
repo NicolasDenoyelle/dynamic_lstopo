@@ -738,7 +738,7 @@ main (int argc, char *argv[])
 	  usage (callname, stderr);
 	  exit(EXIT_FAILURE);
 	}
-	refresh_usec = atol(argv[1]);
+	refresh_usec = atoll(argv[1]);
 	opt = 1;
       } else if (!strcmp (argv[0], "--version")) {
 	printf("%s %s\n", callname, VERSION);

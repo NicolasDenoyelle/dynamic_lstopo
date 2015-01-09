@@ -1336,7 +1336,7 @@ perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj
     break;
   case HWLOC_OBJ_PACKAGE:
     myheight = ds->totheight;
-    mywidth = ds->totwidth - 2 * ds->gridsize;
+    mywidth = ds->totwidth;
     x = ds->x + ds->gridsize;
     y = ds->y + ds->gridsize;
     break;
