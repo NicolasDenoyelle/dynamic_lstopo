@@ -47,9 +47,29 @@
 
 #include "lstopo.h"
 #include "monitor.h"
+#include "pwatch.h"
 
 #if (CAIRO_HAS_XLIB_SURFACE + CAIRO_HAS_PNG_FUNCTIONS + CAIRO_HAS_PDF_SURFACE + CAIRO_HAS_PS_SURFACE + CAIRO_HAS_SVG_SURFACE)
 /* Cairo methods */
+
+static void topo_cairo_perf_boxes(hwloc_topology_t topology, Monitors_t monitors, hwloc_bitmap_t active, cairo_t *c, struct draw_methods * methods)
+{
+  unsigned int i, nobj;
+  struct node_box * box;
+  hwloc_obj_t obj;
+    for(i=0;i<monitors->count;i++){
+      nobj = hwloc_get_nbobjs_by_depth(monitors->topology,monitors->depths[i]);
+      while(nobj--){
+	box=(struct node_box *)(hwloc_get_obj_by_depth(monitors->topology,monitors->depths[i],nobj)->userdata);
+	obj = hwloc_get_obj_by_depth(topology,monitors->depths[i],nobj);
+	proc_watch_get_watched_in_cpuset(monitors->pw,obj->cpuset,active);
+	if(!hwloc_bitmap_iszero(active)){
+	  perf_box_draw(topology, methods, obj, c, obj->depth, box);
+	}
+      }
+    }
+}
+
 static void
 topo_cairo_box(void *output, int r, int g, int b, unsigned depth __hwloc_attribute_unused, unsigned x, unsigned width, unsigned y, unsigned height)
 {
@@ -398,7 +418,8 @@ output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_attribut
   old_usec=time.tv_usec;
   old_sec =time.tv_sec;
 
-  
+  hwloc_bitmap_t active = hwloc_bitmap_dup(hwloc_topology_get_topology_cpuset(topology));
+
   cairo_t *c;
   c = cairo_create(disp->cs);
 
@@ -408,20 +429,13 @@ output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_attribut
     if(time.tv_usec-old_usec>=refresh_usec){
       old_usec=time.tv_usec;
       Monitors_update_counters(monitors);
-      Monitors_wait_update(monitors);
-      for(i=0;i<monitors->count;i++){
-	nobj = hwloc_get_nbobjs_by_depth(monitors->topology,monitors->depths[i]);
-	while(nobj--){
-	  struct node_box * box=(struct node_box *)(hwloc_get_obj_by_depth(monitors->topology,monitors->depths[i],nobj)->userdata);
-	  obj = hwloc_get_obj_by_depth(topology,monitors->depths[i],nobj);
-	  
-	  perf_box_draw(topology, &x11_draw_methods, obj, c, obj->depth, box);
-	  cairo_show_page(c);
-	}
-      }
+      //      Monitors_wait_update(monitors);
+      topo_cairo_perf_boxes(topology, monitors, active, c, &x11_draw_methods);
+      cairo_show_page(c);
     }
   }
- 
+
+  hwloc_bitmap_free(active); 
   cairo_destroy(c);
   x11_destroy(disp);
   XDestroyWindow(disp->dpy, disp->top);
@@ -508,6 +522,42 @@ output_pdf(hwloc_topology_t topology, const char *filename, int overwrite, int l
   if (output != stdout)
     fclose(output);
 }
+
+void
+output_pdf_perf(hwloc_topology_t topology, const char *filename __hwloc_attribute_unused, int overwrite __hwloc_attribute_unused, int logical, int legend, int verbose_mode __hwloc_attribute_unused, Monitors_t monitors, unsigned long refresh_usec)
+{
+  unsigned int i, j, nobj;
+  struct node_box * box;
+  hwloc_obj_t obj;
+  hwloc_bitmap_t active = hwloc_bitmap_dup(hwloc_topology_get_topology_cpuset(topology));
+  FILE *output = open_output(filename, overwrite);
+  cairo_surface_t *cs;
+
+  if (!output) {
+    fprintf(stderr, "Failed to open %s for writing (%s)\n", filename, strerror(errno));
+    return;
+  }
+
+  cs = output_draw_start(&pdf_draw_methods, logical, legend, topology, output);
+  topo_cairo_paint(&pdf_draw_methods, logical, legend, topology, cs);
+  cairo_t *c;
+  c = cairo_create(cs);
+
+  Monitors_start(monitors);
+  
+  Monitors_update_counters(monitors);
+  Monitors_wait_update(monitors);
+  topo_cairo_perf_boxes(topology, monitors, active, c, &pdf_draw_methods);
+  cairo_show_page(c);
+
+  cairo_destroy(c);
+  cairo_surface_flush(cs);
+  cairo_surface_destroy(cs);
+  hwloc_bitmap_free(active);
+  if (output != stdout)
+    fclose(output);
+}
+
 #endif /* CAIRO_HAS_PDF_SURFACE */
 
 

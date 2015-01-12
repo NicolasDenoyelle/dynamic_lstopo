@@ -1314,67 +1314,49 @@ perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj
   struct style style;
   lstopo_set_object_color(methods, topology, level, 0 /* node */, &style);
   
-  unsigned myheight, mywidth, x,y;
+  unsigned myheight, mywidth, x = ds->x,y = ds->y;
   switch(level->type){
   case HWLOC_OBJ_SYSTEM: 
     myheight = ds->totheight; 
     mywidth = ds->totwidth; 
-    x = ds->x + ds->gridsize;
-    y = ds->y + ds->gridsize;
     break;
   case HWLOC_OBJ_MACHINE:
     myheight = ds->totheight;
     mywidth = ds->totwidth - 2 * ds->gridsize;
-    x = ds->x + ds->gridsize;
-    y = ds->y + ds->gridsize;
     break;
   case HWLOC_OBJ_NUMANODE:
     myheight = ds->myheight - ds->gridsize;
-    mywidth = ds->totwidth;
-    x = ds->x + 2*ds->gridsize;
-    y = ds->y + 2*ds->gridsize;
+    mywidth = ds->totwidth - 2*ds->gridsize;
+    x+=ds->gridsize;
+    y+=ds->gridsize;
     break;
   case HWLOC_OBJ_PACKAGE:
     myheight = ds->totheight;
     mywidth = ds->totwidth;
-    x = ds->x + ds->gridsize;
-    y = ds->y + ds->gridsize;
     break;
   case HWLOC_OBJ_CACHE:
     myheight = ds->myheight - ds->gridsize;
     mywidth = ds->totwidth;
-    x = ds->x + ds->gridsize;
-    y = ds->y + ds->gridsize;
     break;
   case HWLOC_OBJ_CORE:
     myheight = ds->totheight;
     mywidth = ds->totwidth;
-    x = ds->x + ds->gridsize;
-    y = ds->y + ds->gridsize;
     break;
   case HWLOC_OBJ_PU:
     myheight = ds->height;
     mywidth = ds->width;
-    x = ds->x + ds->gridsize;
-    y = ds->y + ds->gridsize;
     break;
   case HWLOC_OBJ_GROUP:
     myheight = ds->totheight;
     mywidth = ds->totwidth;
-    x = ds->x + ds->gridsize;
-    y = ds->y + ds->gridsize;
     break;
   case HWLOC_OBJ_PCI_DEVICE:
     myheight = ds->height;
     mywidth = ds->width;
-    x = ds->x + ds->gridsize;
-    y = ds->y + ds->gridsize;
     break;
   case HWLOC_OBJ_OS_DEVICE:
     myheight = ds->height;
     mywidth = ds->width;
-    x = ds->x + ds->gridsize;
-    y = ds->y + ds->gridsize;
     break;
   case HWLOC_OBJ_BRIDGE:
     myheight = ds->gridsize;
@@ -1388,11 +1370,11 @@ perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj
   unsigned draw_color_red = 255*(float)box->val/(float)(box->max - box->min);
   unsigned draw_color_blue = 255*(1-(float)box->val/(float)(box->max - box->min));
   unsigned draw_color_green = draw_color_blue / 2;
-  methods->box(output,style.bg.r,style.bg.g,style.bg.b,depth,ds->x,mywidth,ds->y,myheight);
-  methods->box(output,draw_color_red,draw_color_green,draw_color_blue,depth,ds->x,mywidth,ds->y,height);
+  methods->box(output,style.bg.r,style.bg.g,style.bg.b,depth,x,mywidth,y,myheight);
+  methods->box(output,draw_color_red,draw_color_green,draw_color_blue,depth,x,mywidth,y,height);
 
   char text[64];
   sprintf(text,"%lf",box->val);
-  methods->text(output, style.t2.r, style.t2.g, style.t2.b, ds->fontsize, depth-2, ds->x+ds->fontsize, ds->y+ds->fontsize, text);
+  methods->text(output, style.t2.r, style.t2.g, style.t2.b, ds->fontsize, depth-2, x+ds->fontsize, y+ds->fontsize, text);
 }
 

@@ -329,16 +329,17 @@ void print_Monitors_header(Monitors_t m){
 }
 
 void 
-Monitors_print(Monitors_t m)
+Monitors_print(Monitors_t m, hwloc_cpuset_t alloc_tmp)
 {
   double val;
   unsigned int p_idx,l_idx,i,nobj;
   hwloc_bitmap_t cpuset = (hwloc_bitmap_t)hwloc_topology_get_topology_cpuset(m->topology);
-
   if(m->pw!=NULL)
-    cpuset = proc_watch_get_watched_in_cpuset(m->pw, cpuset);
+    proc_watch_get_watched_in_cpuset(m->pw, cpuset, alloc_tmp);
+  else
+    hwloc_bitmap_or(alloc_tmp,alloc_tmp,cpuset);
 
-  hwloc_bitmap_foreach_begin(p_idx,cpuset){
+  hwloc_bitmap_foreach_begin(p_idx,alloc_tmp){
     l_idx=physical_to_logical(m->topology,p_idx);
     dprintf(m->output_fd,"%8d ",l_idx);
     dprintf(m->output_fd,"%20lld ",m->PU_vals[l_idx]->real_usec);
@@ -353,14 +354,18 @@ Monitors_print(Monitors_t m)
     dprintf(m->output_fd,"\n");
   }
   hwloc_bitmap_foreach_end();
-  
-  if(m->pw!=NULL)
-    hwloc_bitmap_free(cpuset);
 }
 
-void Monitors_thread_stop(void * eventset){
-  if( eventset==NULL) return;
-  PAPI_destroy_eventset((int*)eventset);
+struct thread_junk{
+  int * eventset;
+  hwloc_bitmap_t active;
+};
+
+void Monitors_thread_stop(void * thread_junk){
+  if(thread_junk==NULL) return;
+  struct thread_junk * tj = (struct thread_junk *)thread_junk;
+  PAPI_destroy_eventset(tj->eventset);
+  hwloc_bitmap_free(tj->active);
 }
 
 
@@ -387,6 +392,7 @@ void * Monitors_thread(void* monitors){
   }  
   /* bind my self to tidx core */
   cpu = hwloc_get_obj_by_depth(m->topology,depth,tidx);
+  b = hwloc_bitmap_dup(cpu->cpuset);
   if(cpu==NULL || cpu->cpuset==NULL){
     fprintf(stderr,"obj[%d] at depth %d is null\n",tidx,depth);
     exit(EXIT_FAILURE);
@@ -399,7 +405,10 @@ void * Monitors_thread(void* monitors){
     exit(EXIT_FAILURE);
   }
 
-  pthread_cleanup_push(Monitors_thread_stop,&eventset);
+  struct thread_junk tj;
+  tj.eventset = &eventset;
+  tj.active = b;
+  pthread_cleanup_push(Monitors_thread_stop,&tj);
   pthread_setcancelstate(PTHREAD_CANCEL_ENABLE,NULL);
   
   PU_vals = m->PU_vals[tidx];
@@ -441,9 +450,8 @@ void * Monitors_thread(void* monitors){
       if(out==NULL)
 	continue;
       if(m->pw!=NULL){
-	b = proc_watch_get_watched_in_cpuset(m->pw,obj->cpuset);
+	proc_watch_get_watched_in_cpuset(m->pw,obj->cpuset,b);
 	weight = hwloc_bitmap_weight(b);
-	hwloc_bitmap_free(b);
       } else weight = hwloc_bitmap_weight(obj->cpuset);
 
       pthread_mutex_trylock(&(out->update_lock));
@@ -490,7 +498,7 @@ void * Monitors_thread(void* monitors){
     /* signal we achieved our update */
   next_loop:;
     pthread_barrier_wait(&(m->barrier));
-    if(tidx==0) Monitors_print(m);
+    if(tidx==0) Monitors_print(m,b);
   }
   pthread_cleanup_pop(0);
   return NULL;

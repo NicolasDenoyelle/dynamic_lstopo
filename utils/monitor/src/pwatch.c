@@ -33,7 +33,7 @@ read_task_core(const char * task_path)
   if(task == NULL)
     return -1;
   
-  fscanf(task,"%**d %**s %**c %**d %**d %**d %**d %**d %**u %**lu %*lu %*lu %*lu %*lu %*lu %*ld %*ld %*ld %*ld %*ld %*ld %*llu %*lu %*ld %*lu %*lu %*lu %*lu %*lu %*lu %*lu %*lu %*lu %*lu %*lu %*lu %*lu %*d %d",&pu_n);
+  fscanf(task,"%*d %*s %*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %*u %*u %*d %*d %*d %*d %*d %*d %*u %*u %*d %*u %*u %*u %*u %*u %*u %*u %*u %*u %*u %*u %*u %*u %*d %d",&pu_n);
   fclose(task);
   return pu_n;
 }
@@ -74,12 +74,11 @@ proc_watch_get_pu_state(struct proc_watch * pw, unsigned int physical_PU)
   return hwloc_bitmap_isset(pw->state,physical_PU);
 }
 
-inline hwloc_bitmap_t
-proc_watch_get_watched_in_cpuset(struct proc_watch * pw, hwloc_cpuset_t cpuset)
+inline void
+proc_watch_get_watched_in_cpuset(struct proc_watch * pw, hwloc_cpuset_t cpuset, hwloc_cpuset_t out)
 {
-  hwloc_bitmap_t ret = hwloc_bitmap_dup(cpuset);
-  hwloc_bitmap_and(ret,ret,pw->state);
-  return ret;
+  if(pw!=NULL)
+    hwloc_bitmap_and(out,cpuset,pw->state);
 }
 
 void

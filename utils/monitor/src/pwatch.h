@@ -20,7 +20,7 @@ int                  proc_watch_rm_task_on_pu(struct proc_watch * pw, unsigned i
 void                 proc_watch_update(struct proc_watch * pw);
 void                 proc_watch_update_tasks(struct proc_watch * pw);
 void                 proc_watch_update_pu(struct proc_watch * pw, int physical_pu);
-hwloc_bitmap_t       proc_watch_get_watched_in_cpuset(struct proc_watch * pw, hwloc_cpuset_t cpuset);
+void                 proc_watch_get_watched_in_cpuset(struct proc_watch * pw, hwloc_cpuset_t cpuset, hwloc_cpuset_t out);
 
 
 /******************* PRIVATE BUT USED IN monitor.c **************************************************************/

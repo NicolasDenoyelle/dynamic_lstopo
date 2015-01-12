@@ -1,18 +1,24 @@
-L2ICM_per_CYC
+$L2ICM_per_CYC
 {
 	depth:4, 
 	PAPI_L2_ICM/PAPI_TOT_CYC
 } 
 
-# L1ICM_per_CYC
-# {
-# 	depth:6, 
-# 	PAPI_L1_ICM/PAPI_TOT_CYC
-# } 
+L1ICM_per_CYC
+{
+	depth:5, 
+	PAPI_L1_ICM/PAPI_TOT_CYC
+} 
 
-# FOPS_per_CYC
-# {
-# 	depth:7, 
-# 	PAPI_FP_OPS/PAPI_TOT_CYC
-# } 
+FOPS_per_CYC
+{
+	depth:1, 
+	PAPI_FP_OPS/PAPI_TOT_CYC
+} 
+
+FOPS
+{
+	depth:8, 
+	PAPI_FP_OPS
+} 
 

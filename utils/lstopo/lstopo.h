@@ -30,7 +30,7 @@ FILE *open_output(const char *filename, int overwrite) __hwloc_attribute_malloc;
 
 extern output_method output_console, output_synthetic, output_text, output_x11, output_fig, output_png, output_pdf, output_ps, output_svg, output_windows, output_xml;
 
-extern output_perf_method output_x11_perf;
+extern output_perf_method output_x11_perf, output_pdf_perf;
 
 struct draw_methods {
   void* (*start) (void *output, int width, int height);

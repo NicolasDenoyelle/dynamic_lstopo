@@ -496,7 +496,7 @@ output_perf(hwloc_topology_t topology, const char * filename, int verbose_mode, 
 # endif /* CAIRO_HAS_PNG_FUNCTIONS */
 # if CAIRO_HAS_PDF_SURFACE
   case LSTOPO_OUTPUT_PDF:
-    output_pdf(topology, filename, overwrite, logical, legend, verbose_mode);
+    output_pdf_perf(topology, NULL, overwrite, logical, legend, verbose_mode,monitors, r_usec);
     break;
 # endif /* CAIRO_HAS_PDF_SURFACE */
 # if CAIRO_HAS_PS_SURFACE
