@@ -393,18 +393,18 @@ struct dyna_save {
 } while (0)
 
 /* Check whether we already computed the size and we are not actually drawing, in that case return it */
-#define DYNA_CHECK() do { \
-  if (level->userdata && methods == &null_draw_methods) { \
-    struct dyna_save *save = level->userdata; \
+#define DYNA_CHECK() do {					    \
+    if (level->userdata && methods == &null_draw_methods) {	    \
+      struct dyna_save *save = level->userdata;			    \
     if (save->fontsize == fontsize && save->gridsize == gridsize) { \
-      *retwidth = save->width; \
-      *retheight = save->height; \
-    } \
-    free(level->userdata); \
-    level->userdata = NULL; \
-    return; \
-  } \
-} while (0)
+      *retwidth = save->width;					    \
+      *retheight = save->height;				    \
+    }								    \
+    free(level->userdata);					    \
+    level->userdata = NULL;					    \
+    return;							    \
+    }								    \
+  } while (0)
 
 static int
 prefer_vert(hwloc_topology_t topology, int logical, hwloc_obj_t level, void *output, unsigned depth, unsigned x, unsigned y, unsigned separator)
@@ -1308,65 +1308,82 @@ output_draw(struct draw_methods *methods, int logical, int legend, hwloc_topolog
 	fig(topology, methods, logical, legend, hwloc_get_root_obj(topology), output, 100, 0, 0);
 }
 
+#ifdef HWLOC_HAVE_MONITOR
 void
 perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj_t level, void *output, unsigned depth, struct node_box * box){
-  struct dyna_save * ds = (struct dyna_save *) level->userdata;
+  unsigned x,y,totwidth,totheight,mywidth,myheight,width,height,gridsize;
   struct style style;
   lstopo_set_object_color(methods, topology, level, 0 /* node */, &style);
-  
-  unsigned myheight, mywidth, x = ds->x,y = ds->y;
+
+
+  struct dyna_save * ds = (struct dyna_save *) level->userdata;
+  if(ds!=NULL){
+    x = ds->x;
+    y = ds->y;
+    totwidth = ds->totwidth;
+    totheight = ds->totheight;
+    mywidth = ds->mywidth;
+    myheight = ds->myheight;
+    width = ds->width;
+    height = ds->height;
+    gridsize = ds->gridsize;
+  }
+
+  else
+    return;
+
   switch(level->type){
   case HWLOC_OBJ_SYSTEM: 
-    myheight = ds->totheight; 
-    mywidth = ds->totwidth; 
+    myheight = totheight; 
+    mywidth = totwidth; 
     break;
   case HWLOC_OBJ_MACHINE:
-    myheight = ds->totheight;
-    mywidth = ds->totwidth - 2 * ds->gridsize;
+    myheight = totheight;
+    mywidth = totwidth - 2 * gridsize;
     break;
   case HWLOC_OBJ_NUMANODE:
-    myheight = ds->myheight - ds->gridsize;
-    mywidth = ds->totwidth - 2*ds->gridsize;
-    x+=ds->gridsize;
-    y+=ds->gridsize;
+    myheight = myheight - gridsize;
+    mywidth = totwidth - 2*gridsize;
+    x+=gridsize;
+    y+=gridsize;
     break;
   case HWLOC_OBJ_PACKAGE:
-    myheight = ds->totheight;
-    mywidth = ds->totwidth;
+    myheight = totheight;
+    mywidth = totwidth;
     break;
   case HWLOC_OBJ_CACHE:
-    myheight = ds->myheight - ds->gridsize;
-    mywidth = ds->totwidth;
+    myheight = myheight - gridsize;
+    mywidth = totwidth;
     break;
   case HWLOC_OBJ_CORE:
-    myheight = ds->totheight;
-    mywidth = ds->totwidth;
+    myheight = totheight;
+    mywidth = totwidth;
     break;
   case HWLOC_OBJ_PU:
-    myheight = ds->height;
-    mywidth = ds->width;
+    myheight = height;
+    mywidth = width;
     break;
   case HWLOC_OBJ_GROUP:
-    myheight = ds->totheight;
-    mywidth = ds->totwidth;
+    myheight = totheight;
+    mywidth = totwidth;
     break;
   case HWLOC_OBJ_PCI_DEVICE:
-    myheight = ds->height;
-    mywidth = ds->width;
+    myheight = height;
+    mywidth = width;
     break;
   case HWLOC_OBJ_OS_DEVICE:
-    myheight = ds->height;
-    mywidth = ds->width;
+    myheight = height;
+    mywidth = width;
     break;
   case HWLOC_OBJ_BRIDGE:
-    myheight = ds->gridsize;
-    mywidth = ds->gridsize;
-    x = ds->x + 3*ds->gridsize;
-    y = ds->y + ds->totheight;
+    myheight = gridsize;
+    mywidth = gridsize;
+    x = x + 3*gridsize;
+    y = y + totheight;
     break;
   }
-  unsigned height = myheight*box->val/(box->max - box->min);
-  unsigned draw_value = (float)box->val*(float)ds->height/(float)(box->max - box->min);
+  height = myheight*box->val/(box->max - box->min);
+  unsigned draw_value = (float)box->val*(float)height/(float)(box->max - box->min);
   unsigned draw_color_red = 255*(float)box->val/(float)(box->max - box->min);
   unsigned draw_color_blue = 255*(1-(float)box->val/(float)(box->max - box->min));
   unsigned draw_color_green = draw_color_blue / 2;
@@ -1375,6 +1392,7 @@ perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj
 
   char text[64];
   sprintf(text,"%lf",box->val);
-  methods->text(output, style.t2.r, style.t2.g, style.t2.b, ds->fontsize, depth-2, x+ds->fontsize, y+ds->fontsize, text);
+  methods->text(output, style.t2.r, style.t2.g, style.t2.b, fontsize, depth-2, x+fontsize, y+fontsize, text);
 }
 
+#endif /* HWLOC_HAVE_MONITOR */

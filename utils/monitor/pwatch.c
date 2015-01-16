@@ -29,7 +29,6 @@ read_task_core(const char * task_path)
 {
   FILE * task = fopen(task_path, "r");
   int pu_n=-1;
-  void * nul;
   if(task == NULL)
     return -1;
   

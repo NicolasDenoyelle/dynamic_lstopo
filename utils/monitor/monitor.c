@@ -192,8 +192,7 @@ Monitors_t new_Monitors(hwloc_topology_t topology,
     hwloc_topology_dup(&m->topology,topology);
   }
   else{
-    hwloc_topology_init(&m->topology);
-    hwloc_topology_load(m->topology);
+    topology_init(&m->topology);
   }
 
   /* Initialize output */
@@ -242,12 +241,13 @@ Monitors_t new_Monitors(hwloc_topology_t topology,
   return m;
 }
 
-int add_Monitor(Monitors_t m, const char * name, unsigned int depth, double (*fun)(long long *)){
+int add_Monitor(Monitors_t m, const char * name, char * hwloc_obj_name, double (*fun)(long long *)){
   unsigned int i,j, n_obj;
   hwloc_obj_t node;
-  
   if(m==NULL)
     return 1;
+
+  /* realloc necessary space */
   if(m->allocated_count<=m->count){
     m->allocated_count*=2;
     if((m->names=realloc(m->names, sizeof(char*)*m->allocated_count))==NULL)
@@ -256,6 +256,30 @@ int add_Monitor(Monitors_t m, const char * name, unsigned int depth, double (*fu
       exit(EXIT_FAILURE);
     if((m->compute=realloc(m->compute, sizeof(double(*)(long long*))*m->allocated_count))==NULL)
       exit(EXIT_FAILURE);
+  }
+
+  /* find hwloc obj depth */
+  hwloc_obj_type_t type;
+  int  depthattrp;
+  hwloc_obj_cache_type_t cache_type;
+  hwloc_obj_type_sscanf(hwloc_obj_name,&type,&depthattrp,&cache_type,sizeof(cache_type));
+  int depth = hwloc_get_type_depth(m->topology,type);
+  if(depth==HWLOC_TYPE_DEPTH_MULTIPLE){
+    if(type==HWLOC_OBJ_CACHE){
+      depth = hwloc_get_cache_type_depth(m->topology,depthattrp,cache_type);
+      if(depth == HWLOC_TYPE_DEPTH_UNKNOWN){
+	fprintf(stderr,"type %s cannot be found, level=%d\n",hwloc_obj_name,depthattrp);
+	return 1;
+      }
+      if(depth == HWLOC_TYPE_DEPTH_MULTIPLE){
+	fprintf(stderr,"type %s multiple caches match\n",hwloc_obj_name);
+	return 1;
+      }
+    }
+    else{
+      fprintf(stderr,"type %s isn't handled...\n",hwloc_obj_name);
+      return 1;
+    }
   }
 
   i=0;
@@ -416,6 +440,7 @@ void * Monitors_thread(void* monitors){
   if(m->pw==NULL)
     PAPI_start(eventset);
   pthread_barrier_wait(&(m->barrier));
+
   for(;;){
     m->uptodate=1;
     pthread_mutex_lock(&m->cond_mtx);
@@ -546,11 +571,10 @@ new_default_Monitors(hwloc_topology_t topology, const char * output,unsigned int
 {
   char ** event_names;
   Monitors_t m;
-  int depth;
 
   event_names = malloc(sizeof(char*)*2);
   event_names[0]=strdup("PAPI_FP_OPS");
-  event_names[1]=strdup("PAPI_L1_DCA");
+  event_names[1]=strdup("PAPI_L1_DCM");
   m = new_Monitors(topology, 2,event_names,output,pid);
   if(m==NULL){
     fprintf(stderr,"default monitors creation failed\n");
@@ -558,9 +582,8 @@ new_default_Monitors(hwloc_topology_t topology, const char * output,unsigned int
     return NULL;
   }
   free(event_names[0]); free(event_names[1]); free(event_names);
-  depth = hwloc_topology_get_depth(m->topology);
-  add_Monitor(m,"flops_fp",depth-1,flop_fp);
-  add_Monitor(m,"L1_DCA / FP_OPS",depth-2,L1d_access_per_fpops);
+  add_Monitor(m,"flops_fp","PU",flop_fp);
+  add_Monitor(m,"L1_DCM / FP_OPS","L1",L1d_access_per_fpops);
   return m;
 }
 
@@ -578,7 +601,7 @@ load_Monitors(hwloc_topology_t topology, const char * perf_group_file, const cha
     return NULL;
   }
   if( access( perf_group_file, R_OK ) == -1 ){
-    fprintf(stderr,"perf group file:%s cannot be accessed;_n",perf_group_file);
+    fprintf(stderr,"perf group file:%s cannot be accessed;\n",perf_group_file);
     return NULL;
   }
 
@@ -603,16 +626,17 @@ load_Monitors(hwloc_topology_t topology, const char * perf_group_file, const cha
     fun = dlsym(m->dlhandle,(pn->monitor_names)[i]);
     if(fun==NULL){
       fprintf(stderr,"could not load monitor function %s : %s\n",(pn->monitor_names)[i],dlerror());
-      add_Monitor(m,(pn->monitor_names)[i],(pn->depths)[i],no_fun);
+      add_Monitor(m,(pn->monitor_names)[i],(pn->monitor_obj)[i],no_fun);
     }
     else
-      add_Monitor(m,(pn->monitor_names)[i],(pn->depths)[i],*fun);
+      add_Monitor(m,(pn->monitor_names)[i],(pn->monitor_obj)[i],*fun);
     free(pn->monitor_names[i]);
+    free(pn->monitor_obj[i]);
   }
   
   free(pn->monitor_names);
   free(pn->event_names);
-  free(pn->depths);
+  free(pn->monitor_obj);
   free(pn);
   return m;
 }

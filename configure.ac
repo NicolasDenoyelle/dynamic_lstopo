@@ -271,6 +271,7 @@ Probe / display I/O devices:$hwloc_probeio_list
 Graphical output (Cairo):    $hwloc_cairo_happy
 XML input / output:          $hwloc_xml_status
 Netloc functionality:        $netloc_happy
+Monitor functionality:       $hwloc_monitor_happy
 EOF
 
 # Linux specific support

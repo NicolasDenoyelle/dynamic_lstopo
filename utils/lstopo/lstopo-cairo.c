@@ -10,6 +10,7 @@
 
 #include <cairo.h>
 #include <sys/time.h>
+#include <sys/timerfd.h>
 
 #if CAIRO_HAS_PDF_SURFACE
 #include <cairo-pdf.h>
@@ -44,31 +45,15 @@
 #include <string.h>
 #include <errno.h>
 #include <limits.h>
-
 #include "lstopo.h"
+
+#ifdef HWLOC_HAVE_MONITOR
 #include "monitor.h"
 #include "pwatch.h"
+#endif
 
 #if (CAIRO_HAS_XLIB_SURFACE + CAIRO_HAS_PNG_FUNCTIONS + CAIRO_HAS_PDF_SURFACE + CAIRO_HAS_PS_SURFACE + CAIRO_HAS_SVG_SURFACE)
 /* Cairo methods */
-
-static void topo_cairo_perf_boxes(hwloc_topology_t topology, Monitors_t monitors, hwloc_bitmap_t active, cairo_t *c, struct draw_methods * methods)
-{
-  unsigned int i, nobj;
-  struct node_box * box;
-  hwloc_obj_t obj;
-    for(i=0;i<monitors->count;i++){
-      nobj = hwloc_get_nbobjs_by_depth(monitors->topology,monitors->depths[i]);
-      while(nobj--){
-	box=(struct node_box *)(hwloc_get_obj_by_depth(monitors->topology,monitors->depths[i],nobj)->userdata);
-	obj = hwloc_get_obj_by_depth(topology,monitors->depths[i],nobj);
-	proc_watch_get_watched_in_cpuset(monitors->pw,obj->cpuset,active);
-	if(!hwloc_bitmap_iszero(active)){
-	  perf_box_draw(topology, methods, obj, c, obj->depth, box);
-	}
-      }
-    }
-}
 
 static void
 topo_cairo_box(void *output, int r, int g, int b, unsigned depth __hwloc_attribute_unused, unsigned x, unsigned width, unsigned y, unsigned height)
@@ -269,22 +254,22 @@ move_x11(struct display *disp, int logical, int legend, hwloc_topology_t topolog
   }
 }
 
-int handle_xDisplay(struct display *disp, hwloc_topology_t topology, int logical, int legend){
+int handle_xDisplay(struct display *disp, hwloc_topology_t topology, int logical, int legend, int * lastx, int* lasty){
   XEvent e;
   int finish=0;
   int state = 0;
   int x = 0, y = 0; /* shut warning down */
-  int lastx = disp->x, lasty = disp->y;
   
   if (!XEventsQueued(disp->dpy, QueuedAfterFlush)) {
     /* No pending event, flush moving windows before waiting for next event */
-    if (disp->x != lastx || disp->y != lasty) {
+    if (disp->x != *lastx || disp->y != *lasty) {
       XMoveWindow(disp->dpy, disp->win, -disp->x, -disp->y);
-      lastx = disp->x;
-      lasty = disp->y;
+      *lastx = disp->x;
+      *lasty = disp->y;
     }
-    return 0;
+    //return 0;
   }
+
   XNextEvent(disp->dpy, &e);
   switch (e.type) {
   case Expose:
@@ -304,7 +289,7 @@ int handle_xDisplay(struct display *disp, hwloc_topology_t topology, int logical
     disp->screen_width = e.xconfigure.width;
     disp->screen_height = e.xconfigure.height;
     move_x11(disp, logical, legend, topology);
-    if (disp->x != lastx || disp->y != lasty)
+    if (disp->x != *lastx || disp->y != *lasty)
       XMoveWindow(disp->dpy, disp->win, -disp->x, -disp->y);
     break;
   case ButtonPress:
@@ -389,8 +374,8 @@ output_x11(hwloc_topology_t topology, const char *filename __hwloc_attribute_unu
 {
   struct display *disp = output_draw_start(&x11_draw_methods, logical, legend, topology, NULL);
   topo_cairo_paint(&x11_draw_methods, logical, legend, topology, disp->cs);
-
-  while (!handle_xDisplay(disp,topology,logical,legend));
+  int lastx = disp->x, lasty = disp->y;
+  while (!handle_xDisplay(disp,topology,logical,legend,&lastx,&lasty));
  
   x11_destroy(disp);
   XDestroyWindow(disp->dpy, disp->top);
@@ -399,42 +384,88 @@ output_x11(hwloc_topology_t topology, const char *filename __hwloc_attribute_unu
   free(disp);
 }
 
+
+#ifdef HWLOC_HAVE_MONITOR
+static void topo_cairo_perf_boxes(hwloc_topology_t topology, Monitors_t monitors, hwloc_bitmap_t active, cairo_t *c, struct draw_methods * methods)
+{
+  unsigned int i, nobj;
+  struct node_box * box;
+  hwloc_obj_t obj;
+  for(i=0;i<monitors->count;i++){
+    nobj = hwloc_get_nbobjs_by_depth(monitors->topology,monitors->depths[i]);
+    while(nobj--){
+      box=(struct node_box *)(hwloc_get_obj_by_depth(monitors->topology,monitors->depths[i],nobj)->userdata);
+      obj = hwloc_get_obj_by_depth(topology,monitors->depths[i],nobj);
+      proc_watch_get_watched_in_cpuset(monitors->pw,obj->cpuset,active);
+      if(!monitors->pw || !hwloc_bitmap_iszero(active)){
+	perf_box_draw(topology, methods, obj, c, obj->depth, box);
+      }
+    }
+  }
+  cairo_show_page(c);
+}
+
 void
 output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_attribute_unused, int overwrite __hwloc_attribute_unused, int logical, int legend, int verbose_mode __hwloc_attribute_unused, Monitors_t monitors, unsigned long refresh_usec)
 {
-  unsigned int i, nobj,retwidth, retheight;
-  hwloc_obj_t obj;
-  struct node_box * box;
-  unsigned int height, box_height, width;
-
-  struct display *disp = output_draw_start(&x11_draw_methods, logical, legend, topology, NULL);
+  /* draw initial topology */
+  struct display *disp;
+  disp = output_draw_start(&x11_draw_methods, logical, legend, topology, NULL);
+  int lastx = disp->x, lasty = disp->y;
   topo_cairo_paint(&x11_draw_methods, logical, legend, topology, disp->cs);
+  cairo_t * c = cairo_create(disp->cs);
 
-  struct timeval time;
-  time.tv_sec=0; 
-  time.tv_usec=0; 
-  unsigned long old_sec;
-  unsigned long old_usec;
-  old_usec=time.tv_usec;
-  old_sec =time.tv_sec;
+  /* passed to draw perf boxes methods to avoid drawing unactive boxes */
+  hwloc_bitmap_t active;
+  active= hwloc_bitmap_dup(hwloc_topology_get_topology_cpuset(topology));
 
-  hwloc_bitmap_t active = hwloc_bitmap_dup(hwloc_topology_get_topology_cpuset(topology));
+  /* set timer interval for update */
+  struct itimerspec itimer;
+  itimer.it_interval.tv_sec=refresh_usec/1000000; 
+  itimer.it_interval.tv_nsec=(refresh_usec%1000000)*1000; 
+  itimer.it_value.tv_sec=itimer.it_interval.tv_sec;
+  itimer.it_value.tv_nsec=itimer.it_interval.tv_nsec; 
+ 
+  /* select between x11event and alarm */
+  fd_set in_fds, in_fds_original;
+  FD_ZERO(&in_fds_original);  
+  int x11_fd = ConnectionNumber(disp->dpy);
+  int itimer_fd = timerfd_create(CLOCK_REALTIME,0);
+  if(itimer_fd==-1){
+    perror("itimer");
+    goto exit;
+  }
+  FD_SET(x11_fd, &in_fds_original);
+  FD_SET(itimer_fd, &in_fds_original);
+  int nfds = x11_fd > itimer_fd ? x11_fd+1 : itimer_fd+1;  
+  
+  struct timeval timeout;
+  timeout.tv_sec=10;
+  timeout.tv_usec=0;
 
-  cairo_t *c;
-  c = cairo_create(disp->cs);
-
+  /* start monitoring activity */
   Monitors_start(monitors);
-  while (!handle_xDisplay(disp,topology,logical,legend)){
-    gettimeofday(&time,NULL);
-    if(time.tv_usec-old_usec>=refresh_usec){
-      old_usec=time.tv_usec;
-      Monitors_update_counters(monitors);
-      //      Monitors_wait_update(monitors);
-      topo_cairo_perf_boxes(topology, monitors, active, c, &x11_draw_methods);
-      cairo_show_page(c);
+
+  /* start timer */
+  timerfd_settime(itimer_fd,0,&itimer,NULL);
+
+  while(1){
+    in_fds = in_fds_original;
+    if(select(nfds, &in_fds, NULL, NULL,&timeout)>0){
+      if(FD_ISSET(x11_fd,&in_fds)){
+    	if(handle_xDisplay(disp,topology,logical,legend,&lastx,&lasty))
+    	  break;
+      }
+      if(FD_ISSET(itimer_fd,&in_fds)){
+	read(itimer_fd,NULL,sizeof(uint64_t));
+	topo_cairo_perf_boxes(topology, monitors, active, c, &x11_draw_methods);
+	Monitors_update_counters(monitors);
+	Monitors_wait_update(monitors);
+      }
     }
   }
 
+ exit:;
   hwloc_bitmap_free(active); 
   cairo_destroy(c);
   x11_destroy(disp);
@@ -443,7 +474,7 @@ output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_attribut
   XCloseDisplay(disp->dpy);
   free(disp);
 }
-
+#endif /*HWLOC_HAVE_MONITOR*/
 
 #endif /* CAIRO_HAS_XLIB_SURFACE */
 
@@ -523,6 +554,8 @@ output_pdf(hwloc_topology_t topology, const char *filename, int overwrite, int l
     fclose(output);
 }
 
+
+#ifdef HWLOC_HAVE_MONITOR
 void
 output_pdf_perf(hwloc_topology_t topology, const char *filename __hwloc_attribute_unused, int overwrite __hwloc_attribute_unused, int logical, int legend, int verbose_mode __hwloc_attribute_unused, Monitors_t monitors, unsigned long refresh_usec)
 {
@@ -557,7 +590,7 @@ output_pdf_perf(hwloc_topology_t topology, const char *filename __hwloc_attribut
   if (output != stdout)
     fclose(output);
 }
-
+#endif /* HWLOC_HAVE_MONITOR */
 #endif /* CAIRO_HAS_PDF_SURFACE */
 
 

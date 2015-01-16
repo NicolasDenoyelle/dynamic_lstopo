@@ -35,7 +35,10 @@
 
 #include "lstopo.h"
 #include "misc.h"
+
+#ifdef HWLOC_HAVE_MONITOR
 #include "monitor.h"
+#endif
 
 int lstopo_pid_number = -1;
 hwloc_pid_t lstopo_pid;
@@ -57,10 +60,12 @@ static int logical = -1;
 static unsigned int legend = 1;
 static unsigned int top  = 0;
 
+#ifdef HWLOC_HAVE_MONITOR
 static unsigned int perf = 0;
 static char * perf_output = NULL;
 static char * perf_input = NULL;
 static unsigned long refresh_usec=100000;
+#endif
 
 FILE *open_output(const char *filename, int overwrite)
 {
@@ -303,8 +308,10 @@ void usage(const char *name, FILE *where)
   fprintf (where, "  --no-io               Do not show any I/O device or bridge\n");
   fprintf (where, "  --no-bridges          Do not any I/O bridge except hostbridges\n");
   fprintf (where, "  --whole-io            Show all I/O devices and bridges\n");
+#ifdef HWLOC_HAVE_MONITOR
   fprintf (where, "  --perf-output         Choose a file to keep monitors trace\n");
   fprintf (where, "  -r --refresh <r_usec> Refresh display each r_usec when --perf option is used\n");
+#endif
   fprintf (where, "Input options:\n");
   hwloc_utils_input_format_usage(where, 6);
   fprintf (where, "  --thissystem          Assume that the input topology provides the topology\n"
@@ -322,8 +329,10 @@ void usage(const char *name, FILE *where)
   fprintf (where, "  --export-synthetic-flags <n>\n"
 	   "                        Set flags during the synthetic topology export\n");
   fprintf (where, "  --ps --top            Display processes within the hierarchy\n");
+#ifdef HWLOC_HAVE_MONITOR
   fprintf (where, "  --perf                Display dynamic monitors on topology\n");
   fprintf (where, "  --perf-input          Choose a file where monitors are defined\n");
+#endif
   fprintf (where, "  --version             Report version and exit\n");
 }
 
@@ -444,11 +453,10 @@ output(hwloc_topology_t topology, const char * filename, int verbose_mode, char*
   }
 }
 
-
+#ifdef HWLOC_HAVE_MONITOR
 void 
 output_perf(hwloc_topology_t topology, const char * filename, int verbose_mode, char* callname, int output_format, Monitors_t monitors, unsigned long r_usec)
 {
-
   switch (output_format) {
   case LSTOPO_OUTPUT_DEFAULT:
 #ifdef LSTOPO_HAVE_GRAPHICS
@@ -519,7 +527,7 @@ output_perf(hwloc_topology_t topology, const char * filename, int verbose_mode, 
     exit(EXIT_FAILURE);
   }
 }
-
+#endif /*HWLOC_HAVE_MONITOR*/
 
 #define LSTOPO_VERBOSE_MODE_DEFAULT 1
 
@@ -715,8 +723,10 @@ main (int argc, char *argv[])
 	  exit(EXIT_FAILURE);
 	}
 	lstopo_pid_number = atoi(argv[1]); opt = 1;
-      } else if (!strcmp (argv[0], "--ps") || !strcmp (argv[0], "--top"))
+      } else if (!strcmp (argv[0], "--ps") || !strcmp (argv[0], "--top")){
         top = 1;
+      }
+#ifdef HWLOC_HAVE_MONITOR
       else if (!strcmp (argv[0], "--perf"))
 	perf = 1;
       else if (!strcmp (argv[0], "--perf-output")){
@@ -740,7 +750,9 @@ main (int argc, char *argv[])
 	}
 	refresh_usec = atoll(argv[1]);
 	opt = 1;
-      } else if (!strcmp (argv[0], "--version")) {
+    }
+#endif
+	else if (!strcmp (argv[0], "--version")) {
 	printf("%s %s\n", callname, VERSION);
 	exit(EXIT_SUCCESS);
       } else if (!strcmp (argv[0], "--output-format") || !strcmp (argv[0], "--of")) {
@@ -848,6 +860,7 @@ main (int argc, char *argv[])
       logical = 0;
   }
 
+#ifdef HWLOC_HAVE_MONITOR
   if(perf){
     Monitors_t m=load_Monitors(topology,perf_input,perf_output,lstopo_pid);
     if(m==NULL)
@@ -857,7 +870,8 @@ main (int argc, char *argv[])
     output_perf(topology, filename, verbose_mode, callname, output_format, m, refresh_usec);
     delete_Monitors(m);
   }
-
+  else
+#endif
   output(topology, filename, verbose_mode, callname, output_format);
  exit:;
   hwloc_topology_destroy (topology);

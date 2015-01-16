@@ -6,12 +6,18 @@
 
 # This makefile is only reached when building in standalone mode
 
-AM_CFLAGS = $(HWLOC_CFLAGS) -g3
+AM_CFLAGS = $(HWLOC_CFLAGS)
 # Add -I of utils/hwloc for misc.h
-AM_CPPFLAGS = $(HWLOC_CPPFLAGS) -I$(top_srcdir)/utils/hwloc -I$(top_srcdir)/utils/monitor/src
-AM_LDFLAGS = $(HWLOC_LDFLAGS) -L/opt/papi-5.3.0/lib/ -lpapi
+AM_CPPFLAGS = $(HWLOC_CPPFLAGS) -I$(top_srcdir)/utils/hwloc 
 
-LDADD = $(HWLOC_top_builddir)/hwloc/libhwloc.la $(HWLOC_top_builddir)/utils/monitor/libmonitor.la
+AM_LDFLAGS = $(HWLOC_LDFLAGS)
+
+LDADD = $(HWLOC_top_builddir)/hwloc/libhwloc.la
+
+if HWLOC_HAVE_MONITOR
+AM_CPPFLAGS+= -I$(top_srcdir)/utils/monitor
+LDADD+= $(HWLOC_top_builddir)/utils/monitor/libmonitor.la 
+endif
 
 bin_PROGRAMS = \
         lstopo-no-graphics

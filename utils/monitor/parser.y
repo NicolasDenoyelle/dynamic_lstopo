@@ -7,6 +7,7 @@
 #include "hwloc.h"
 #include "parser.h"
 
+  hwloc_topology_t topology;
   int yyerror(char * s);
   char * concat_expr(char* expr1, char sign, char* expr2);
   char * parenthesis(char* expr);
@@ -14,13 +15,13 @@
   void print_func(char * name,char* code);
   unsigned int nb_counters, nb_monitors, topodepth, i;
   char * err;
-  char ** event_names, ** monitor_names;
-  unsigned int * monitor_depths;
+  char ** event_names, ** monitor_names, ** monitor_obj;
   
 
 %}
 
-%token <str> NAME COUNTER REAL INTEGER DEPTH
+%error-verbose
+%token <str> NAME COUNTER REAL INTEGER OBJ
 %type  <str> primary_expr add_expr mul_expr 
 
 
@@ -37,10 +38,9 @@ monitor_list
 ;
 
 monitor
-: NAME '{' hwloc_obj_expr ',' add_expr '}' {
+: NAME '{' hwloc_obj ',' add_expr '}' {
   /* {{{ */
   if(nb_monitors==0 || 
-     //     !bsearch(&tmp, monitors,nb_monitors,sizeof(Monitor_t),cmpmonitordepth) ||
      strsearch($1, monitor_names,nb_monitors)==-1){
     print_func($1,$5);
     monitor_names[nb_monitors]=$1;
@@ -66,8 +66,8 @@ add_expr
 | mul_expr '/' primary_expr {$$=concat_expr($1,'/',$3); free($1); free($3);}
 ;
 
-hwloc_obj_expr
-: DEPTH ':' INTEGER {monitor_depths[nb_monitors]=atoi($3); free($1); free($3);}
+hwloc_obj
+: OBJ {monitor_obj[nb_monitors]=$1;}
 ;
 
 primary_expr 
@@ -114,9 +114,25 @@ extern int yylineno;
 
 int yyerror (char *s) {
   /* {{{ */
-
   fflush (stdout);
-  fprintf (stderr, "%d:%d: %s\n", yylineno, column, s);
+  
+  fprintf(stderr, "%d:%d: %s while scanning input file\n", yylineno, column, s);
+  fprintf(stderr, "available hwloc_objs: \n");
+  unsigned nobjs;
+  char** objs = get_avail_hwloc_objs_names(&nobjs);
+  while((nobjs--) >0){
+    fprintf(stderr,("\t%s\n"),objs[nobjs]);
+    free(objs[nobjs]);
+  }
+
+  fprintf(stderr, "available counters: \n");
+  unsigned ncount;
+  char** counters = get_avail_papi_counters(&ncount);
+  while((ncount--) >0){
+    fprintf(stderr,("\t%s\n"),counters[ncount]);
+    free(counters[ncount]);
+  }
+  
   exit(EXIT_FAILURE);
 
   /* }}} */
@@ -179,17 +195,14 @@ void print_func(char * name,char* code){
 }
 
 struct parsed_names * parser(const char * file_name) {
-  hwloc_topology_t topology;
   /* Allocate and initialize topology object. */
-  hwloc_topology_init(&topology);
-  /* Perform the topology detection. */
-  hwloc_topology_load(topology);
+  topology_init(&topology);
   topodepth = hwloc_topology_get_depth(topology);
 
   monitor_names = malloc(sizeof(char*)*topodepth);
-  monitor_depths = malloc(sizeof(int)*topodepth);
-  event_names = malloc(sizeof(char*)*PAPI_MAX_MPX_CTRS);
-  if(event_names==NULL || monitor_names==NULL || monitor_depths==NULL){
+  monitor_obj  = malloc(sizeof(char*)*topodepth);
+  event_names   = malloc(sizeof(char*)*PAPI_MAX_MPX_CTRS);
+  if(event_names==NULL || monitor_names==NULL || monitor_obj==NULL){
     exit(1);
   }
 
@@ -230,7 +243,7 @@ struct parsed_names * parser(const char * file_name) {
   pn->n_monitors = nb_monitors;
   pn->monitor_names = monitor_names;
   pn->event_names = event_names;
-  pn->depths = monitor_depths;
+  pn->monitor_obj = monitor_obj;
 
   fclose(output);
 

@@ -2,7 +2,13 @@
 #
 # See COPYING in top-level directory.
 
-SUBDIRS = hwloc monitor lstopo 
+SUBDIRS= hwloc
+
+if HWLOC_HAVE_MONITOR
+SUBDIRS+= monitor 
+endif
+
+SUBDIRS += lstopo 
 
 if BUILD_NETLOC
 SUBDIRS += \
