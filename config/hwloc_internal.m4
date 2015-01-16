@@ -50,6 +50,11 @@ AC_DEFUN([HWLOC_DEFINE_ARGS],[
                   AC_HELP_STRING([--disable-picky],
                                  [When in developer checkouts of hwloc and compiling with gcc, the default is to enable maximum compiler pickyness.  Using --disable-picky or --enable-picky overrides any default setting]))
 
+    #monitor ?			 
+    AC_ARG_ENABLE([monitor],
+       		  AS_HELP_STRING([--disable-monitor],
+				 [Disable PAPI monitoring back-end hwloc's lstopo command]))
+
     # Cairo?
     AC_ARG_ENABLE([cairo],
                   AS_HELP_STRING([--disable-cairo],
@@ -261,10 +266,6 @@ papi_header_happy=no
 lex_happy=no
 yacc_happy=no
 no_happy=no
-
-AC_ARG_ENABLE([monitor],
-AS_HELP_STRING([--disable-monitor],
-[Disable PAPI monitoring back-end hwloc's lstopo command]))
 
 if test "x$enable_monitor" != "xno"; then
 hwloc_monitor_happy=yes     
