@@ -21,4 +21,5 @@ libmonitor_la_LDFLAGS = -lpapi -ldl -lpthread -lm
 AM_CPPFLAGS = $(HWLOC_CPPFLAGS) -I$(top_srcdir)/utils/hwloc
 libmonitor_la_LIBADD = $(top_builddir)/hwloc/libhwloc.la
 
-DISTCLEANFILES = scanner.c scanner.l parser.c p
+DISTCLEANFILES = scanner.c scanner.l parser.c parser.tab.h
+
