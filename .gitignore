@@ -174,10 +174,20 @@ test-suite.log
 /utils/lstopo/*.o
 /utils/lstopo/lstopo
 /utils/lstopo/lstopo-no-graphics
+/utils/lstopo/lstopo-no-graphics.1
+/utils/lstopo/autom4te.cache
 /utils/lstopo/lstopo.1
 /utils/lstopo/test-hwloc-ls.sh
 /utils/lstopo/test-*.sh.log
 /utils/lstopo/test-*.sh.trs
+
+/utils/monitor/Makefile.save
+/utils/monitor/multithread.c
+/utils/monitor/main.c
+/utils/monitor/parser.tab.h
+/utils/monitor/scanner.c
+/utils/monitor/scanner.l
+/utils/monitor/parser.c
 
 /netloc.pc
 
