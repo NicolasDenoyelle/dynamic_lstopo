@@ -2,6 +2,7 @@
 #define MONITOR_H
 
 #include "hwloc.h"
+#include <poll.h>
 
 struct node_box{
   long long *     counters_val;
@@ -38,7 +39,8 @@ struct monitors{
   pthread_barrier_t barrier;
   pthread_cond_t    cond;
   pthread_mutex_t   cond_mtx;
-  unsigned int      uptodate;
+  int               update_pipe[2];
+  struct pollfd     update_poll;
 
   unsigned int      count;             /* nb_monitors */
   unsigned int      allocated_count; 

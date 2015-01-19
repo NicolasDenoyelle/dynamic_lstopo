@@ -1384,12 +1384,12 @@ perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj
   }
   height = myheight*box->val/(box->max - box->min);
   unsigned draw_value = (float)box->val*(float)height/(float)(box->max - box->min);
-  unsigned draw_color_red = 255*(float)box->val/(float)(box->max - box->min);
-  unsigned draw_color_blue = 255*(1-(float)box->val/(float)(box->max - box->min));
-  unsigned draw_color_green = draw_color_blue / 2;
+  float value = (float)box->val/(float)(box->max - box->min);
+  float r = value>0.5? 255:510*value;
+  float g = value>0.5? 510*(1-value):255;
+  float b = 0;
   methods->box(output,style.bg.r,style.bg.g,style.bg.b,depth,x,mywidth,y,myheight);
-  methods->box(output,draw_color_red,draw_color_green,draw_color_blue,depth,x,mywidth,y,height);
-
+  methods->box(output,(unsigned)r,(unsigned)g,(unsigned)b,depth,x,mywidth,y+myheight-height,height);
   char text[64];
   sprintf(text,"%lf",box->val);
   methods->text(output, style.t2.r, style.t2.g, style.t2.b, fontsize, depth-2, x+fontsize, y+fontsize, text);

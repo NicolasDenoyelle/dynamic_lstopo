@@ -465,7 +465,7 @@ output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_attribut
 	read(itimer_fd,NULL,sizeof(uint64_t));
 	topo_cairo_perf_boxes(topology, monitors, active, c, &x11_draw_methods);
 	Monitors_update_counters(monitors);
-	//Monitors_wait_update(monitors);
+	Monitors_wait_update(monitors);
       }
     }
   }

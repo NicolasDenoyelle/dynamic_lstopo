@@ -25,12 +25,12 @@
 #define Monitors_get_monitor_min(m,i) Monitors_get_node_box(m,i,0)->min
 #define Monitors_get_monitor_value(m, monitor_idx, sibling_idx) Monitors_get_node_box(m,monitor_idx,sibling_idx)->val
 
-inline void zerof(double * array, unsigned int size){
+static inline void zerof(double * array, unsigned int size){
   unsigned int i = size;
   for(i=0;i<size;i++) array[i]=0;
 }
 
-inline void zerod(long long * array, unsigned int size){
+static inline void zerod(long long * array, unsigned int size){
   unsigned int i = size;
   for(i=0;i<size;i++) array[i]=0;
 }
@@ -178,8 +178,6 @@ Monitors_t new_Monitors(hwloc_topology_t topology,
   m->n_PU=0;
   m->pthreads=NULL;
   m->count=0;
-  m->allocated_count=0;
-  m->uptodate=0;
   m->names=NULL;
   m->depths=NULL;
   m->output_fd=0;
@@ -194,6 +192,12 @@ Monitors_t new_Monitors(hwloc_topology_t topology,
   else{
     topology_init(&m->topology);
   }
+
+  /* initialize pipe */
+  pipe(m->update_pipe);
+  m->update_poll.fd=m->update_pipe[0];
+  m->update_poll.events=POLLIN;
+  m->update_poll.revents=POLLIN;
 
   /* Initialize output */
   if(output==NULL)
@@ -216,7 +220,6 @@ Monitors_t new_Monitors(hwloc_topology_t topology,
   pthread_barrier_init(&m->barrier,NULL,m->n_PU);
   if(pid!=0)
     m->pw = new_proc_watch(m->topology, pid, m->n_PU);
-  m->count=0;
   m->allocated_count=4;
 
   M_alloc(m->pthreads,m->n_PU,sizeof(pthread_t));
@@ -442,8 +445,10 @@ void * Monitors_thread(void* monitors){
   pthread_barrier_wait(&(m->barrier));
 
   for(;;){
-    m->uptodate=1;
     pthread_mutex_lock(&m->cond_mtx);
+    if(tidx==0){
+      write(m->update_pipe[1],"1",1);
+    }
     pthread_cond_wait(&(m->cond),&m->cond_mtx);
     pthread_mutex_unlock(&m->cond_mtx);
     /* update time stamp*/
@@ -674,8 +679,14 @@ Monitors_start(Monitors_t m)
 
 void
 Monitors_update_counters(Monitors_t m){
+  /* flush update fd */
+  int available;
+  if((available = poll(&m->update_poll,1,0))>0){
+    int buff[available];
+    read(m->update_pipe[0],&buff,available);
+  }
+  /* start update */
   pthread_mutex_lock(&m->cond_mtx);
-  m->uptodate=0;
   pthread_cond_broadcast(&(m->cond));
   pthread_mutex_unlock(&m->cond_mtx);
   if(m->pw!=NULL)
@@ -684,7 +695,8 @@ Monitors_update_counters(Monitors_t m){
 
 inline void
 Monitors_wait_update(Monitors_t m){
-  while(!m->uptodate) sched_yield();
+  char buf;
+  read(m->update_pipe[0],&buf,1);
 }
 
 inline long long
@@ -723,42 +735,6 @@ Monitors_wait_monitor_variation(Monitors_t m, unsigned int monitor_idx, unsigned
   pthread_mutex_unlock(&(box->update_lock));
   return val;
 }
-
-
-
-/* void Monitors_insert_print_in_topology(Monitors_t m){ */
-/*   char string_counter[2*24*m->count]; */
-/*   int monitor_idx, nobj; */
-/*   hwloc_obj_t obj; */
-/*   double val; */
-
-/*   for(monitor_idx=0;monitor_idx<m->count;monitor_idx++){ */
-/*     nobj = hwloc_get_nbobjs_by_depth(m->topology,m->depths[monitor_idx]); */
-/*     while(nobj--){ */
-/*       obj = hwloc_get_obj_by_depth(m->topology, m->depths[monitor_idx], nobj); */
-/*       val = Monitors_get_monitor_value(m,monitor_idx,nobj); */
-/*       sprintf(string_counter,"%ss: %22lf",m->names[monitor_idx],val); */
-/*       if(!hwloc_topology_insert_misc_object_by_parent(m->topology, obj, string_counter)){ */
-/* 	fprintf(stderr, "Failed to insert counter %s\n", m->names[monitor_idx]); */
-/*       } */
-/*     } */
-/*   }       */
-/* } */
-
-/* void Monitors_print_in_topology(Monitors_t m){ */
-/*   int monitor_idx, nobj; */
-/*   hwloc_obj_t obj; */
-/*   double val; */
-/*   for(monitor_idx=0;monitor_idx<m->count;monitor_idx++){ */
-/*     nobj = hwloc_get_nbobjs_by_depth(m->topology,m->depths[monitor_idx]); */
-/*     while(nobj--){ */
-/*       obj = hwloc_get_obj_by_depth(m->topology, m->depths[monitor_idx], nobj)->children[1]; */
-/*       val = Monitors_get_monitor_value(m,monitor_idx,nobj); */
-/*       sprintf(&(obj->name[0]),"%ss: %22lf",m->names[monitor_idx],val); */
-/*     } */
-/*   }       */
-/* } */
-
 
 void
 delete_Monitors(Monitors_t m)

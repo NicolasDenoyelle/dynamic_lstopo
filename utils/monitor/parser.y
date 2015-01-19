@@ -71,8 +71,7 @@ hwloc_obj
 ;
 
 primary_expr 
-: NAME    {$$ = $1;}
-| COUNTER {
+: COUNTER {
    int counter_idx=-1;
    if(nb_counters==0){
      event_names[0] = $1;
