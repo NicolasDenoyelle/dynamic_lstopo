@@ -1,11 +1,7 @@
 lib_LTLIBRARIES = libmonitor.la
 
-list_avail_SOURCES = make_scanner.c list_avail.c
-list_avail_LDADD = $(HWLOC_top_builddir)/hwloc/libhwloc.la
-list_avail_LDFLAGS = -L/home/ndenoyel/papi-5.4.0/build/lib -lpapi 
-list_avail_CFLAGS = $(AM_CFLAGS)
-
-bin_PROGRAMS = list_avail
+list_avail: make_scanner.c list_avail.c
+	$(CC) -o $@ $^ -L$(HWLOC_top_builddir)/hwloc/libhwloc.la -lpapi -lhwloc
 
 scanner.l: list_avail
 	./$< $@
@@ -21,5 +17,5 @@ libmonitor_la_LDFLAGS = -lpapi -ldl -lpthread -lm
 AM_CPPFLAGS = $(HWLOC_CPPFLAGS) -I$(top_srcdir)/utils/hwloc
 libmonitor_la_LIBADD = $(top_builddir)/hwloc/libhwloc.la
 
-DISTCLEANFILES = scanner.c scanner.l parser.c parser.tab.h
+DISTCLEANFILES = scanner.c scanner.l parser.c parser.tab.h list_avail
 

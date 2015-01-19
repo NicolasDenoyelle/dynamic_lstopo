@@ -8,7 +8,7 @@
 
 AM_CFLAGS = $(HWLOC_CFLAGS)
 # Add -I of utils/hwloc for misc.h
-AM_CPPFLAGS = $(HWLOC_CPPFLAGS) -I$(top_srcdir)/utils/hwloc 
+AM_CPPFLAGS = $(HWLOC_CPPFLAGS) -pg -I$(top_srcdir)/utils/hwloc 
 
 AM_LDFLAGS = $(HWLOC_LDFLAGS)
 

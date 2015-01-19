@@ -112,6 +112,21 @@ extern FILE *yyin;
 extern int column;
 extern int yylineno;
 
+void print_func(char * name,char* code){
+  /* {{{ */
+  FILE  * header = fopen(PARSED_CODE_SRC,"a+");
+  if(header==NULL){
+    fflush(stdout);
+    fprintf(stderr,"could not create or open %s\n",PARSED_CODE_SRC);
+    exit(1);
+  }
+  fprintf(header,"double %s(long long * in){\n\treturn (double) %s;\n}\n\n",name,code);
+  fclose(header);
+
+  /* }}} */
+}
+
+
 int yyerror (char *s) {
   /* {{{ */
   fflush (stdout);
@@ -178,20 +193,6 @@ int cmpstr(void const *a, void const *b) {
     const char * const *arg = b;
     printf("myStrCmp: s1(%p): %s, s2(%p): %s\n", a, key, b, *arg);
     return strcmp(key, *arg);
-}
-
-void print_func(char * name,char* code){
-  /* {{{ */
-  FILE  * header = fopen(PARSED_CODE_SRC,"a+");
-  if(header==NULL){
-    fflush(stdout);
-    fprintf(stderr,"could not create or open %s\n",PARSED_CODE_SRC);
-    exit(1);
-  }
-  fprintf(header,"double %s(long long * in){\n\treturn (double) %s;\n}\n\n",name,code);
-  fclose(header);
-
-  /* }}} */
 }
 
 struct parsed_names * parser(const char * file_name) {

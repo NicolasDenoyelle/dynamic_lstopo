@@ -331,7 +331,8 @@ void usage(const char *name, FILE *where)
   fprintf (where, "  --ps --top            Display processes within the hierarchy\n");
 #ifdef HWLOC_HAVE_MONITOR
   fprintf (where, "  --perf                Display dynamic monitors on topology\n");
-  fprintf (where, "  --perf-input          Choose a file where monitors are defined\n");
+  fprintf (where, "  --perf-input          Choose a file where monitors are defined as follow: \n");
+  fprintf (where, "                        L1i_miss_per_cycle{L1i,PAPI_L1_ICM/PAPI_REF_CYC}\n");
 #endif
   fprintf (where, "  --version             Report version and exit\n");
 }
@@ -865,15 +866,14 @@ main (int argc, char *argv[])
     Monitors_t m=load_Monitors(topology,perf_input,perf_output,lstopo_pid);
     if(m==NULL)
       m=new_default_Monitors(topology,perf_output,lstopo_pid);
-    if(m==NULL)
-      goto exit;
-    output_perf(topology, filename, verbose_mode, callname, output_format, m, refresh_usec);
-    delete_Monitors(m);
+    if(m!=NULL){
+      output_perf(topology, filename, verbose_mode, callname, output_format, m, refresh_usec);
+      delete_Monitors(m);
+    }
   }
   else
 #endif
   output(topology, filename, verbose_mode, callname, output_format);
- exit:;
   hwloc_topology_destroy (topology);
 
   for(i=0; i<lstopo_append_legends_nr; i++)

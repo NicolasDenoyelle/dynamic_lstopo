@@ -413,6 +413,11 @@ output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_attribut
   disp = output_draw_start(&x11_draw_methods, logical, legend, topology, NULL);
   int lastx = disp->x, lasty = disp->y;
   topo_cairo_paint(&x11_draw_methods, logical, legend, topology, disp->cs);
+  /* flush windows*/
+  XMoveWindow(disp->dpy, disp->win, -disp->x, -disp->y);
+  lastx = disp->x;
+  lasty = disp->y;
+
   cairo_t * c = cairo_create(disp->cs);
 
   /* passed to draw perf boxes methods to avoid drawing unactive boxes */
@@ -460,7 +465,7 @@ output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_attribut
 	read(itimer_fd,NULL,sizeof(uint64_t));
 	topo_cairo_perf_boxes(topology, monitors, active, c, &x11_draw_methods);
 	Monitors_update_counters(monitors);
-	Monitors_wait_update(monitors);
+	//Monitors_wait_update(monitors);
       }
     }
   }
