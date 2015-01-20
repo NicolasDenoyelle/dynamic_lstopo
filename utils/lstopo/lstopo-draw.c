@@ -1312,10 +1312,6 @@ output_draw(struct draw_methods *methods, int logical, int legend, hwloc_topolog
 void
 perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj_t level, void *output, unsigned depth, struct node_box * box){
   unsigned x,y,totwidth,totheight,mywidth,myheight,width,height,gridsize;
-  struct style style;
-  lstopo_set_object_color(methods, topology, level, 0 /* node */, &style);
-
-
   struct dyna_save * ds = (struct dyna_save *) level->userdata;
   if(ds!=NULL){
     x = ds->x;
@@ -1327,10 +1323,8 @@ perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj
     width = ds->width;
     height = ds->height;
     gridsize = ds->gridsize;
+    lstopo_set_object_color(methods, topology, level, 0 /* node */, &ds->style);
   }
-
-  else
-    return;
 
   switch(level->type){
   case HWLOC_OBJ_SYSTEM: 
@@ -1388,11 +1382,12 @@ perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj
   float r = value>0.5? 255:510*value;
   float g = value>0.5? 510*(1-value):255;
   float b = 0;
-  methods->box(output,style.bg.r,style.bg.g,style.bg.b,depth,x,mywidth,y,myheight);
+
+  methods->box(output,ds->style.bg.r,ds->style.bg.g,ds->style.bg.b,depth,x,mywidth,y,myheight);
   methods->box(output,(unsigned)r,(unsigned)g,(unsigned)b,depth,x,mywidth,y+myheight-height,height);
   char text[64];
   sprintf(text,"%lf",box->val);
-  methods->text(output, style.t2.r, style.t2.g, style.t2.b, fontsize, depth-2, x+fontsize, y+fontsize, text);
+  methods->text(output, ds->style.t2.r, ds->style.t2.g, ds->style.t2.b, fontsize, depth-2, x+fontsize, y+fontsize, text);
 }
 
 #endif /* HWLOC_HAVE_MONITOR */

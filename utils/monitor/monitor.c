@@ -212,6 +212,7 @@ Monitors_t new_Monitors(hwloc_topology_t topology,
   }
 
   /* set condition for reading counters */
+  pthread_mutex_init(&m->update_mtx,NULL);
   pthread_mutex_init(&m->cond_mtx,NULL);
   pthread_cond_init(&m->cond,NULL);
   /* count core number */
@@ -446,9 +447,7 @@ void * Monitors_thread(void* monitors){
 
   for(;;){
     pthread_mutex_lock(&m->cond_mtx);
-    if(tidx==0){
-      write(m->update_pipe[1],"1",1);
-    }
+    pthread_mutex_unlock(&m->update_mtx);
     pthread_cond_wait(&(m->cond),&m->cond_mtx);
     pthread_mutex_unlock(&m->cond_mtx);
     /* update time stamp*/
@@ -679,14 +678,8 @@ Monitors_start(Monitors_t m)
 
 void
 Monitors_update_counters(Monitors_t m){
-  /* flush update fd */
-  int available;
-  if((available = poll(&m->update_poll,1,0))>0){
-    int buff[available];
-    read(m->update_pipe[0],&buff,available);
-  }
-  /* start update */
   pthread_mutex_lock(&m->cond_mtx);
+  pthread_mutex_trylock(&m->update_mtx);
   pthread_cond_broadcast(&(m->cond));
   pthread_mutex_unlock(&m->cond_mtx);
   if(m->pw!=NULL)
@@ -695,8 +688,8 @@ Monitors_update_counters(Monitors_t m){
 
 inline void
 Monitors_wait_update(Monitors_t m){
-  char buf;
-  read(m->update_pipe[0],&buf,1);
+  pthread_mutex_lock(&m->update_mtx);
+  pthread_mutex_unlock(&m->update_mtx);
 }
 
 inline long long
@@ -755,6 +748,7 @@ delete_Monitors(Monitors_t m)
 
   pthread_cond_destroy(&(m->cond));
   pthread_mutex_destroy(&(m->cond_mtx));
+  pthread_mutex_destroy(&m->update_mtx);
   pthread_barrier_destroy(&(m->barrier));
   free(m->pthreads);
 
