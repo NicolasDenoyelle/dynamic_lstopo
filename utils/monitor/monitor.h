@@ -39,8 +39,6 @@ struct monitors{
   pthread_barrier_t barrier;
   pthread_cond_t    cond;
   pthread_mutex_t   cond_mtx, update_mtx;
-  int               update_pipe[2];
-  struct pollfd     update_poll;
 
   unsigned int      count;             /* nb_monitors */
   unsigned int      allocated_count; 
