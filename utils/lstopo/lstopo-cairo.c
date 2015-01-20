@@ -408,6 +408,9 @@ static void topo_cairo_perf_boxes(hwloc_topology_t topology, Monitors_t monitors
 void
 output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_attribute_unused, int overwrite __hwloc_attribute_unused, int logical, int legend, int verbose_mode __hwloc_attribute_unused, Monitors_t monitors, unsigned long refresh_usec)
 {
+  struct timeval timeout;
+  char buf[sizeof(uint64_t)];
+
   /* draw initial topology */
   struct display *disp;
   disp = output_draw_start(&x11_draw_methods, logical, legend, topology, NULL);
@@ -444,25 +447,22 @@ output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_attribut
   FD_SET(itimer_fd, &in_fds_original);
   int nfds = x11_fd > itimer_fd ? x11_fd+1 : itimer_fd+1;  
   
-  struct timeval timeout;
-  timeout.tv_sec=10;
-  timeout.tv_usec=0;
-
   /* start monitoring activity */
   Monitors_start(monitors);
 
   /* start timer */
   timerfd_settime(itimer_fd,0,&itimer,NULL);
-
   while(1){
     in_fds = in_fds_original;
+    timeout.tv_sec=10;
+    timeout.tv_usec=0;
     if(select(nfds, &in_fds, NULL, NULL,&timeout)>0){
       if(FD_ISSET(x11_fd,&in_fds)){
     	if(handle_xDisplay(disp,topology,logical,legend,&lastx,&lasty))
     	  break;
       }
       if(FD_ISSET(itimer_fd,&in_fds)){
-	read(itimer_fd,NULL,sizeof(uint64_t));
+	read(itimer_fd,&buf,sizeof(uint64_t));
 	topo_cairo_perf_boxes(topology, monitors, active, c, &x11_draw_methods);
 	Monitors_update_counters(monitors);
 	Monitors_wait_update(monitors);
