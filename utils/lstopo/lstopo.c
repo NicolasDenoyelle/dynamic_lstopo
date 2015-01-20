@@ -735,6 +735,7 @@ main (int argc, char *argv[])
 	  usage (callname, stderr);
 	  exit(EXIT_FAILURE);
 	}
+	perf = 1;
         perf_output = argv[1];
         opt = 1;
       } else if (!strcmp (argv[0], "--perf-input")){
@@ -742,6 +743,7 @@ main (int argc, char *argv[])
 	  usage (callname, stderr);
 	  exit(EXIT_FAILURE);
 	}
+	perf = 1;
         perf_input = argv[1];
         opt = 1;
       } else if (!strcmp (argv[0], "--refresh") || !strcmp (argv[0], "-r")) {
@@ -749,6 +751,7 @@ main (int argc, char *argv[])
 	  usage (callname, stderr);
 	  exit(EXIT_FAILURE);
 	}
+	perf = 1;
 	refresh_usec = atoll(argv[1]);
 	opt = 1;
     }
