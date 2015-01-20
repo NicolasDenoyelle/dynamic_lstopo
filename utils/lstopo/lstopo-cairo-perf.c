@@ -125,7 +125,7 @@ output_png_perf(hwloc_topology_t topology, const char *filename, int overwrite, 
 
   cairo_surface_write_to_png_stream(cs, topo_cairo_write, output);
   cairo_surface_destroy(cs);
-
+  hwloc_bitmap_free(active);
   if (output != stdout)
     fclose(output);
 }
@@ -146,13 +146,15 @@ output_pdf_perf(hwloc_topology_t topology, const char *filename __hwloc_attribut
   }
 
   cs = output_draw_start(&pdf_draw_methods, logical, legend, topology, output);
-  topo_cairo_paint(&pdf_draw_methods, logical, legend, topology, cs);
-  
   cairo_t *c;
   c = cairo_create(cs);
   Monitors_start(monitors);
-  Monitors_update_counters(monitors);
-  Monitors_wait_update(monitors);
+  unsigned i;
+  for(i=0;i<10;i++){
+    Monitors_update_counters(monitors);
+    Monitors_wait_update(monitors);
+  }
+  output_draw( &pdf_draw_methods, logical, legend, topology, c);
   topo_cairo_perf_boxes(topology, monitors, active, c, &pdf_draw_methods);
   cairo_destroy(c);
 
@@ -178,9 +180,6 @@ output_ps_perf(hwloc_topology_t topology, const char *filename, int overwrite, i
   }
 
   cs = output_draw_start(&ps_draw_methods, logical, legend, topology, output);
-  topo_cairo_paint(&ps_draw_methods, logical, legend, topology, cs);
-
-
   hwloc_bitmap_t active = hwloc_bitmap_dup(hwloc_topology_get_topology_cpuset(topology));
   cairo_t *c;
   c = cairo_create(cs);
@@ -190,12 +189,12 @@ output_ps_perf(hwloc_topology_t topology, const char *filename, int overwrite, i
     Monitors_update_counters(monitors);
     Monitors_wait_update(monitors);
   }
+  output_draw( &ps_draw_methods, logical, legend, topology, c);
   topo_cairo_perf_boxes(topology, monitors, active, c, &png_draw_methods);
-  cairo_destroy(c);
-
   cairo_surface_flush(cs);
+  cairo_destroy(c);
   cairo_surface_destroy(cs);
-
+  hwloc_bitmap_free(active);
   if (output != stdout)
     fclose(output);
 }
@@ -218,8 +217,6 @@ output_svg_perf(hwloc_topology_t topology, const char *filename, int overwrite, 
   }
 
   cs = output_draw_start(&svg_draw_methods, logical, legend, topology, output);
-  topo_cairo_paint(&svg_draw_methods, logical, legend, topology, cs);
-
   hwloc_bitmap_t active = hwloc_bitmap_dup(hwloc_topology_get_topology_cpuset(topology));
   cairo_t *c;
   c = cairo_create(cs);
@@ -229,6 +226,7 @@ output_svg_perf(hwloc_topology_t topology, const char *filename, int overwrite, 
     Monitors_update_counters(monitors);
     Monitors_wait_update(monitors);
   }
+  output_draw( &svg_draw_methods, logical, legend, topology, c);
   topo_cairo_perf_boxes(topology, monitors, active, c, &png_draw_methods);
   cairo_destroy(c);
 
