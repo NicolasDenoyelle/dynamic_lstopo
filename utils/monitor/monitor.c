@@ -193,21 +193,16 @@ Monitors_t new_Monitors(hwloc_topology_t topology,
     topology_init(&m->topology);
   }
 
-  /* initialize pipe */
-  pipe(m->update_pipe);
-  m->update_poll.fd=m->update_pipe[0];
-  m->update_poll.events=POLLIN;
-  m->update_poll.revents=POLLIN;
-
   /* Initialize output */
-  if(output==NULL)
-    m->output_fd=1;
+  if(output==NULL){
+    m->output_fd=open("/dev/null",O_WRONLY | O_NONBLOCK, S_IRUSR|S_IWUSR);
+  }
   else{
     m->output_fd=open(output,O_WRONLY | O_NONBLOCK | O_CREAT, S_IRUSR|S_IWUSR);
     if(m->output_fd==-1){
       fprintf(stderr,"warning: could not open or create %s:\n",output);
       fprintf(stderr,"%s\n",strerror(errno));
-      m->output_fd=1;
+      m->output_fd=STDIN_FILENO;
     }
   }
 
