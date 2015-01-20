@@ -1376,17 +1376,19 @@ perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj
     y = y + totheight;
     break;
   }
-  height = myheight*box->val/(box->max - box->min);
-  unsigned draw_value = (float)box->val*(float)height/(float)(box->max - box->min);
-  float value = (float)box->val/(float)(box->max - box->min);
+
+ 
+  float value = (float)(box->val);
+  char text[64];
+  sprintf(text,"%lf",value);
+  value/=(float)(box->max - box->min);
+  height = myheight*value;
   float r = value>0.5? 255:510*value;
   float g = value>0.5? 510*(1-value):255;
   float b = 0;
 
   methods->box(output,ds->style.bg.r,ds->style.bg.g,ds->style.bg.b,depth,x,mywidth,y,myheight);
   methods->box(output,(unsigned)r,(unsigned)g,(unsigned)b,depth,x,mywidth,y+myheight-height,height);
-  char text[64];
-  sprintf(text,"%lf",box->val);
   methods->text(output, ds->style.t2.r, ds->style.t2.g, ds->style.t2.b, fontsize, depth-2, x+fontsize, y+fontsize, text);
 }
 

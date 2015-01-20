@@ -382,6 +382,8 @@ Monitors_print(Monitors_t m, hwloc_cpuset_t alloc_tmp)
 struct thread_junk{
   int * eventset;
   hwloc_bitmap_t active;
+  long long *values;
+  long long *old_values;
 };
 
 void Monitors_thread_stop(void * thread_junk){
@@ -389,6 +391,8 @@ void Monitors_thread_stop(void * thread_junk){
   struct thread_junk * tj = (struct thread_junk *)thread_junk;
   PAPI_destroy_eventset(tj->eventset);
   hwloc_bitmap_free(tj->active);
+  free(tj->values);
+  free(tj->old_values);
 }
 
 
@@ -397,13 +401,14 @@ void * Monitors_thread(void* monitors){
   pthread_t tid;
   unsigned int i,j,weight, nobj;
   int tidx, p_tidx, eventset, depth;
+  long long * values, * old_values, * tmp;
   hwloc_obj_t obj,cpu;
   struct node_box * out, * PU_vals;
   hwloc_bitmap_t b;
 
   if(monitors==NULL)
     pthread_exit(NULL);
-  
+
   m = (Monitors_t)monitors;
   weight=0; tidx=-1; eventset=PAPI_NULL; depth=hwloc_topology_get_depth(m->topology)-1;
   tid = pthread_self();
@@ -413,6 +418,16 @@ void * Monitors_thread(void* monitors){
       break;
     }
   }  
+
+  values = malloc(sizeof(long long)*m->n_events);
+  old_values = malloc(sizeof(long long)*m->n_events);
+  if(values==NULL || old_values==NULL){
+    perror("malloc");
+    exit(EXIT_FAILURE);
+  }
+  zerod(values,m->n_events);
+  zerod(old_values,m->n_events);
+  
   /* bind my self to tidx core */
   cpu = hwloc_get_obj_by_depth(m->topology,depth,tidx);
   b = hwloc_bitmap_dup(cpu->cpuset);
@@ -431,24 +446,27 @@ void * Monitors_thread(void* monitors){
   struct thread_junk tj;
   tj.eventset = &eventset;
   tj.active = b;
+  tj.values = values;
+  tj.old_values = old_values;
   pthread_cleanup_push(Monitors_thread_stop,&tj);
   pthread_setcancelstate(PTHREAD_CANCEL_ENABLE,NULL);
   
   PU_vals = m->PU_vals[tidx];
-
+  
   if(m->pw==NULL)
     PAPI_start(eventset);
   pthread_barrier_wait(&(m->barrier));
 
   for(;;){
     pthread_mutex_lock(&m->cond_mtx);
+    /* signal we are ready for new update*/
     pthread_mutex_unlock(&m->update_mtx);
     pthread_cond_wait(&(m->cond),&m->cond_mtx);
     pthread_mutex_unlock(&m->cond_mtx);
     /* update time stamp*/
     PU_vals->old_usec=PU_vals->real_usec;
     PU_vals->real_usec=PAPI_get_real_usec();
-    /* gathers counters */
+    /* check actually sampling PUs */
     if(m->pw!=NULL){
       /* A pid is specified */
       if(proc_watch_check_start_pu(m->pw,p_tidx))
@@ -460,8 +478,16 @@ void * Monitors_thread(void* monitors){
       else if(!proc_watch_get_pu_state(m->pw,p_tidx))
 	goto next_loop;
     }
-
-    PAPI_read(eventset,PU_vals->counters_val);
+    /* gathers counters */
+    PAPI_read(eventset,values);
+    /* calculate difference to get total counter variation between samples */
+    for(i=0;i<m->n_events;i++){
+      PU_vals->counters_val[i] = values[i]-old_values[i];
+    }
+    /* swap values and old_values */
+    tmp = values;
+    values = old_values;
+    old_values = tmp;
 
     /* reduce counters for every monitors */
     for(i=0;i<m->count;i++){
