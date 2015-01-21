@@ -3,8 +3,6 @@
 
 #include "hwloc.h"
 
-#define MONITOR_DOT_H "monitor.h"
-#define MONITOR_DOT_C "src/monitor.c"
 #define PARSED_CODE_SRC "/tmp/custom_monitors.c"
 #define PARSED_CODE_LIB "/tmp/custom_monitors.so"
 
