@@ -12,10 +12,7 @@ void topo_cairo_perf_boxes(hwloc_topology_t topology, Monitors_t monitors, hwloc
     while(nobj--){
       box=(struct node_box *)(hwloc_get_obj_by_depth(monitors->topology,monitors->depths[i],nobj)->userdata);
       obj = hwloc_get_obj_by_depth(topology,monitors->depths[i],nobj);
-      proc_watch_get_watched_in_cpuset(monitors->pw,obj->cpuset,active);
-      if(!monitors->pw || !hwloc_bitmap_iszero(active)){
-	perf_box_draw(topology, methods, obj, c, obj->depth, box);
-      }
+      perf_box_draw(topology, methods, obj, c, obj->depth, box);
     }
   }
   cairo_show_page(c);
