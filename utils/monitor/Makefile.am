@@ -1,7 +1,9 @@
 lib_LTLIBRARIES = libmonitor.la
 
-list_avail: make_scanner.c list_avail.c
-	$(CC) -o $@ $^ -L$(HWLOC_top_builddir)/hwloc/libhwloc.la -lpapi -lhwloc
+noinst_PROGRAMS=list_avail
+list_avail_SOURCES = make_scanner.c list_avail.c
+list_avail_LDADD = $(top_builddir)/hwloc/libhwloc.la -lpapi
+list_avail_CFLAGS = $(AM_CFLAGS)
 
 scanner.l: list_avail
 	./$< $@
@@ -17,5 +19,6 @@ libmonitor_la_LDFLAGS = -lpapi -ldl -lpthread -lm
 AM_CPPFLAGS = $(HWLOC_CPPFLAGS) -I$(top_srcdir)/utils/hwloc
 libmonitor_la_LIBADD = $(top_builddir)/hwloc/libhwloc.la
 
+CLEANFILES = scanner.c scanner.l parser.c parser.tab.h list_avail
 DISTCLEANFILES = scanner.c scanner.l parser.c parser.tab.h list_avail
 
