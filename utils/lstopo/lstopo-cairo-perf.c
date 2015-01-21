@@ -80,6 +80,7 @@ void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_att
 	Monitors_update_counters(monitors);
 	Monitors_wait_update(monitors);
 	topo_cairo_perf_boxes(topology, monitors, active, c, &x11_draw_methods);
+	XFlush(disp->dpy);
       }
     }
   }
