@@ -666,6 +666,21 @@ load_Monitors(hwloc_topology_t topology, const char * perf_group_file, const cha
   return m;
 }
 
+unsigned int 
+Monitors_watch_pid(Monitors_t m,unsigned int pid)
+{
+  unsigned int ret=0;
+  if(m->pw!=NULL){
+    ret = proc_watch_get_pid(m->pw);
+    delete_proc_watch(m->pw);
+  }
+  if(pid!=0)
+    m->pw = new_proc_watch(m->topology, pid, m->n_PU);
+  if(m->pw==NULL)
+    return -1;
+  return ret;
+}
+
 int
 Monitors_start(Monitors_t m)
 {
