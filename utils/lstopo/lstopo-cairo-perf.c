@@ -65,7 +65,7 @@ void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_att
   FD_SET(itimer_fd, &in_fds_original);
   int nfds = x11_fd > itimer_fd ? x11_fd+1 : itimer_fd+1;  
   
-  /* start monitoring activity */
+  /* prepare monitoring activity */
   Monitors_start(monitors);
 
   /* start executable to watch */
@@ -89,9 +89,11 @@ void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_att
 	  fprintf(stderr, "Failed to launch executable \"%s\"\n",
 		  executable);
 	  perror("execvp");
+	  goto exit;
 	}
       }
     }
+
     msync(child, sizeof(*child), MS_SYNC);
     if(*child>0 && !ret){
       Monitors_watch_pid(monitors,*child);
