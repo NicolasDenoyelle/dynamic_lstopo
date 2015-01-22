@@ -456,7 +456,7 @@ output(hwloc_topology_t topology, const char * filename, int verbose_mode, char*
 
 #ifdef HWLOC_HAVE_MONITOR
 void 
-output_perf(hwloc_topology_t topology, const char * filename, int verbose_mode, char* callname, int output_format, Monitors_t monitors, unsigned long r_usec)
+output_perf(hwloc_topology_t topology, const char * filename, int verbose_mode, char* callname, int output_format, Monitors_t monitors, unsigned long r_usec, char * executable, char * exe_args[])
 {
   switch (output_format) {
   case LSTOPO_OUTPUT_DEFAULT:
@@ -465,7 +465,7 @@ output_perf(hwloc_topology_t topology, const char * filename, int verbose_mode, 
     if (getenv("DISPLAY")) {
       if (logical == -1)
 	logical = 0;
-      output_x11_perf(topology, NULL, overwrite, logical, legend, verbose_mode,monitors, r_usec);
+      output_x11_perf(topology, NULL, overwrite, logical, legend, verbose_mode,monitors, r_usec, executable, exe_args);
     } else
 #endif /* CAIRO_HAS_XLIB_SURFACE */
 #ifdef HWLOC_WIN_SYS
@@ -500,22 +500,22 @@ output_perf(hwloc_topology_t topology, const char * filename, int verbose_mode, 
 #ifdef LSTOPO_HAVE_GRAPHICS
 # if CAIRO_HAS_PNG_FUNCTIONS
   case LSTOPO_OUTPUT_PNG:
-    output_png_perf(topology, filename, overwrite, logical, legend, verbose_mode, monitors, r_usec);
+    output_png_perf(topology, filename, overwrite, logical, legend, verbose_mode, monitors, r_usec, executable, exe_args);
     break;
 # endif /* CAIRO_HAS_PNG_FUNCTIONS */
 # if CAIRO_HAS_PDF_SURFACE
   case LSTOPO_OUTPUT_PDF:
-    output_pdf_perf(topology, NULL, overwrite, logical, legend, verbose_mode, monitors, r_usec);
+    output_pdf_perf(topology, NULL, overwrite, logical, legend, verbose_mode, monitors, r_usec, executable, exe_args);
     break;
 # endif /* CAIRO_HAS_PDF_SURFACE */
 # if CAIRO_HAS_PS_SURFACE
   case LSTOPO_OUTPUT_PS:
-    output_ps_perf(topology, filename, overwrite, logical, legend, verbose_mode, monitors, r_usec);
+    output_ps_perf(topology, filename, overwrite, logical, legend, verbose_mode, monitors, r_usec, executable, exe_args);
     break;
 #endif /* CAIRO_HAS_PS_SURFACE */
 #if CAIRO_HAS_SVG_SURFACE
   case LSTOPO_OUTPUT_SVG:
-    output_svg(topology, filename, overwrite, logical, legend, verbose_mode);
+    output_svg_perf(topology, filename, overwrite, logical, legend, verbose_mode, monitors, r_usec, executable, exe_args);
     break;
 #endif /* CAIRO_HAS_SVG_SURFACE */
 #endif /* LSTOPO_HAVE_GRAPHICS */
@@ -579,6 +579,10 @@ main (int argc, char *argv[])
 
   while (argc >= 1)
     {
+      if(strncmp(argv[0],"-",1)){
+	printf("break at %s\n",argv[0]);
+	break;
+      }
       opt = 0;
       if (!strcmp (argv[0], "-v") || !strcmp (argv[0], "--verbose")) {
 	verbose_mode++;
@@ -735,9 +739,11 @@ main (int argc, char *argv[])
 	  usage (callname, stderr);
 	  exit(EXIT_FAILURE);
 	}
-	perf = 1;
-        perf_output = argv[1];
-        opt = 1;
+	else{
+	  perf = 1;
+	  perf_output = argv[1];
+	  opt = 1;
+	}
       } else if (!strcmp (argv[0], "--perf-input")){
 	if (argc < 2) {
 	  usage (callname, stderr);
@@ -766,14 +772,14 @@ main (int argc, char *argv[])
 	}
         output_format = parse_output_format(argv[1], callname);
         opt = 1;
-      } else {
-	if (filename) {
-	  fprintf (stderr, "Unrecognized option: %s\n", argv[0]);
-	  usage (callname, stderr);
-	  exit(EXIT_FAILURE);
-	} else
-	  filename = argv[0];
-      }
+      }/*  else { */
+      /* 	if (filename) { */
+      /* 	  fprintf (stderr, "Unrecognized option: %s\n", argv[0]); */
+      /* 	  usage (callname, stderr); */
+      /* 	  exit(EXIT_FAILURE); */
+      /* 	} else */
+      /* 	  filename = argv[0]; */
+      /* } */
       argc -= opt+1;
       argv += opt+1;
     }
@@ -870,7 +876,7 @@ main (int argc, char *argv[])
     if(m==NULL)
       m=new_default_Monitors(topology,perf_output,lstopo_pid);
     if(m!=NULL){
-      output_perf(topology, filename, verbose_mode, callname, output_format, m, refresh_usec);
+      output_perf(topology, filename, verbose_mode, callname, output_format, m, refresh_usec, argv[0], argv);
       delete_Monitors(m);
     }
   }
