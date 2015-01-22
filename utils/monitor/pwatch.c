@@ -57,6 +57,10 @@ proc_watch_check_start_pu(struct proc_watch * pw,unsigned int physical_PU)
   return 0;
 }
 
+inline unsigned int proc_watch_get_pid(struct proc_watch * pw){
+  return pw->pid;
+}
+
 int
 proc_watch_check_stop_pu(struct proc_watch * pw, unsigned int physical_PU)
 {
