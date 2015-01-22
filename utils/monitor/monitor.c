@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <sched.h>
 #include <math.h>
+#include <limits.h>
 #include "pwatch.h"
 #include "parser.h"
 #include "monitor.h"
@@ -452,7 +453,8 @@ void * Monitors_thread(void* monitors){
   pthread_setcancelstate(PTHREAD_CANCEL_ENABLE,NULL);
   
   PU_vals = m->PU_vals[tidx];
-  
+
+  double c_value;
   if(m->pw==NULL)
     PAPI_start(eventset);
   pthread_barrier_wait(&(m->barrier));
@@ -482,7 +484,9 @@ void * Monitors_thread(void* monitors){
     PAPI_read(eventset,values);
     /* calculate difference to get total counter variation between samples */
     for(i=0;i<m->n_events;i++){
-      PU_vals->counters_val[i] = values[i]-old_values[i];
+      /* overflow ? */
+      c_value = values[i]<old_values[i]? LLONG_MAX-old_values[i]+values[i] : values[i]-old_values[i];
+      PU_vals->counters_val[i] = c_value;
     }
     /* swap values and old_values */
     tmp = values;
