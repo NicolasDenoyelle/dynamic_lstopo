@@ -285,6 +285,7 @@ void usage(const char *name, FILE *where)
   fprintf (where, "  -p --physical         Display physical object indexes\n");
   fprintf (where, "                        (default for graphical output)\n");
   fprintf (where, "Output options:\n");
+  fprintf (where, "  --output <output_file>\n");
   fprintf (where, "  --output-format <format>\n");
   fprintf (where, "  --of <format>         Force the output to use the given format\n");
   fprintf (where, "  -f --force            Overwrite the output file if it exists\n");
@@ -505,7 +506,7 @@ output_perf(hwloc_topology_t topology, const char * filename, int verbose_mode, 
 # endif /* CAIRO_HAS_PNG_FUNCTIONS */
 # if CAIRO_HAS_PDF_SURFACE
   case LSTOPO_OUTPUT_PDF:
-    output_pdf_perf(topology, NULL, overwrite, logical, legend, verbose_mode, monitors, r_usec, executable, exe_args);
+    output_pdf_perf(topology, filename, overwrite, logical, legend, verbose_mode, monitors, r_usec, executable, exe_args);
     break;
 # endif /* CAIRO_HAS_PDF_SURFACE */
 # if CAIRO_HAS_PS_SURFACE
@@ -772,14 +773,14 @@ main (int argc, char *argv[])
 	}
         output_format = parse_output_format(argv[1], callname);
         opt = 1;
-      }/*  else { */
-      /* 	if (filename) { */
-      /* 	  fprintf (stderr, "Unrecognized option: %s\n", argv[0]); */
-      /* 	  usage (callname, stderr); */
-      /* 	  exit(EXIT_FAILURE); */
-      /* 	} else */
-      /* 	  filename = argv[0]; */
-      /* } */
+      }	else if (!strcmp (argv[0], "--output")) {
+	if (argc < 2) {
+	  usage (callname, stderr);
+	  exit(EXIT_FAILURE);
+	}
+        filename = argv[1];
+        opt = 1;
+	}
       argc -= opt+1;
       argv += opt+1;
     }
