@@ -129,7 +129,7 @@ handle_error(int err)
 }
 
 int 
-init_eventset(int * eventset,unsigned int n_events,  char** event_names, unsigned cpu_num, unsigned int pid)
+init_eventset(int * eventset,unsigned int n_events,  char** event_names, unsigned cpu_num)
 {
   int err; unsigned int i;
   
@@ -236,7 +236,7 @@ Monitors_t new_Monitors(hwloc_topology_t topology,
   m->n_PU = hwloc_get_nbobjs_by_depth(m->topology, depth-1);
   pthread_barrier_init(&m->barrier,NULL,m->n_PU);
   if(pid!=0)
-    m->pw = new_proc_watch(m->topology, pid, m->n_PU);
+    m->pw = new_proc_watch(pid);
   m->allocated_count=4;
 
   M_alloc(m->pthreads,m->n_PU,sizeof(pthread_t));
@@ -425,10 +425,10 @@ void * Monitors_thread(void* monitors){
   long long * values, * old_values, * tmp;
   hwloc_obj_t obj,cpu;
   struct node_box * out, * PU_vals;
-  hwloc_bitmap_t b;
   if(monitors==NULL)
     pthread_exit(NULL);
 
+  /**************** Thread init ****************/
   m = (Monitors_t)monitors;
   weight=0; tidx=-1; eventset=PAPI_NULL; depth=hwloc_topology_get_depth(m->topology)-1;
   tid = pthread_self();
@@ -439,6 +439,22 @@ void * Monitors_thread(void* monitors){
     }
   }  
 
+  /* stores time and difference between two samples*/
+  PU_vals = m->PU_vals[tidx];
+  
+  /* bind my self to tidx core */
+  cpu = hwloc_get_obj_by_depth(m->topology,depth,tidx);
+  hwloc_bitmap_t active_pu = hwloc_bitmap_dup(cpu->cpuset);
+  hwloc_bitmap_singlify(active_pu);
+  hwloc_set_thread_cpubind(m->topology,tid, active_pu, HWLOC_CPUBIND_THREAD | HWLOC_CPUBIND_STRICT);
+  p_tidx = hwloc_bitmap_first(active_pu);
+  
+  if(init_eventset(&eventset,m->n_events,m->event_names,p_tidx)!=0){
+    fprintf(stderr,"%d failed to init its eventset\n",tidx);
+    exit(EXIT_FAILURE);
+  }
+
+  /* initialize counters value container */
   values = malloc(sizeof(long long)*m->n_events);
   old_values = malloc(sizeof(long long)*m->n_events);
   if(values==NULL || old_values==NULL){
@@ -447,44 +463,22 @@ void * Monitors_thread(void* monitors){
   }
   zerod(values,m->n_events);
   zerod(old_values,m->n_events);
-  
-  /* bind my self to tidx core */
-  cpu = hwloc_get_obj_by_depth(m->topology,depth,tidx);
-  b = hwloc_bitmap_dup(cpu->cpuset);
-  hwloc_bitmap_singlify(b);
-  if(cpu==NULL || cpu->cpuset==NULL){
-    fprintf(stderr,"obj[%d] at depth %d is null\n",tidx,depth);
-    exit(EXIT_FAILURE);
-  }
-  hwloc_set_thread_cpubind(m->topology,tid, b, HWLOC_CPUBIND_THREAD | HWLOC_CPUBIND_STRICT);
-  PAPI_register_thread();
 
-  p_tidx = hwloc_bitmap_first(cpu->cpuset);
-  
-  unsigned int pid = 0;
-  if(m->pw)
-    pid = proc_watch_get_pid(m->pw);
-  if(init_eventset(&eventset,m->n_events,m->event_names,p_tidx,pid)!=0){
-    fprintf(stderr,"%d failed to init its eventset\n",tidx);
-    exit(EXIT_FAILURE);
-  }
-
+  /* fill the structure of objects to free at cleanup */
   struct thread_junk tj;
   tj.eventset = &eventset;
-  tj.active = b;
+  tj.active = active_pu;
   tj.values = values;
   tj.old_values = old_values;
   pthread_cleanup_push(Monitors_thread_stop,&tj);
   pthread_setcancelstate(PTHREAD_CANCEL_ENABLE,NULL);
   
-  PU_vals = m->PU_vals[tidx];
 
-  long long c_value;
   if(m->pw==NULL)
     PAPI_start(eventset);
   pthread_barrier_wait(&(m->barrier));
 
-
+  /**************** Thread actual work ****************/
   for(;;){
     pthread_mutex_lock(&m->cond_mtx);
     /* signal we are ready for new update*/
@@ -511,10 +505,10 @@ void * Monitors_thread(void* monitors){
     /* calculate difference to get total counter variation between samples */
     for(i=0;i<m->n_events;i++){
       /* overflow ? */
-      c_value = values[i]<old_values[i]? c_value : values[i]-old_values[i];
-      PU_vals->counters_val[i] = c_value;
+      if(values[i]>=old_values[i])
+	PU_vals->counters_val[i] = values[i]-old_values[i];
     }
-    /* swap values and old_values */
+    /* swap values and old_values for next loop */
     tmp = values;
     values = old_values;
     old_values = tmp;
@@ -522,16 +516,12 @@ void * Monitors_thread(void* monitors){
     /* reduce counters for every monitors */
     for(i=0;i<m->count;i++){
       obj = hwloc_get_ancestor_obj_by_depth(m->topology,m->depths[i],cpu);
-      if(obj==NULL){
-	printf("NULL obj\n");
-	exit(EXIT_FAILURE);
-      }
       out = (struct node_box *)(obj->userdata);
-      if(out==NULL)
-	continue;
+
+      /* get the number of threads updating this array of counters */
       if(m->pw!=NULL){
-	proc_watch_get_watched_in_cpuset(m->pw,obj->cpuset,b);
-	weight = hwloc_bitmap_weight(b);
+	proc_watch_get_watched_in_cpuset(m->pw,obj->cpuset,active_pu);
+	weight = hwloc_bitmap_weight(active_pu);
       } else weight = hwloc_bitmap_weight(obj->cpuset);
 
       pthread_mutex_trylock(&(out->update_lock));
@@ -544,10 +534,6 @@ void * Monitors_thread(void* monitors){
       }
       /* accumulate values */
       for(j=0;j<m->n_events;j++){
-	if(PU_vals->counters_val == NULL || out->counters_val == NULL){
-	  fprintf(stderr,"NULL\n");
-	  exit(EXIT_FAILURE);
-	}
 	out->counters_val[j]+=PU_vals->counters_val[j];
       }
 
@@ -558,6 +544,8 @@ void * Monitors_thread(void* monitors){
 	out->uptodate=0;
 	out->old_val = out->val;
 	out->val = m->compute[i](out->counters_val);
+	
+	/* update min and max value in every node at depth i*/
 	if(isinf(out->max) || out->max<out->val){
 	  nobj=hwloc_get_nbobjs_by_depth(m->topology,m->depths[i]);
 	  while(nobj--)
@@ -568,6 +556,7 @@ void * Monitors_thread(void* monitors){
 	  while(nobj--)
 	    Monitors_get_node_box(m,i,nobj)->min=out->val;
 	}
+	/* compute real_usec mean value */
 	out->real_usec/=weight;
 	pthread_mutex_unlock(&(out->update_lock));
 	pthread_mutex_unlock(&(out->read_lock));
@@ -575,10 +564,9 @@ void * Monitors_thread(void* monitors){
       else
 	pthread_mutex_unlock(&(out->read_lock));
     }
-    /* signal we achieved our update */
   next_loop:;
     pthread_barrier_wait(&(m->barrier));
-    if(tidx==0) Monitors_print(m,b);
+    if(tidx==0) Monitors_print(m,active_pu);
   }
   pthread_cleanup_pop(0);
   return NULL;
@@ -705,7 +693,7 @@ Monitors_watch_pid(Monitors_t m,unsigned int pid)
     delete_proc_watch(m->pw);
   }
   if(pid!=0)
-    m->pw = new_proc_watch(m->topology, pid, m->n_PU);
+    m->pw = new_proc_watch(pid);
   if(m->pw==NULL)
     return -1;
   return ret;
