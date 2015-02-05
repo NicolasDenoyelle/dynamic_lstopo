@@ -289,7 +289,7 @@ if test "$hwloc_monitor_happy" = "yes"; then
 AC_DEFINE([HWLOC_HAVE_MONITOR], [1], [Define to 1 if you are able to compile the 'monitor'.])
 else
 AS_IF([test "$enable_monitor" = "yes"],
-[AS_IF([test "$papi_lib_happy" = "no"],  [AC_MSG_WARN([--enable-monitor requested, but papi lib was not found])])
+[AS_IF([test "$papi_lib_happy" = "no"],  [AC_MSG_WARN([--enable-monitor requested, but papi lib was not found, LDFLAGS=$LDFLAGS])])
 AS_IF([test "$papi_header_happy" = "no"],[AC_MSG_WARN([--enable-monitor requested, but papi header was not found])])
 AS_IF([test "$lex_happy" = "no"],[AC_MSG_WARN([--enable-monitor requested, but program lex $LEX was not found])])
 AS_IF([test "$yacc_happy" = "no"],[AC_MSG_WARN([--enable-monitor requested, but program yacc $YACC was not found])])

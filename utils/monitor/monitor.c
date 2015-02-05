@@ -114,27 +114,54 @@ handle_error(int err)
     fprintf(stderr,"The EventSet specified does not exist.\n");
     break;
   case PAPI_ECMP:
-    fprintf(stderr,"This component does not support the underlying hardware.");
+    fprintf(stderr,"This component does not support the underlying hardware.\n");
+    break;
+  case PAPI_ENOCMP:
+    fprintf(stderr,"Argument is not a valid component. PAPI_ENOCMP\n");
+    break;
+  case PAPI_EBUG:
+    fprintf(stderr,"Internal error, please send mail to the developers.\n");
     break;
   default:
+    fprintf(stderr,"Unknown error ID\n");
     break;
   }
 }
 
 int 
-init_eventset(int * eventset,unsigned int n_events,  char** event_names)
+init_eventset(int * eventset,unsigned int n_events,  char** event_names, unsigned cpu_num, unsigned int pid)
 {
   int err; unsigned int i;
-  PAPI_granularity_option_t option;
-
+  
+  /* initialize eventset */
   *(eventset)=PAPI_NULL;
   if((err=PAPI_create_eventset(eventset))!=PAPI_OK){
     fprintf(stderr,"eventset init: create failed\n");
     handle_error(err);
     return 1;
   }
-  if((err = PAPI_assign_eventset_component(*eventset, 0)) != PAPI_OK) handle_error(err);
-  if((err = PAPI_set_multiplex(*eventset))                != PAPI_OK) handle_error(err);
+
+  if((err = PAPI_assign_eventset_component(*eventset, 0)) != PAPI_OK){
+    handle_error(err);
+    PAPI_event_info_t info;
+    int code;
+    PAPI_event_name_to_code(event_names[0],&code);
+    PAPI_get_event_info(code,&info);
+    fprintf(stderr,"%s component = %d\n",event_names[0],info.component_index);
+  }
+
+
+  PAPI_option_t cpu_option;
+  cpu_option.cpu.eventset=*eventset;
+  cpu_option.cpu.cpu_num = cpu_num;
+
+  err = PAPI_set_debug(PAPI_VERB_ESTOP);
+  if ( err != PAPI_OK ) handle_error(err);
+  if((err = PAPI_set_opt(PAPI_CPU_ATTACH,&cpu_option))!=PAPI_OK){
+    fprintf(stderr, "Could not set PAPI option PAPI_CPU_ATTACH to %u\n",cpu_num);
+    handle_error(err);
+  }
+
   for(i=0;i<n_events;i++){
     err =  PAPI_add_named_event(*(eventset),event_names[i]);
     if(err!=PAPI_OK){
@@ -142,13 +169,6 @@ init_eventset(int * eventset,unsigned int n_events,  char** event_names)
       handle_error(err);
       return 1;
     }
-  }
-
-  option.eventset=*(eventset);
-  option.granularity=PAPI_GRN_SYS;
-  err=PAPI_set_opt(PAPI_GRANUL,(PAPI_option_t *)(&option));
-  if(err!=PAPI_OK){
-    fprintf(stderr,"eventset init: cannot set eventset granularity. errorcode:%d\n",err);
   }
 
   return 0;
@@ -406,7 +426,6 @@ void * Monitors_thread(void* monitors){
   hwloc_obj_t obj,cpu;
   struct node_box * out, * PU_vals;
   hwloc_bitmap_t b;
-
   if(monitors==NULL)
     pthread_exit(NULL);
 
@@ -432,14 +451,20 @@ void * Monitors_thread(void* monitors){
   /* bind my self to tidx core */
   cpu = hwloc_get_obj_by_depth(m->topology,depth,tidx);
   b = hwloc_bitmap_dup(cpu->cpuset);
+  hwloc_bitmap_singlify(b);
   if(cpu==NULL || cpu->cpuset==NULL){
     fprintf(stderr,"obj[%d] at depth %d is null\n",tidx,depth);
     exit(EXIT_FAILURE);
   }
-  hwloc_set_cpubind(m->topology, cpu->cpuset, HWLOC_CPUBIND_STRICT|HWLOC_CPUBIND_PROCESS|HWLOC_CPUBIND_NOMEMBIND);
+  hwloc_set_thread_cpubind(m->topology,tid, b, HWLOC_CPUBIND_THREAD | HWLOC_CPUBIND_STRICT);
+  PAPI_register_thread();
 
   p_tidx = hwloc_bitmap_first(cpu->cpuset);
-  if(init_eventset(&eventset,m->n_events,m->event_names)!=0){
+  
+  unsigned int pid = 0;
+  if(m->pw)
+    pid = proc_watch_get_pid(m->pw);
+  if(init_eventset(&eventset,m->n_events,m->event_names,p_tidx,pid)!=0){
     fprintf(stderr,"%d failed to init its eventset\n",tidx);
     exit(EXIT_FAILURE);
   }
@@ -458,6 +483,7 @@ void * Monitors_thread(void* monitors){
   if(m->pw==NULL)
     PAPI_start(eventset);
   pthread_barrier_wait(&(m->barrier));
+
 
   for(;;){
     pthread_mutex_lock(&m->cond_mtx);
@@ -700,17 +726,32 @@ Monitors_start(Monitors_t m)
      fprintf(stderr,"PAPI library init failed!\n");
      exit(EXIT_FAILURE);
    }
-   PAPI_thread_init(pthread_self);
-   PAPI_multiplex_init();
  }
+
+ //PAPI_multiplex_init();
+ PAPI_thread_init(pthread_self);
+
+ /*   if(m->pw){ */
+ /*     if((err = PAPI_set_granularity(PAPI_GRN_PROC))!=PAPI_OK){ */
+ /*       fprintf(stderr, "Could not set PAPI granularity to count process events\n");  */
+ /*       handle_error(err); */
+ /*     } */
+ /*   } */
+ /*   else */
+ /*     if((err = PAPI_set_granularity(PAPI_GRN_SYS_CPU))!=PAPI_OK){ */
+ /*       fprintf(stderr, "Could not set PAPI granularity to count each cpus individually\n");  */
+ /*       handle_error(err); */
+ /*     } */
+
+ /* } */
  
  print_Monitors_header(m);
  for(i=0;i<m->n_PU;i++){
-   err=pthread_create(&(m->pthreads[i]),NULL,Monitors_thread,(void*)m);
-   if(err!=0){
-     fprintf(stderr,"pthread create failed with err: %d\n",err);
-     exit(EXIT_FAILURE);
-   }
+ err=pthread_create(&(m->pthreads[i]),NULL,Monitors_thread,(void*)m);
+ if(err!=0){
+   fprintf(stderr,"pthread create failed with err: %d\n",err);
+   exit(EXIT_FAILURE);
+ }
  }
  Monitors_wait_update(m);
  return 0;
@@ -747,7 +788,7 @@ Monitors_get_monitor_variation(Monitors_t m, unsigned int monitor_idx, unsigned 
 }
 
 
-inline double
+double
 Monitors_wait_monitor_value(Monitors_t m, unsigned int monitor_idx, unsigned int sibling_idx)
 {
   struct node_box * box = Monitors_get_node_box(m,monitor_idx, sibling_idx);
@@ -758,7 +799,7 @@ Monitors_wait_monitor_value(Monitors_t m, unsigned int monitor_idx, unsigned int
   return val;
 }
 
-inline double
+double
 Monitors_wait_monitor_variation(Monitors_t m, unsigned int monitor_idx, unsigned int sibling_idx)
 {
   struct node_box * box = Monitors_get_node_box(m,monitor_idx, sibling_idx);

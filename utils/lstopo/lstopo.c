@@ -581,7 +581,6 @@ main (int argc, char *argv[])
   while (argc >= 1)
     {
       if(strncmp(argv[0],"-",1)){
-	printf("break at %s\n",argv[0]);
 	break;
       }
       opt = 0;

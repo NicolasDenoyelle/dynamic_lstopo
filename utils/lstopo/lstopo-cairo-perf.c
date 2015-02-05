@@ -65,7 +65,7 @@ void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_att
   FD_SET(itimer_fd, &in_fds_original);
   int nfds = x11_fd > itimer_fd ? x11_fd+1 : itimer_fd+1;  
   
-  /* prepare monitoring activity */
+  /* start monitoring activity */
   Monitors_start(monitors);
 
   /* start executable to watch */
@@ -93,7 +93,6 @@ void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_att
 	}
       }
     }
-
     msync(child, sizeof(*child), MS_SYNC);
     if(*child>0 && !ret){
       Monitors_watch_pid(monitors,*child);
@@ -194,11 +193,11 @@ output_pdf_perf(hwloc_topology_t topology, const char *filename __hwloc_attribut
   }
   output_draw( &pdf_draw_methods, logical, legend, topology, c);
   topo_cairo_perf_boxes(topology, monitors, active, c, &pdf_draw_methods);
-  cairo_destroy(c);
+  hwloc_bitmap_free(active);
 
+  cairo_destroy(c);
   cairo_surface_flush(cs);
   cairo_surface_destroy(cs);
-  hwloc_bitmap_free(active);
   if (output != stdout)
     fclose(output);
 }
@@ -229,10 +228,10 @@ output_ps_perf(hwloc_topology_t topology, const char *filename, int overwrite, i
   }
   output_draw( &ps_draw_methods, logical, legend, topology, c);
   topo_cairo_perf_boxes(topology, monitors, active, c, &png_draw_methods);
-  cairo_surface_flush(cs);
-  cairo_destroy(c);
-  cairo_surface_destroy(cs);
   hwloc_bitmap_free(active);
+  cairo_destroy(c);
+  cairo_surface_flush(cs);
+  cairo_surface_destroy(cs);
   if (output != stdout)
     fclose(output);
 }

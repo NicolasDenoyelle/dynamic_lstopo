@@ -1380,7 +1380,9 @@ perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj
  
   float value = (float)(box->val);
   char text[64];
-  sprintf(text,"%lf",value);
+  unsigned precision = ((mywidth-gridsize)/fontsize)-4;
+  precision = precision>64? 64 : precision;
+  sprintf(text,"%1.*e",precision,value);
   value=(value-(float)box->min)/(float)(box->max - box->min);
   height = myheight*value;
   float r = value>0.5? 255:510*value;
