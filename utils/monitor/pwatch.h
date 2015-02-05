@@ -9,17 +9,11 @@
 
 
 struct proc_watch;
+struct task_stat;
+
 struct proc_watch *  new_proc_watch(hwloc_topology_t topology, unsigned int pid, unsigned int initial_count);
 void                 delete_proc_watch(struct proc_watch * pw);
-
-void                 proc_watch_add_task(struct proc_watch * pw, unsigned int tid);
-void                 proc_watch_add_task_on_pu(struct proc_watch * pw, unsigned int tid, unsigned int physical_PU);
-int                  proc_watch_rm_task(struct proc_watch * pw, unsigned int tid);
-int                  proc_watch_rm_task_on_pu(struct proc_watch * pw, unsigned int tid, unsigned int physical_PU);
-
 void                 proc_watch_update(struct proc_watch * pw);
-void                 proc_watch_update_tasks(struct proc_watch * pw);
-void                 proc_watch_update_pu(struct proc_watch * pw, int physical_pu);
 void                 proc_watch_get_watched_in_cpuset(struct proc_watch * pw, hwloc_cpuset_t cpuset, hwloc_cpuset_t out);
 unsigned int         proc_watch_get_pid(struct proc_watch * pw);
 

@@ -728,22 +728,7 @@ Monitors_start(Monitors_t m)
    }
  }
 
- //PAPI_multiplex_init();
  PAPI_thread_init(pthread_self);
-
- /*   if(m->pw){ */
- /*     if((err = PAPI_set_granularity(PAPI_GRN_PROC))!=PAPI_OK){ */
- /*       fprintf(stderr, "Could not set PAPI granularity to count process events\n");  */
- /*       handle_error(err); */
- /*     } */
- /*   } */
- /*   else */
- /*     if((err = PAPI_set_granularity(PAPI_GRN_SYS_CPU))!=PAPI_OK){ */
- /*       fprintf(stderr, "Could not set PAPI granularity to count each cpus individually\n");  */
- /*       handle_error(err); */
- /*     } */
-
- /* } */
  
  print_Monitors_header(m);
  for(i=0;i<m->n_PU;i++){
