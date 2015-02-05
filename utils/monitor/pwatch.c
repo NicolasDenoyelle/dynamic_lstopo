@@ -20,11 +20,6 @@ struct proc_watch{
   pthread_mutex_t    lock;        
 };
 
-#define EVENT_SIZE  (sizeof(struct inotify_event))
-#define BUF_LEN     (1024 * (EVENT_SIZE + 16))
-
-int  compare_tasks(const void* a,const void* b ){return ((unsigned int *)a)[0] - ((unsigned int *)b)[0];}
-
 struct task_stat{
   unsigned pu_num;
   unsigned state; // 1=RUNNING, 0=NOT RUNNING
