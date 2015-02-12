@@ -1310,7 +1310,7 @@ output_draw(struct draw_methods *methods, int logical, int legend, hwloc_topolog
 
 #ifdef HWLOC_HAVE_MONITOR
 void
-perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj_t level, void *output, unsigned depth, struct node_box * box){
+perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj_t level, void *output, unsigned depth, float value, float max, float min){
   unsigned x,y,totwidth,totheight,mywidth,myheight,width,height,gridsize;
   struct dyna_save * ds = (struct dyna_save *) level->userdata;
   if(ds!=NULL){
@@ -1378,12 +1378,11 @@ perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj
   }
 
  
-  float value = (float)(box->val);
   char text[64];
   unsigned precision = ((mywidth-gridsize)/fontsize)-4;
   precision = precision>10? 10 : precision;
   sprintf(text,"%1.*e",precision,value);
-  value=(value-(float)box->min)/(float)(box->max - box->min);
+  value=(value - min)/(max - min);
   height = myheight*value;
   float r = value>0.5? 255:510*value;
   float g = value>0.5? 510*(1-value):255;

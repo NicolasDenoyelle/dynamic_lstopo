@@ -51,11 +51,20 @@ extern void output_draw(struct draw_methods *draw_methods, int logical, int lege
 
 #ifdef HWLOC_HAVE_MONITOR
 #include "monitor.h"
+#include "monitor_replay.h"
 
-extern void output_draw_perf(struct draw_methods *draw_methods, int logical, int legend, struct hwloc_topology *topology, void *output, Monitors_t monitors);
-typedef void output_perf_method(struct hwloc_topology *topology, const char *output, int overwrite, int logical, int legend, int verbose_mode, Monitors_t monitors, unsigned long refresh_usec, char * executable, char * exe_args[]);
+/* monitor draw */
+extern void output_draw_perf(struct draw_methods *draw_methods, int logical, int legend, struct hwloc_topology *topology, void *output, monitors_t monitors);
+typedef void output_perf_method(struct hwloc_topology *topology, const char *output, int overwrite, int logical, int legend, int verbose_mode, monitors_t monitors, unsigned long refresh_usec, char * executable, char * exe_args[]);
 extern output_perf_method output_x11_perf, output_pdf_perf, output_png_perf, output_ps_perf, output_svg_perf;
-extern void perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj_t level, void *output, unsigned depth, struct node_box * box);
+
+/* perf draw */
+extern void output_draw_perf_replay(struct draw_methods *draw_methods, int logical, int legend, struct hwloc_topology *topology, void *output, replay_t replay);
+typedef void output_perf_replay_method(struct hwloc_topology *topology, const char *output, int overwrite, int logical, int legend, int verbose_mode, replay_t replay);
+extern output_perf_replay_method output_x11_perf_replay, output_pdf_perf_replay, output_png_perf_replay, output_ps_perf_replay, output_svg_perf_replay;
+
+/* box draw */
+extern void perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj_t level, void *output, unsigned depth, float value, float max, float min);
 #endif /* HWLOC_HAVE_MONITOR */
 
 int rgb_to_color(int r, int g, int b) __hwloc_attribute_const;

@@ -2,31 +2,52 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <poll.h>
 #include "lstopo-cairo.h"
 #include "monitor.h"
+#include "monitor_replay.h"
 #include "pwatch.h"
 
-void topo_cairo_perf_boxes(hwloc_topology_t topology, Monitors_t monitors, hwloc_bitmap_t active, cairo_t *c, struct draw_methods * methods)
+void topo_cairo_perf_boxes(hwloc_topology_t topology, 
+monitors_t monitors, hwloc_bitmap_t active, cairo_t *c, struct draw_methods * methods)
 {
   unsigned int i, nobj;
-  struct node_box * box;
+  struct monitor_node * box;
   hwloc_obj_t obj;
   for(i=0;i<monitors->count;i++){
     nobj = hwloc_get_nbobjs_by_depth(monitors->topology,monitors->depths[i]);
     while(nobj--){
-      box=(struct node_box *)(hwloc_get_obj_by_depth(monitors->topology,monitors->depths[i],nobj)->userdata);
+      box=(struct monitor_node *)(hwloc_get_obj_by_depth(monitors->topology,monitors->depths[i],nobj)->userdata);
       obj = hwloc_get_obj_by_depth(topology,monitors->depths[i],nobj);
       proc_watch_get_watched_in_cpuset(monitors->pw,obj->cpuset,active);
       if(!monitors->pw || !hwloc_bitmap_iszero(active)){
-	perf_box_draw(topology, methods, obj, c, obj->depth, box);
+	perf_box_draw(topology, methods, obj, c, obj->depth, (float)box->val, (float)box->max, (float)box->min);
       }
     }
   }
   cairo_show_page(c);
 }
 
+void topo_cairo_perf_replay_boxes(hwloc_topology_t topology, 
+replay_t replay, cairo_t *c, struct draw_methods * methods)
+{
+  unsigned int i, nobj;
+  hwloc_obj_t obj;
+  struct replay_node * box;
+  for(i=0;i<replay->count;i++){
+    nobj = hwloc_get_nbobjs_by_depth(replay->topology,replay->depths[i]);
+    while(nobj--){
+      obj = hwloc_get_obj_by_depth(replay->topology,replay->depths[i],nobj);
+      box=(struct replay_node *)(obj->userdata);
+      perf_box_draw(topology, methods, obj, c, obj->depth, (float)replay_node_get_value(box), (float)box->max, (float)box->min);
+    }
+  }
+  cairo_show_page(c);
+}
+
+
 #if CAIRO_HAS_XLIB_SURFACE
-void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_attribute_unused, int overwrite __hwloc_attribute_unused, int logical, int legend, int verbose_mode __hwloc_attribute_unused, Monitors_t monitors, unsigned long refresh_usec, char * executable, char * exe_args[])
+void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_attribute_unused, int overwrite __hwloc_attribute_unused, int logical, int legend, int verbose_mode __hwloc_attribute_unused, monitors_t monitors, unsigned long refresh_usec, char * executable, char * exe_args[])
 {
   struct timeval timeout;
   char buf[sizeof(uint64_t)];
@@ -130,12 +151,48 @@ void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_att
   XCloseDisplay(disp->dpy);
   free(disp);
 }
+
+void output_x11_perf_replay(hwloc_topology_t topology, const char *filename __hwloc_attribute_unused, int overwrite __hwloc_attribute_unused, int logical, int legend, int verbose_mode __hwloc_attribute_unused, replay_t replay)
+{
+  /* draw initial topology */
+  struct display *disp;
+  disp = output_draw_start(&x11_draw_methods, logical, legend, topology, NULL);
+  int lastx = disp->x, lasty = disp->y;
+  topo_cairo_paint(&x11_draw_methods, logical, legend, topology, disp->cs);
+  /* flush windows*/
+  XMoveWindow(disp->dpy, disp->win, -disp->x, -disp->y);
+
+  cairo_t * c = cairo_create(disp->cs);
+  struct pollfd pfd;
+  pfd.fd = ConnectionNumber(disp->dpy);
+  pfd.events = POLLIN;
+  
+  replay_start(replay);
+  while(!replay_is_finished(replay)){
+    if(poll(&pfd,1,0)){
+      if(handle_xDisplay(disp,topology,logical,legend,&lastx,&lasty))
+	goto exit;
+    }
+    replay_wait_read(replay);
+    topo_cairo_perf_replay_boxes(topology, replay, c, &x11_draw_methods);
+    XFlush(disp->dpy);
+  }
+    
+ exit:;
+  cairo_destroy(c);
+  x11_destroy(disp);
+  XDestroyWindow(disp->dpy, disp->top);
+  XFreeCursor(disp->dpy, disp->hand);
+  XCloseDisplay(disp->dpy);
+  free(disp);
+}
+
 #endif /* CAIRO_HAS_XLIB_SURFACE */
 
 #if CAIRO_HAS_PNG_FUNCTIONS
 /* PNG back-end */
 void
-output_png_perf(hwloc_topology_t topology, const char *filename, int overwrite, int logical, int legend, int verbose_mode __hwloc_attribute_unused, Monitors_t monitors, unsigned long refresh_usec, char * executable, char * exe_args[])
+output_png_perf(hwloc_topology_t topology, const char *filename, int overwrite, int logical, int legend, int verbose_mode __hwloc_attribute_unused, monitors_t monitors, unsigned long refresh_usec, char * executable, char * exe_args[])
 {
   FILE *output = open_output(filename, overwrite);
   cairo_surface_t *cs;
@@ -171,7 +228,7 @@ output_png_perf(hwloc_topology_t topology, const char *filename, int overwrite, 
 #if CAIRO_HAS_PDF_SURFACE
 /* PDF back-end */
 void
-output_pdf_perf(hwloc_topology_t topology, const char *filename __hwloc_attribute_unused, int overwrite __hwloc_attribute_unused, int logical, int legend, int verbose_mode __hwloc_attribute_unused, Monitors_t monitors, unsigned long refresh_usec, char * executable, char * exe_args[])
+output_pdf_perf(hwloc_topology_t topology, const char *filename __hwloc_attribute_unused, int overwrite __hwloc_attribute_unused, int logical, int legend, int verbose_mode __hwloc_attribute_unused, monitors_t monitors, unsigned long refresh_usec, char * executable, char * exe_args[])
 {
   hwloc_bitmap_t active = hwloc_bitmap_dup(hwloc_topology_get_topology_cpuset(topology));
   FILE *output = open_output(filename, overwrite);
@@ -206,7 +263,7 @@ output_pdf_perf(hwloc_topology_t topology, const char *filename __hwloc_attribut
 #if CAIRO_HAS_PS_SURFACE
 /* PS back-end */
 void
-output_ps_perf(hwloc_topology_t topology, const char *filename, int overwrite, int logical, int legend, int verbose_mode __hwloc_attribute_unused, Monitors_t monitors, unsigned long refresh_usec, char * executable, char * exe_args[])
+output_ps_perf(hwloc_topology_t topology, const char *filename, int overwrite, int logical, int legend, int verbose_mode __hwloc_attribute_unused, monitors_t monitors, unsigned long refresh_usec, char * executable, char * exe_args[])
 {
   FILE *output = open_output(filename, overwrite);
   cairo_surface_t *cs;
@@ -242,7 +299,7 @@ output_ps_perf(hwloc_topology_t topology, const char *filename, int overwrite, i
 /* SVG back-end */
 
 void
-output_svg_perf(hwloc_topology_t topology, const char *filename, int overwrite, int logical, int legend, int verbose_mode __hwloc_attribute_unused, Monitors_t monitors, unsigned long refresh_usec, char * executable, char * exe_args[])
+output_svg_perf(hwloc_topology_t topology, const char *filename, int overwrite, int logical, int legend, int verbose_mode __hwloc_attribute_unused, monitors_t monitors, unsigned long refresh_usec, char * executable, char * exe_args[])
 {
   FILE *output;
   cairo_surface_t *cs;
