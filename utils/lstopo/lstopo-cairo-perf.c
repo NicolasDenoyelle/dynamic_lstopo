@@ -33,15 +33,19 @@ replay_t replay, cairo_t *c, struct draw_methods * methods)
 {
   unsigned int i, nobj;
   hwloc_obj_t obj;
+  float val;
   struct replay_node * box;
   for(i=0;i<replay->count;i++){
     nobj = hwloc_get_nbobjs_by_depth(replay->topology,replay->depths[i]);
     while(nobj--){
       obj = hwloc_get_obj_by_depth(replay->topology,replay->depths[i],nobj);
       box=(struct replay_node *)(obj->userdata);
-      perf_box_draw(topology, methods, obj, c, obj->depth, (float)replay_node_get_value(box), (float)box->max, (float)box->min);
+      val = (float)replay_node_get_value(box);
+      printf("read_node [%d:%d], value:%f in [%f,%f]\n",replay->depths[i],nobj,val,(float)box->min,(float)box->max);
+      perf_box_draw(topology, methods, obj, c, obj->depth, 0.5,1.0,0.0);
     }
   }
+  printf("#################################\n");
   cairo_show_page(c);
 }
 

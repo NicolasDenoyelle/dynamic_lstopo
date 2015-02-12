@@ -17,6 +17,7 @@ struct replay_node{
   struct replay_queue * tail;
   double max;
   double min;
+  pthread_mutex_t mtx;
 };
 
 struct replay_node * new_replay_node();
@@ -34,7 +35,6 @@ struct replay_t{
   sem_t reader_semaphore; /* should block until one reader is allowed to read values */
   sem_t buffer_semaphore; /* increment each time a timestamp is enqueued in timestamps */
 
-  struct timeval start; /* set at time the replay starts */
   long long trace_start; /* the younger real_usec read from trace */
   struct replay_node * timestamps; /* The first sample's time stamp of each topology's set of samples */
   struct line_content last_read; /* if a node buffer was full when attempting to enqueue a value, we store read content here */

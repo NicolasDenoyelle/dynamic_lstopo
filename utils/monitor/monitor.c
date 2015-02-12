@@ -20,10 +20,10 @@
     exit(EXIT_FAILURE);					\
   }							
 
-#define Monitors_get_node_box(m,index,sibling) ((struct node_box*)(hwloc_get_obj_by_depth(m->topology,m->depths[index],sibling)->userdata))
-#define Monitors_get_monitor_max(m,i) Monitors_get_node_box(m,i,0)->max
-#define Monitors_get_monitor_min(m,i) Monitors_get_node_box(m,i,0)->min
-#define Monitors_get_monitor_value(m, monitor_idx, sibling_idx) Monitors_get_node_box(m,monitor_idx,sibling_idx)->val
+#define Monitors_get_monitor_node(m,index,sibling) ((struct monitor_node*)(hwloc_get_obj_by_depth(m->topology,m->depths[index],sibling)->userdata))
+#define Monitors_get_monitor_max(m,i) Monitors_get_monitor_node(m,i,0)->max
+#define Monitors_get_monitor_min(m,i) Monitors_get_monitor_node(m,i,0)->min
+#define Monitors_get_monitor_value(m, monitor_idx, sibling_idx) Monitors_get_monitor_node(m,monitor_idx,sibling_idx)->val
 
 static inline void zerof(double * array, unsigned int size){
   unsigned int i = size;
@@ -35,10 +35,10 @@ static inline void zerod(long long * array, unsigned int size){
   for(i=0;i<size;i++) array[i]=0;
 }
 
-struct node_box *
-new_node_box(unsigned int n_events)
+struct monitor_node *
+new_monitor_node(unsigned int n_events)
 {
-  struct node_box * out = malloc(sizeof(*out));
+  struct monitor_node * out = malloc(sizeof(*out));
   if(out==NULL){
     perror("malloc failed\n");
     exit(EXIT_FAILURE);
@@ -63,7 +63,7 @@ new_node_box(unsigned int n_events)
 }
 
 void
-delete_node_box(struct node_box * out)
+delete_monitor_node(struct monitor_node * out)
 {
   if(out==NULL)
     return;
@@ -244,11 +244,11 @@ monitors_t new_Monitors(hwloc_topology_t topology,
   M_alloc(m->compute,m->allocated_count,sizeof(double (*)(long long*)));
   M_alloc(m->names,m->allocated_count,sizeof(char *));
   M_alloc(m->event_names,n_events,sizeof(char*));
-  M_alloc(m->PU_vals,m->n_PU,sizeof(struct node_box *));
+  M_alloc(m->PU_vals,m->n_PU,sizeof(struct monitor_node *));
 
   for(i=0;i<m->n_PU;i++){
     m->pthreads[i]=0;
-    m->PU_vals[i] = new_node_box(n_events);
+    m->PU_vals[i] = new_monitor_node(n_events);
   }
 
   for(i=0;i<m->allocated_count;i++)
@@ -310,7 +310,7 @@ int add_Monitor(monitors_t m, const char * name, char * hwloc_obj_name, double (
 
   while(n_obj--){
     node=hwloc_get_obj_by_depth(m->topology,depth,n_obj);
-    node->userdata = new_node_box(m->n_events);
+    node->userdata = new_monitor_node(m->n_events);
   }
   
   return 0;
@@ -323,7 +323,7 @@ Monitors_print(monitors_t m, hwloc_cpuset_t alloc_tmp)
   unsigned m_idx,sibling_idx;
   hwloc_obj_t obj;
   unsigned topo_depth = hwloc_topology_get_depth(m->topology), obj_depth;
-  struct node_box * values;
+  struct monitor_node * values;
   char type[10];
   pthread_mutex_lock(&(m->print_mtx));
   for(m_idx=0;m_idx<m->count;m_idx++){
@@ -391,7 +391,7 @@ void * monitors_thread(void* monitors){
   int tidx, p_tidx, eventset, depth;
   long long * values, * old_values, * tmp;
   hwloc_obj_t obj,cpu;
-  struct node_box * out, * PU_vals;
+  struct monitor_node * out, * PU_vals;
   struct line_content output;
   char type[10];
   if(monitors==NULL)
@@ -485,7 +485,7 @@ void * monitors_thread(void* monitors){
     /* reduce counters for every monitors_t */
     for(i=0;i<m->count;i++){
       obj = hwloc_get_ancestor_obj_by_depth(m->topology,m->depths[i],cpu);
-      out = (struct node_box *)(obj->userdata);
+      out = (struct monitor_node *)(obj->userdata);
 
       /* get the number of threads updating this array of counters */
       if(m->pw!=NULL){
@@ -518,12 +518,12 @@ void * monitors_thread(void* monitors){
 	if(isinf(out->max) || out->max<out->val){
 	  nobj=hwloc_get_nbobjs_by_depth(m->topology,m->depths[i]);
 	  while(nobj--)
-	    Monitors_get_node_box(m,i,nobj)->max=out->val;
+	    Monitors_get_monitor_node(m,i,nobj)->max=out->val;
 	}
 	if(isinf(out->min) || out->min>out->val){
 	  nobj=hwloc_get_nbobjs_by_depth(m->topology,m->depths[i]);
 	  while(nobj--)
-	    Monitors_get_node_box(m,i,nobj)->min=out->val;
+	    Monitors_get_monitor_node(m,i,nobj)->min=out->val;
 	}
 	/* compute real_usec mean value */
 	out->real_usec/=weight;
@@ -618,7 +618,7 @@ load_Monitors_from_config(hwloc_topology_t topology, const char * perf_group_fil
   double (*fun)(long long*);
   void * dlhandle;
 
-  if(chk_input_file(perf_group_file))
+  if(!chk_input_file(perf_group_file))
     return NULL;
 
   pn = parser(perf_group_file);
@@ -722,7 +722,7 @@ Monitors_wait_update(monitors_t m){
 inline long long
 Monitors_get_counter_value(monitors_t m,unsigned int counter_idx,unsigned int PU_idx)
 {
-  return Monitors_get_node_box(m,hwloc_topology_get_depth(m->topology)-1,PU_idx)->counters_val[counter_idx];
+  return Monitors_get_monitor_node(m,hwloc_topology_get_depth(m->topology)-1,PU_idx)->counters_val[counter_idx];
 }
 
 inline double 
@@ -730,14 +730,14 @@ Monitors_get_monitor_variation(monitors_t m, unsigned int monitor_idx, unsigned 
 { 
   hwloc_obj_t obj;
   obj = hwloc_get_obj_by_depth(m->topology,m->depths[monitor_idx],sibling_idx);
-  return ((struct node_box *)(obj->userdata))->val-((struct node_box *)(obj->userdata))->old_val;
+  return ((struct monitor_node *)(obj->userdata))->val-((struct monitor_node *)(obj->userdata))->old_val;
 }
 
 
 double
 Monitors_wait_monitor_value(monitors_t m, unsigned int monitor_idx, unsigned int sibling_idx)
 {
-  struct node_box * box = Monitors_get_node_box(m,monitor_idx, sibling_idx);
+  struct monitor_node * box = Monitors_get_monitor_node(m,monitor_idx, sibling_idx);
   double val;
   pthread_mutex_lock(&(box->update_lock));
   val = box->val;
@@ -748,7 +748,7 @@ Monitors_wait_monitor_value(monitors_t m, unsigned int monitor_idx, unsigned int
 double
 Monitors_wait_monitor_variation(monitors_t m, unsigned int monitor_idx, unsigned int sibling_idx)
 {
-  struct node_box * box = Monitors_get_node_box(m,monitor_idx, sibling_idx);
+  struct monitor_node * box = Monitors_get_monitor_node(m,monitor_idx, sibling_idx);
   double val;
   pthread_mutex_lock(&(box->update_lock));
   val = box->val - box->old_val;
@@ -784,11 +784,11 @@ delete_Monitors(monitors_t m)
     free(m->names[i]);
     n_obj=hwloc_get_nbobjs_by_depth(m->topology,m->depths[i]);
     for(j=0;j<n_obj;j++){
-      delete_node_box(Monitors_get_node_box(m,i,j));
+      delete_monitor_node(Monitors_get_monitor_node(m,i,j));
     }
   }
   for(i=0;i<m->n_PU;i++){
-    delete_node_box(m->PU_vals[i]);
+    delete_monitor_node(m->PU_vals[i]);
   }
 
   free(m->PU_vals);

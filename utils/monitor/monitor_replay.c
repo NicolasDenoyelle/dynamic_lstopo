@@ -17,7 +17,7 @@
 
 void output_header(int output_fd){
   dprintf(output_fd,"#-----+---------+-------------------+-------------------+-------------------+\n");
-  dprintf(output_fd,"%6s", "idx");
+  dprintf(output_fd,"#%5s", "idx");
   dprintf(output_fd,"%10s","level");
   dprintf(output_fd,"%20s","real_usec");
   dprintf(output_fd,"%20s","monitor_name");
@@ -41,29 +41,31 @@ input_line_content(FILE * in, struct line_content * out){
   size_t len = 0;
   char * line = NULL;
   if((ret = getline(&line,&len,in))<0){
-    perror("getline");
     return ret;
   }
-
-  char * name, * obj_name;
+  char sibling_idx[6], obj_name[10], real_usec[20], name[20], value[20];
   int n;
   errno = 0;
-  n = sscanf(line,"%6d%10s%20lld%20s%20lf",&(out->sibling_idx),out->obj_name,&(out->real_usec), out->name, &(out->value));
+  n = sscanf(line,"%6s%10s%20s%20s%20s",sibling_idx,obj_name, real_usec, name, value);
   free(line);
+
   if (errno != 0) {
     perror("scanf");
-  } else if(n!=5)
+  } 
+  else if(n!=5 || sibling_idx[0] == '#'){
     return input_line_content(in, out);
+  }
   else{
-    strcpy(out->name,name);
-    strcpy(out->obj_name,obj_name);
-    free(obj_name);
-    free(name);
+    strncpy(out->name,name,20);
+    strncpy(out->obj_name,obj_name,10);
+    out->real_usec=atoll(real_usec);
+    out->sibling_idx=atoi(sibling_idx);
+    out->value=atof(value);
   }
   return ret;
 }
 
-inline void 
+static inline void 
 chk_update_max(hwloc_topology_t topology, unsigned depth, double max){
   hwloc_obj_t obj = hwloc_get_obj_by_depth(topology,depth,0);
   if(((struct replay_node *)obj->userdata)->max < max){
@@ -73,7 +75,7 @@ chk_update_max(hwloc_topology_t topology, unsigned depth, double max){
   }
 }
 
-inline void 
+static inline void 
 chk_update_min(hwloc_topology_t topology, unsigned depth, double min){
   hwloc_obj_t obj = hwloc_get_obj_by_depth(topology,depth,0);
   if(((struct replay_node *)obj->userdata)->min > min){
@@ -90,9 +92,7 @@ struct replay_node * node;
   node->max = DBL_MIN;
   node->min = DBL_MAX;
   M_alloc(node->head,1,sizeof(struct replay_queue));
-  node->tail = NULL;
   struct replay_queue * current=node->head;
-  current->prev=NULL;
   unsigned i;
   for(i=0;i<BUF_MAX-1;i++){
     current->val=0;
@@ -103,6 +103,8 @@ struct replay_node * node;
   current->val=0;
   current->next=node->head;
   node->head->prev=current;
+  node->tail = NULL;
+  pthread_mutex_init(&node->mtx,NULL);
   return node;
 }
 
@@ -116,11 +118,13 @@ delete_replay_node(struct replay_node * node)
     current = next;
   } 
   free(node->head);
+  pthread_mutex_destroy(&node->mtx);
   free(node);
 }
 
 int
 replay_node_insert_value(struct replay_node * out, double in){
+  pthread_mutex_lock(&out->mtx);
   /* end of circular queue */
   if(out->tail==out->head)
     return -1;
@@ -133,10 +137,12 @@ replay_node_insert_value(struct replay_node * out, double in){
     out->tail->val=in;
     out->tail = out->tail->next;
   }
+  pthread_mutex_unlock(&out->mtx);
 }
 
 double
 replay_node_remove_value(struct replay_node * rn){
+  pthread_mutex_lock(&rn->mtx);
   /* empty_queue */
   if(rn->tail==NULL)
     return 0;
@@ -144,7 +150,8 @@ replay_node_remove_value(struct replay_node * rn){
   rn->head = rn->head->next;
   /* the queue is empty */
   if(rn->head==rn->tail)
-    rn->tail==NULL;
+    rn->tail=NULL;
+  pthread_mutex_unlock(&rn->mtx);
   return val;
 }
 
@@ -246,7 +253,7 @@ new_replay(const char * filename, hwloc_topology_t topology)
   for(i=0;i<topo_depth;i++){
     rp->depths[i]=0;
   }
-
+  i=0;
   hwloc_obj_t obj = hwloc_get_root_obj (rp->topology);
   struct line_content lc;
 
@@ -371,27 +378,28 @@ replay_is_finished(replay_t r){
 
 void * replay_timer_thread(void* arg){
   replay_t r = (replay_t)arg;
-  struct timeval now, elapsed, pause;
-  long long trace_elapsed, usleep_len;
-  gettimeofday(&r->start,NULL);
+  struct timeval start, now, pause;
+  long long trace_elapsed, elapsed, usleep_len;
+  gettimeofday(&start,NULL);
   
   while(!replay_is_finished(r)){
     sem_wait(&r->buffer_semaphore);
     trace_elapsed = replay_node_get_value(r->timestamps) - r->trace_start;
     gettimeofday(&now,NULL);
-    timeval_subtract(&elapsed, &now, &r->start);
-    usleep_len = trace_elapsed - elapsed.tv_usec;
+    elapsed = 1000000*(now.tv_sec - start.tv_sec) + now.tv_usec -start.tv_usec;
+    usleep_len = trace_elapsed - elapsed;
     if(usleep_len>0){
+      printf("sleeping %lld\n",usleep_len);
       usleep(usleep_len);
     }
 
     /* pause handling */
-    pthread_mutex_lock(&r->pause_mtx);
-    pthread_mutex_unlock(&r->pause_mtx);
-    gettimeofday(&pause,NULL);
-    timeval_subtract(&elapsed, &pause, &now);
-    r->start.tv_sec+=elapsed.tv_sec;
-    r->start.tv_usec+=elapsed.tv_usec;
+    /* pthread_mutex_lock(&r->pause_mtx); */
+    /* pthread_mutex_unlock(&r->pause_mtx); */
+    /* gettimeofday(&pause,NULL); */
+    /* timeval_subtract(&pause, &pause, &now); */
+    /* start.tv_sec+=pause.tv_sec; */
+    /* start.tv_usec+=pause.tv_usec; */
 
     sem_post(&r->reader_semaphore);
   }
