@@ -188,7 +188,7 @@ monitors_t new_Monitors(hwloc_topology_t topology,
     return NULL;
   }
 
-  m = malloc(sizeof(struct monitors_t));
+  m = malloc(sizeof(struct monitors));
   if(m==NULL){
     perror("malloc failed\n");
     return NULL;
