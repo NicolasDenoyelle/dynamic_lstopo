@@ -32,7 +32,6 @@ struct replay_t{
   /**** private ****/
   FILE * input;
   int    eof;
-  sem_t reader_semaphore; /* should block until one reader is allowed to read values */
   sem_t buffer_semaphore; /* increment each time a timestamp is enqueued in timestamps */
 
   long long trace_start; /* the younger real_usec read from trace */
@@ -51,6 +50,8 @@ struct replay_t{
 
   /**** public ****/
   hwloc_topology_t topology; /* stores a replay_node in each obj sibling at depth "depths[i]" which first element is the value to be read */
+  int update_read_fd;        /* should block until one reader is allowed to read values */
+  int update_write_fd;        /* should block until one reader is allowed to read values */
 };
 typedef struct replay_t * replay_t;
 
@@ -59,7 +60,6 @@ void     delete_replay   (replay_t r);
 void     replay_start    (replay_t r);
 void     replay_pause    (replay_t r);
 void     replay_resume   (replay_t r);
-void     replay_wait_read(replay_t r);
 int      replay_is_finished(replay_t r);
 
 

@@ -2,7 +2,6 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include <poll.h>
 #include "lstopo-cairo.h"
 #include "monitor.h"
 #include "monitor_replay.h"
@@ -33,19 +32,15 @@ replay_t replay, cairo_t *c, struct draw_methods * methods)
 {
   unsigned int i, nobj;
   hwloc_obj_t obj;
-  float val;
   struct replay_node * box;
   for(i=0;i<replay->count;i++){
     nobj = hwloc_get_nbobjs_by_depth(replay->topology,replay->depths[i]);
     while(nobj--){
-      obj = hwloc_get_obj_by_depth(replay->topology,replay->depths[i],nobj);
-      box=(struct replay_node *)(obj->userdata);
-      val = (float)replay_node_get_value(box);
-      printf("read_node [%d:%d], value:%f in [%f,%f]\n",replay->depths[i],nobj,val,(float)box->min,(float)box->max);
-      perf_box_draw(topology, methods, obj, c, obj->depth, 0.5,1.0,0.0);
+      obj = hwloc_get_obj_by_depth(topology,replay->depths[i],nobj);
+      box=(struct replay_node *)(hwloc_get_obj_by_depth(replay->topology,replay->depths[i],nobj)->userdata);
+      perf_box_draw(topology, methods, obj, c, obj->depth, (float)replay_node_get_value(box), (float)box->max, (float)box->min);
     }
   }
-  printf("#################################\n");
   cairo_show_page(c);
 }
 
@@ -167,19 +162,33 @@ void output_x11_perf_replay(hwloc_topology_t topology, const char *filename __hw
   XMoveWindow(disp->dpy, disp->win, -disp->x, -disp->y);
 
   cairo_t * c = cairo_create(disp->cs);
-  struct pollfd pfd;
-  pfd.fd = ConnectionNumber(disp->dpy);
-  pfd.events = POLLIN;
+
+  /* select between x11event and alarm */
+  char buf[sizeof(uint64_t)];
+  struct timeval timeout;
+  fd_set in_fds, in_fds_original;
+  FD_ZERO(&in_fds_original);  
+  int x11_fd = ConnectionNumber(disp->dpy);
+  FD_SET(x11_fd, &in_fds_original);
+  FD_SET(replay->update_read_fd, &in_fds_original);
+  int nfds = x11_fd > replay->update_read_fd ? x11_fd+1 : replay->update_read_fd+1;  
   
   replay_start(replay);
   while(!replay_is_finished(replay)){
-    if(poll(&pfd,1,0)){
-      if(handle_xDisplay(disp,topology,logical,legend,&lastx,&lasty))
-	goto exit;
+    in_fds = in_fds_original;
+    timeout.tv_sec=10;
+    timeout.tv_usec=0;
+    if(select(nfds, &in_fds, NULL, NULL,&timeout)>0){
+      if(FD_ISSET(x11_fd,&in_fds)){
+	if(handle_xDisplay(disp,topology,logical,legend,&lastx,&lasty))
+	  break;
+      }
+      if(FD_ISSET(replay->update_read_fd,&in_fds)){
+	read(replay->update_read_fd,&buf,sizeof(uint64_t));
+	topo_cairo_perf_replay_boxes(topology, replay, c, &x11_draw_methods);
+    	XFlush(disp->dpy);
+      }
     }
-    replay_wait_read(replay);
-    topo_cairo_perf_replay_boxes(topology, replay, c, &x11_draw_methods);
-    XFlush(disp->dpy);
   }
     
  exit:;

@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <semaphore.h>
 #include <pthread.h>
-#include <sys/queue.h>
 #include <sys/time.h>
 #include <float.h>
+#include <unistd.h>
 #include "hwloc.h"
 #include "monitor_replay.h"
 #include "monitor_utils.h"
@@ -232,11 +232,6 @@ new_replay(const char * filename, hwloc_topology_t topology)
   else
     hwloc_topology_dup(&rp->topology,topology);
 
-  if(sem_init(&rp->reader_semaphore, 0, 0)){
-    perror("sem_init");
-    exit(EXIT_FAILURE);
-  }
-  
   if(sem_init(&rp->buffer_semaphore, 0, 0)){
     perror("sem_init");
     exit(EXIT_FAILURE);
@@ -290,7 +285,7 @@ new_replay(const char * filename, hwloc_topology_t topology)
     err = replay_input_line(rp);
   } while(err > 1);
   
-  /* filling stopped beacause buffers were full then we can have an approximation of the time interval between 
+  /* filling stopped because buffers were full then we can have an approximation of the time interval between 
      two sets of sample */
   if(err==1){
     rp->sample_interval = rp->last_read.real_usec - rp->timestamps->head->val;
@@ -299,6 +294,17 @@ new_replay(const char * filename, hwloc_topology_t topology)
     rp->eof=1;
     rp->sample_interval = 0;
   }
+
+
+  /* set fd for updates */
+  int update_fds[2];
+  if(pipe(update_fds)==-1){
+    perror("pipe");
+    exit(EXIT_FAILURE);
+  }
+  rp->update_read_fd = update_fds[0];
+  rp->update_write_fd = update_fds[1];
+
   return rp;
 }
 
@@ -311,7 +317,6 @@ delete_replay(replay_t r)
   pthread_cancel(r->timer_thread);
   pthread_join(r->fill_thread,NULL);
   pthread_join(r->timer_thread,NULL);
-  sem_destroy(&r->reader_semaphore);
   sem_destroy(&r->buffer_semaphore);
   pthread_mutex_destroy(&r->pause_mtx);
   delete_replay_node(r->timestamps);
@@ -378,21 +383,20 @@ replay_is_finished(replay_t r){
 
 void * replay_timer_thread(void* arg){
   replay_t r = (replay_t)arg;
-  struct timeval start, now, pause;
-  long long trace_elapsed, elapsed, usleep_len;
+  long long trace_elapsed, elapsed, diff;
+  struct timeval start, now, wait;
+
   gettimeofday(&start,NULL);
-  
   while(!replay_is_finished(r)){
     sem_wait(&r->buffer_semaphore);
     trace_elapsed = replay_node_get_value(r->timestamps) - r->trace_start;
     gettimeofday(&now,NULL);
     elapsed = 1000000*(now.tv_sec - start.tv_sec) + now.tv_usec -start.tv_usec;
-    usleep_len = trace_elapsed - elapsed;
-    if(usleep_len>0){
-      printf("sleeping %lld\n",usleep_len);
-      usleep(usleep_len);
+    if((diff = trace_elapsed - elapsed) > 0){
+      usleep(diff);
     }
-
+    write(r->update_write_fd,"1",sizeof(uint64_t));
+    
     /* pause handling */
     /* pthread_mutex_lock(&r->pause_mtx); */
     /* pthread_mutex_unlock(&r->pause_mtx); */
@@ -401,12 +405,7 @@ void * replay_timer_thread(void* arg){
     /* start.tv_sec+=pause.tv_sec; */
     /* start.tv_usec+=pause.tv_usec; */
 
-    sem_post(&r->reader_semaphore);
   }
-}
-
-inline void replay_wait_read(replay_t r){
-  sem_wait(&r->reader_semaphore);
 }
 
 void replay_start(replay_t r){
