@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
 #include <papi.h>
 #include "hwloc.h"
 
@@ -16,7 +18,10 @@ hwloc_get_obj_depth_by_name(hwloc_topology_t topology, char * obj_name){
   hwloc_obj_type_t type;
   int depthattrp;
   hwloc_obj_cache_type_t cache_type;
-  hwloc_obj_type_sscanf(obj_name,&type,&depthattrp,&cache_type,sizeof(cache_type));
+  if(hwloc_obj_type_sscanf(obj_name,&type,&depthattrp,&cache_type,sizeof(cache_type))==-1){
+    fprintf(stderr,"type %s was not recognized\n",obj_name);
+    return -1;
+  }
   int depth = hwloc_get_type_depth(topology,type);
   if(depth==HWLOC_TYPE_DEPTH_MULTIPLE){
     if(type==HWLOC_OBJ_CACHE){
@@ -45,6 +50,41 @@ chk_input_file(const char * filename)
     return 0;
   }
   return 1;
+}
+
+
+pid_t 
+start_executable(char * executable, char * exe_args[])
+{
+  pid_t ret;
+  pid_t *child = mmap(NULL, sizeof *child, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+  *child=0;
+  pid_t pid2, pid1 = fork();
+  if(pid1){
+    wait(NULL);
+  }
+  else if(!pid1){
+    pid2=fork();
+    if(pid2){
+      *child = pid2;
+      exit(0);
+    }
+    else if(!pid2){
+      ret = execvp(executable, exe_args);
+      if (ret) {
+	fprintf(stderr, "Failed to launch executable \"%s\"\n",
+		executable);
+	perror("execvp");
+	exit(EXIT_FAILURE);
+      }
+    }
+  }
+  msync(child, sizeof(*child), MS_SYNC);
+  if(*child>0 && !ret){
+    ret = *child;
+  }
+  munmap(child, sizeof *child);
+  return ret; 
 }
 
 char ** get_avail_hwloc_objs_names(unsigned * nobjs){

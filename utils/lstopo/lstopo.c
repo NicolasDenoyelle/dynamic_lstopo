@@ -37,6 +37,8 @@
 #include "misc.h"
 
 #ifdef HWLOC_HAVE_MONITOR
+#include <sys/types.h>
+#include <signal.h>
 #include "monitor.h"
 #include "monitor_replay.h"
 #endif
@@ -312,6 +314,8 @@ void usage(const char *name, FILE *where)
   fprintf (where, "  --whole-io            Show all I/O devices and bridges\n");
 #ifdef HWLOC_HAVE_MONITOR
   fprintf (where, "  --perf-output         Choose a file to keep monitors_t trace\n");
+  fprintf (where, "  --perf-no-display     Record counters without direct printing for later display.\n");
+  fprintf (where, "                        This option is usefull to reduce recording overhead.\n");
   fprintf (where, "  -r --refresh <r_usec> Refresh display each r_usec when --perf option is used\n");
 #endif
   fprintf (where, "Input options:\n");
@@ -332,7 +336,6 @@ void usage(const char *name, FILE *where)
 	   "                        Set flags during the synthetic topology export\n");
   fprintf (where, "  --ps --top            Display processes within the hierarchy\n");
 #ifdef HWLOC_HAVE_MONITOR
-  fprintf (where, "  --perf                Display dynamic monitors_t on topology\n");
   fprintf (where, "  --perf-input          Choose a file where monitors_t are defined as follow: \n");
   fprintf (where, "                        L1i_miss_per_cycle{L1i,PAPI_L1_ICM/PAPI_REF_CYC}\n");
   fprintf (where, "  --perf-replay         Choose a file output by --perf-output to replay an execution from trace.\n");
@@ -819,45 +822,72 @@ main (int argc, char *argv[])
         top = 1;
       }
 #ifdef HWLOC_HAVE_MONITOR
-      else if (!strcmp (argv[0], "--perf"))
-	perf = 1;
       else if (!strcmp (argv[0], "--perf-output")){
 	if (argc < 2) {
 	  usage (callname, stderr);
 	  exit(EXIT_FAILURE);
 	}
-	else{
-	  perf = 1;
-	  perf_output = argv[1];
-	  opt = 1;
+	if(perf==2){
+	  fprintf(stderr,"option %s cannot be used with option %s simultaneously\n",argv[0],"--perf-replay");
+	  exit(EXIT_FAILURE);
 	}
-      } else if (!strcmp (argv[0], "--perf-input")){
+	if(perf==0)
+	  perf = 1;
+	perf_output = argv[1];
+	opt = 1;
+      }
+      else if (!strcmp (argv[0], "--perf-input")){
 	if (argc < 2) {
 	  usage (callname, stderr);
 	  exit(EXIT_FAILURE);
 	}
-	perf = 1;
-        perf_input = argv[1];
-        opt = 1;
-      } else if (!strcmp (argv[0], "--perf-replay")){
+	if(perf==2){
+	  fprintf(stderr,"option %s cannot be used with option %s simultaneously\n",argv[0],"--perf-replay");
+	  exit(EXIT_FAILURE);
+	}
+	if(perf==0)
+	  perf = 1;
+	perf_input = argv[1];
+	opt = 1;
+      }
+      else if (!strcmp (argv[0], "--perf-replay")){
 	if (argc < 2) {
 	  usage (callname, stderr);
+	  exit(EXIT_FAILURE);
+	}
+	if(perf!=0){
+	  fprintf(stderr,"option %s does not support other perf option.\n",argv[0]);
 	  exit(EXIT_FAILURE);
 	}
 	perf = 2;
-        perf_input = argv[1];
-        opt = 1;
-      } else if (!strcmp (argv[0], "--refresh") || !strcmp (argv[0], "-r")) {
+	perf_input = argv[1];
+	opt = 1;
+      }
+      else if (!strcmp (argv[0], "--refresh") || !strcmp (argv[0], "-r")) {
 	if (argc < 2) {
 	  usage (callname, stderr);
+	  exit(EXIT_FAILURE);
+	}
+	if(perf==2){
+	  fprintf(stderr,"option %s cannot be used with option %s simultaneously\n",argv[0],"--perf-replay");
 	  exit(EXIT_FAILURE);
 	}
 	perf = 1;
 	refresh_usec = atoll(argv[1]);
 	opt = 1;
-    }
+      }
+      else if (!strcmp (argv[0], "--perf-no-display")){
+	if(perf_output==NULL){
+	  perf_output = "/dev/stdout";
+	}
+	if(perf==2){
+	  fprintf(stderr,"option %s cannot be used with option %s simultaneously\n",argv[0],"--perf-replay");
+	  exit(EXIT_FAILURE);
+	}
+	perf = 3;
+      }
 #endif
-	else if (!strcmp (argv[0], "--version")) {
+      else if (!strcmp (argv[0], "--version")) {
 	printf("%s %s\n", callname, VERSION);
 	exit(EXIT_SUCCESS);
       } else if (!strcmp (argv[0], "--output-format") || !strcmp (argv[0], "--of")) {
@@ -878,7 +908,7 @@ main (int argc, char *argv[])
       argc -= opt+1;
       argv += opt+1;
     }
-
+  
   if (lstopo_show_only != (hwloc_obj_type_t)-1)
     merge = 0;
 
@@ -976,8 +1006,30 @@ main (int argc, char *argv[])
     if(m==NULL)
       m=new_default_Monitors(topology,perf_output,lstopo_pid);
     if(m!=NULL){
-      output_perf(topology, filename, verbose_mode, callname, output_format, m, refresh_usec, argv[0], argv);
-      delete_Monitors(m);
+      if(perf==3){
+	pid_t pid=0;
+	if(argv[0]){
+	  pid = start_executable(argv[0],argv);
+	  Monitors_watch_pid(m,pid);
+	}
+	Monitors_start(m);
+	if(pid){
+	  while(kill(pid,0)==0){
+	    Monitors_update_counters(m);
+	    usleep(refresh_usec);
+	  }
+	}
+	else{
+	  while(1){
+	    Monitors_update_counters(m);
+	    usleep(refresh_usec);
+	  }
+	}
+      }
+      else{
+	output_perf(topology, filename, verbose_mode, callname, output_format, m, refresh_usec, argv[0], argv);
+	delete_Monitors(m);
+      }
     }
   }
   else
