@@ -68,7 +68,7 @@ input_line_content(FILE * in, struct line_content * out){
 static inline void 
 chk_update_max(hwloc_topology_t topology, unsigned depth, double max){
   hwloc_obj_t obj = hwloc_get_obj_by_depth(topology,depth,0);
-  if(((struct replay_node *)obj->userdata)->max < max){
+  if(obj->userdata && ((struct replay_node *)obj->userdata)->max < max){
     do{
       ((struct replay_node *)obj->userdata)->max = max;
     } while((obj = obj->next_sibling) != NULL && obj->logical_index!=0);
@@ -78,7 +78,7 @@ chk_update_max(hwloc_topology_t topology, unsigned depth, double max){
 static inline void 
 chk_update_min(hwloc_topology_t topology, unsigned depth, double min){
   hwloc_obj_t obj = hwloc_get_obj_by_depth(topology,depth,0);
-  if(((struct replay_node *)obj->userdata)->min > min){
+  if(obj->userdata && ((struct replay_node *)obj->userdata)->min > min){
     do{
       ((struct replay_node *)obj->userdata)->min = min;
     } while((obj = obj->next_sibling) != NULL && obj->logical_index!=0);
@@ -184,7 +184,17 @@ int replay_input_line(replay_t r){
   if(read<=0)
     return read;
   
+
   unsigned depth = hwloc_get_obj_depth_by_name(r->topology, lc.obj_name);
+  hwloc_obj_t obj = hwloc_get_obj_by_depth(r->topology,depth,lc.sibling_idx);
+  if(obj->userdata==NULL){
+    obj->userdata = new_replay_node();
+    if(r->visited[depth]==0){
+      r->depths[r->count++] = depth;
+      r->visited[depth]=1;
+    }
+  }
+    
   chk_update_min(r->topology,depth,lc.value);
   chk_update_max(r->topology,depth,lc.value);
   struct replay_node * node = (struct replay_node *)(hwloc_get_obj_by_depth(r->topology,depth,lc.sibling_idx)->userdata);
@@ -199,12 +209,11 @@ int replay_input_line(replay_t r){
     return 1;
   }
   else{ /* insert successed we also insert timestamp */
-    if(r->n_read==0){
+    if(lc.sibling_idx==0){
       /* this one should never fail if precedent didn't fail */
       replay_node_insert_value(r->timestamps,lc.real_usec);
       sem_post(&r->buffer_semaphore);
     }
-    r->n_read = (1+r->n_read)%r->n_nodes;
   }
   return 2;
 }
@@ -221,8 +230,6 @@ new_replay(const char * filename, hwloc_topology_t topology)
   replay_t rp;
   M_alloc(rp,1,sizeof(struct replay_t));
   rp->input = input;
-  rp->n_nodes=0;  
-  rp->n_read=0;  
   rp->last_read_read=1;
   rp->eof=0;
   rp->timestamps = new_replay_node();
@@ -245,40 +252,21 @@ new_replay(const char * filename, hwloc_topology_t topology)
   int depth, err=0, i=0;
   unsigned topo_depth = hwloc_topology_get_depth(rp->topology);
   M_alloc(rp->depths,topo_depth,sizeof(unsigned));
+  M_alloc(rp->visited,topo_depth,sizeof(unsigned));
   for(i=0;i<topo_depth;i++){
     rp->depths[i]=0;
+    rp->visited[i]=0;
   }
   i=0;
   hwloc_obj_t obj = hwloc_get_root_obj (rp->topology);
   struct line_content lc;
 
-  
   if((err = input_line_content(rp->input,&lc))==-1){
     fprintf(stderr,"nothing to read in %s\n",filename);
     exit(EXIT_SUCCESS);
   }
   rp->trace_start = lc.real_usec;
-  depth = hwloc_get_obj_depth_by_name(rp->topology, lc.obj_name);
-  obj = hwloc_get_obj_by_depth(rp->topology,depth,lc.sibling_idx);
-    
-  /* allocate topology buffers */
-  while(obj->userdata==NULL && err != -1 && i<topo_depth){
-    if(lc.sibling_idx==0)
-      rp->depths[i++] = depth;
-    if(obj==NULL){
-      fprintf(stderr,"input file:%s contains object %s at depth %d and index %d which doesn't exists in current machine topology\n",filename,lc.obj_name,depth,lc.sibling_idx);
-      exit(EXIT_FAILURE);
-    }
-    obj->userdata = new_replay_node();
-    if((err = input_line_content(rp->input,&lc))==-1)
-      break;
-    depth = hwloc_get_obj_depth_by_name(rp->topology, lc.obj_name);
-    obj = hwloc_get_obj_by_depth(rp->topology,depth,lc.sibling_idx);
-    rp->n_nodes++;
-  } 
-  rp->count=i;
-  rewind(rp->input);
-
+  rewind(input);
   /* fill topology_buffers */
   err=0;  
   do{
@@ -327,6 +315,7 @@ delete_replay(replay_t r)
     } while((obj=obj->next_sibling)!=NULL && obj->userdata!=NULL);
   }
   free(r->depths);
+  free(r->visited);
   fclose(r->input);
   hwloc_topology_destroy(r->topology);
   free(r);

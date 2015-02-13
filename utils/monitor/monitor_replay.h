@@ -18,6 +18,7 @@ struct replay_node{
   double max;
   double min;
   pthread_mutex_t mtx;
+  
 };
 
 struct replay_node * new_replay_node();
@@ -44,8 +45,7 @@ struct replay_t{
   pthread_mutex_t pause_mtx;
 
   unsigned count; /* number of monitor levels */
-  unsigned n_nodes; /* total number of nodes stored in topology */
-  unsigned n_read; /* number of line read into input % n_nodes*/
+  unsigned  * visited;/* topology_depth */  
   unsigned  * depths; /* [n_monitors] */  
 
   /**** public ****/
