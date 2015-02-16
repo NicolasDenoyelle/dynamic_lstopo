@@ -77,10 +77,8 @@ delete_monitor_node(struct monitor_node * out)
 /*                                                   PRIVATE                                                   */
 /***************************************************************************************************************/
 
-double no_fun(/*@unused@*/long long * in){return 0;}
-double flop_fp(long long * in){return (double)(in[0]*1.0);}
-double L1d_access_per_fpops(long long * in){return (double)(in[0]==0?-1:in[1]/in[0]);}
-int  compareint(const void* a,const void* b ){return *(int*)a - *(int*)b;}
+double no_fun     (long long * in){return 0;}
+double default_fun(long long * in){return (double)in[0];}
 
 void
 handle_error(int err)
@@ -590,21 +588,53 @@ void unload_monitors_lib(monitors_t m){
 monitors_t
 new_default_Monitors(hwloc_topology_t topology, const char * output,unsigned int pid)
 {
-  char ** event_names;
-  monitors_t m;
+  unsigned i,depth = hwloc_topology_get_depth(topology)-1;
+  int eventset = PAPI_NULL;
 
-  event_names = malloc(sizeof(char*)*2);
-  event_names[0]=strdup("PAPI_FP_OPS");
-  event_names[1]=strdup("PAPI_L1_DCM");
-  m = new_Monitors(topology, 2,event_names,output,pid);
+  PAPI_library_init( PAPI_VER_CURRENT);
+  PAPI_create_eventset(&eventset);
+
+  unsigned count=0, max_count = PAPI_MAX_HWCTRS + PAPI_MAX_PRESET_EVENTS;
+  char ** event_names = malloc(sizeof(char*)*max_count);
+  char ** obj_names = malloc(sizeof(char*)*max_count);
+  char obj_name[20];
+  int event_code = 0 | PAPI_PRESET_MASK;
+  PAPI_event_info_t info;
+
+  PAPI_enum_event( &event_code, PAPI_ENUM_FIRST );
+  do {
+    hwloc_obj_type_snprintf(obj_name,20,hwloc_get_obj_by_depth(topology,depth,0),0);
+    if ( PAPI_get_event_info( event_code, &info ) == PAPI_OK &&
+	 PAPI_add_named_event(eventset,info.symbol) == PAPI_OK
+	 && strcmp(obj_name,"Package") && strcmp(obj_name,"Socket")){
+      printf("obj_names=%s\n",obj_name);
+      obj_names[count] = strdup(obj_name);
+      event_names[count]=strdup(info.symbol);
+      count++;
+    }
+  } while (depth-- && PAPI_enum_event( &event_code, PAPI_PRESET_ENUM_AVAIL ) == PAPI_OK);
+  
+  PAPI_destroy_eventset(&eventset);
+
+  monitors_t m;
+  m = new_Monitors(topology, count, event_names, output, pid);
   if(m==NULL){
     fprintf(stderr,"default monitors_t creation failed\n");
-    free(event_names[0]); free(event_names[1]); free(event_names);
+    for(i=0;i<count;i++){
+      free(event_names[i]);
+      free(obj_names[i]);
+    }
+    free(obj_names);
+    free(event_names);
     return NULL;
   }
-  free(event_names[0]); free(event_names[1]); free(event_names);
-  add_Monitor(m,"flops_fp","PU",flop_fp);
-  add_Monitor(m,"L1_DCM / FP_OPS","L1",L1d_access_per_fpops);
+  for(i=0;i<count;i++){
+    add_Monitor(m,event_names[i],obj_names[i],default_fun);
+    free(event_names[i]);
+    free(obj_names[i]);
+  }
+  free(obj_names);
+  free(event_names);
   return m;
 }
 
