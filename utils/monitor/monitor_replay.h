@@ -15,8 +15,6 @@ struct replay_queue{
 struct replay_node{
   struct replay_queue * head;
   struct replay_queue * tail;
-  double max;
-  double min;
   pthread_mutex_t mtx;
   
 };
@@ -25,9 +23,6 @@ struct replay_node * new_replay_node();
 void                 delete_replay_node(struct replay_node * node);
 int                  replay_node_insert_value(struct replay_node * out, double in);
 double               replay_node_get_value(struct replay_node * rn);
-double               replay_node_get_max_value(struct replay_node * node);
-double               replay_node_get_min_value(struct replay_node * node);
-
 
 struct replay_t{
   /**** private ****/
@@ -46,7 +41,7 @@ struct replay_t{
 
   unsigned count; /* number of monitor levels */
   unsigned  * visited;/* topology_depth */  
-  unsigned  * depths; /* [n_monitors] */  
+  unsigned  * depths, * max, * min; /* [n_monitors] */  
   unsigned n_nodes;
   unsigned nodes_filled;
 
@@ -63,6 +58,5 @@ void     replay_start    (replay_t r);
 void     replay_pause    (replay_t r);
 void     replay_resume   (replay_t r);
 int      replay_is_finished(replay_t r);
-
 
 #endif

@@ -60,21 +60,13 @@ input_line_content(FILE * in, struct line_content * out){
 }
 
 static inline void 
-chk_update_max(hwloc_topology_t topology, unsigned depth, double max){
-  hwloc_obj_t obj = hwloc_get_obj_by_depth(topology,depth,0);
-  do{
-    if(obj->userdata && ((struct replay_node *)obj->userdata)->max < max)
-      ((struct replay_node *)obj->userdata)->max = max; 
-  }while((obj = obj->next_sibling) != NULL && obj->logical_index!=0);
+chk_update_max(unsigned * max, unsigned depth, double val){
+  max[depth] = max[depth] > val ? max[depth] : val;
 }
 
 static inline void 
-chk_update_min(hwloc_topology_t topology, unsigned depth, double min){
-  hwloc_obj_t obj = hwloc_get_obj_by_depth(topology,depth,0);
-  do{
-    if(obj->userdata && ((struct replay_node *)obj->userdata)->min > min)
-      ((struct replay_node *)obj->userdata)->min = min; 
-  }while((obj = obj->next_sibling) != NULL && obj->logical_index!=0);
+chk_update_min(unsigned * min, unsigned depth, double val){
+  min[depth] = min[depth] < val ? min[depth] : val;
 }
 
 struct replay_node * 
@@ -83,8 +75,6 @@ new_replay_node(){
   M_alloc(node,1,sizeof(struct replay_node));
   pthread_mutex_init(&node->mtx,NULL);
   pthread_mutex_lock(&node->mtx);
-  node->max = DBL_MIN;
-  node->min = DBL_MAX;
   M_alloc(node->head,1,sizeof(struct replay_queue));
   struct replay_queue * current=node->head;
   unsigned i;
@@ -162,17 +152,6 @@ replay_node_get_value(struct replay_node * rn)
   return replay_node_remove_value(rn);
 }
 
-inline double 
-replay_node_get_max_value(struct replay_node * node)
-{
-  return node->max;
-}
-
-inline double
-replay_node_get_min_value(struct replay_node * node)
-{
-  return node->min;
-}
 
 int replay_input_line(replay_t r){
   struct line_content lc;
@@ -206,8 +185,8 @@ int replay_input_line(replay_t r){
     }
   }
 
-  chk_update_min(r->topology,depth,lc.value);
-  chk_update_max(r->topology,depth,lc.value);    
+  chk_update_min(r->min,depth,lc.value);
+  chk_update_max(r->max,depth,lc.value);    
   /* if we cannot insert the value, we save the content read to insert it next time */
   if(replay_node_insert_value(obj->userdata, lc.value)==-1){
     strncpy(r->last_read.obj_name,lc.obj_name,10);
@@ -265,10 +244,14 @@ new_replay(const char * filename, hwloc_topology_t topology)
   int depth, err=0, i=0;
   unsigned topo_depth = hwloc_topology_get_depth(rp->topology);
   M_alloc(rp->depths,topo_depth,sizeof(unsigned));
+  M_alloc(rp->max,topo_depth,sizeof(unsigned));
+  M_alloc(rp->min,topo_depth,sizeof(unsigned));
   M_alloc(rp->visited,topo_depth,sizeof(unsigned));
   for(i=0;i<topo_depth;i++){
     rp->depths[i]=0;
     rp->visited[i]=0;
+    rp->max[i] = DBL_MIN;
+    rp->min[i] = DBL_MAX;
   }
   i=0;
   hwloc_obj_t obj = hwloc_get_root_obj (rp->topology);
@@ -328,6 +311,8 @@ delete_replay(replay_t r)
     } while((obj=obj->next_sibling)!=NULL && obj->logical_index != 0);
   }
   free(r->depths);
+  free(r->max);
+  free(r->min);
   free(r->visited);
   fclose(r->input);
   hwloc_topology_destroy(r->topology);

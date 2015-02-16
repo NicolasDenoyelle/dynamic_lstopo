@@ -39,8 +39,7 @@ replay_t replay, cairo_t *c, struct draw_methods * methods)
       box=(struct replay_node *)(hwloc_get_obj_by_depth(replay->topology,replay->depths[i],nobj)->userdata);
       if(box){
 	double val = replay_node_get_value(box);
-	//printf("remove val %f at [%d:%d]\n",val,replay->depths[i],nobj);
-	perf_box_draw(topology, methods, obj, c, obj->depth, val, box->max, box->min);
+	perf_box_draw(topology, methods, obj, c, obj->depth, val, replay->max[replay->depths[i]], replay->min[replay->depths[i]]);
       }
     }
   }
