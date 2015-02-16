@@ -607,7 +607,6 @@ new_default_Monitors(hwloc_topology_t topology, const char * output,unsigned int
     if ( PAPI_get_event_info( event_code, &info ) == PAPI_OK &&
 	 PAPI_add_named_event(eventset,info.symbol) == PAPI_OK
 	 && strcmp(obj_name,"Package") && strcmp(obj_name,"Socket")){
-      printf("obj_names=%s\n",obj_name);
       obj_names[count] = strdup(obj_name);
       event_names[count]=strdup(info.symbol);
       count++;
