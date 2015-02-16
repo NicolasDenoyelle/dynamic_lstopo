@@ -24,7 +24,7 @@ void output_header(int output_fd){
 
 inline void
 output_line_content(int output_fd, struct line_content * in){
-  dprintf(output_fd,"%6d%10s%20lld%20s%20lf\n",
+  dprintf(output_fd,"%6d %9s %19lld %19s %19lf\n",
 	  in->sibling_idx, in->obj_name, in->real_usec, in->name, in->value);
 }
 
@@ -62,27 +62,27 @@ input_line_content(FILE * in, struct line_content * out){
 static inline void 
 chk_update_max(hwloc_topology_t topology, unsigned depth, double max){
   hwloc_obj_t obj = hwloc_get_obj_by_depth(topology,depth,0);
-  if(obj->userdata && ((struct replay_node *)obj->userdata)->max < max){
-    do{
-      ((struct replay_node *)obj->userdata)->max = max;
-    } while((obj = obj->next_sibling) != NULL && obj->logical_index!=0);
-  }
+  do{
+    if(obj->userdata && ((struct replay_node *)obj->userdata)->max < max)
+      ((struct replay_node *)obj->userdata)->max = max; 
+  }while((obj = obj->next_sibling) != NULL && obj->logical_index!=0);
 }
 
 static inline void 
 chk_update_min(hwloc_topology_t topology, unsigned depth, double min){
   hwloc_obj_t obj = hwloc_get_obj_by_depth(topology,depth,0);
-  if(obj->userdata && ((struct replay_node *)obj->userdata)->min > min){
-    do{
-      ((struct replay_node *)obj->userdata)->min = min;
-    } while((obj = obj->next_sibling) != NULL && obj->logical_index!=0);
-  }
+  do{
+    if(obj->userdata && ((struct replay_node *)obj->userdata)->min > min)
+      ((struct replay_node *)obj->userdata)->min = min; 
+  }while((obj = obj->next_sibling) != NULL && obj->logical_index!=0);
 }
 
 struct replay_node * 
 new_replay_node(){
-struct replay_node * node;
+  struct replay_node * node;
   M_alloc(node,1,sizeof(struct replay_node));
+  pthread_mutex_init(&node->mtx,NULL);
+  pthread_mutex_lock(&node->mtx);
   node->max = DBL_MIN;
   node->min = DBL_MAX;
   M_alloc(node->head,1,sizeof(struct replay_queue));
@@ -96,15 +96,16 @@ struct replay_node * node;
   }
   current->val=0;
   current->next=node->head;
-  node->head->prev=current;
+  current->next->prev = current;
   node->tail = NULL;
-  pthread_mutex_init(&node->mtx,NULL);
+  pthread_mutex_unlock(&node->mtx);
   return node;
 }
 
 void
 delete_replay_node(struct replay_node * node)
 {
+  pthread_mutex_lock(&node->mtx);
   struct replay_queue *next, * current = node->head->next;
   while(current!=node->head){
     next = current->next;
@@ -112,6 +113,7 @@ delete_replay_node(struct replay_node * node)
     current = next;
   } 
   free(node->head);
+  pthread_mutex_unlock(&node->mtx);
   pthread_mutex_destroy(&node->mtx);
   free(node);
 }
@@ -187,23 +189,27 @@ int replay_input_line(replay_t r){
     }
   }
   
-
-  unsigned depth = hwloc_get_obj_depth_by_name(r->topology, lc.obj_name);
+  unsigned i,j, depth = hwloc_get_obj_depth_by_name(r->topology, lc.obj_name);
   hwloc_obj_t obj = hwloc_get_obj_by_depth(r->topology,depth,lc.sibling_idx);
   if(obj->userdata==NULL){
     obj->userdata = new_replay_node();
-    if(r->visited[depth]==0){
-      r->depths[r->count++] = depth;
-      r->visited[depth]=1;
-    }
     r->n_nodes++;
+    if(r->visited[depth]==0){
+      i=0;
+      while (i<r->count && r->depths[i] < depth ) i++;
+      for(j=r->count;j>i;j--){
+	r->depths[j] = r->depths[j-1];
+      }
+      r->depths[j] = depth;
+      r->visited[depth]=1;
+      r->count++;
+    }
   }
-    
+
   chk_update_min(r->topology,depth,lc.value);
-  chk_update_max(r->topology,depth,lc.value);
-  struct replay_node * node = (struct replay_node *)(hwloc_get_obj_by_depth(r->topology,depth,lc.sibling_idx)->userdata);
+  chk_update_max(r->topology,depth,lc.value);    
   /* if we cannot insert the value, we save the content read to insert it next time */
-  if(replay_node_insert_value(node, lc.value)==-1){
+  if(replay_node_insert_value(obj->userdata, lc.value)==-1){
     strncpy(r->last_read.obj_name,lc.obj_name,10);
     strncpy(r->last_read.name,lc.name,20);
     r->last_read.value = lc.value;
@@ -317,10 +323,9 @@ delete_replay(replay_t r)
   for(i=0;i<r->count;i++){
     obj = hwloc_get_obj_by_depth(r->topology,r->depths[i],0);
     do{
-      if(obj->userdata){
+      if(obj->userdata)
 	delete_replay_node((struct replay_node *)obj->userdata);
-      }
-    } while((obj=obj->next_sibling)!=NULL && obj->userdata!=NULL);
+    } while((obj=obj->next_sibling)!=NULL && obj->logical_index != 0);
   }
   free(r->depths);
   free(r->visited);
