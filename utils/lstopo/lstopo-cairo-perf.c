@@ -19,7 +19,7 @@ monitors_t monitors, hwloc_bitmap_t active, cairo_t *c, struct draw_methods * me
       obj = hwloc_get_obj_by_depth(topology,monitors->depths[i],nobj);
       proc_watch_get_watched_in_cpuset(monitors->pw,obj->cpuset,active);
       if(!monitors->pw || !hwloc_bitmap_iszero(active)){
-	perf_box_draw(topology, methods, obj, c, obj->depth, (float)box->val, (float)box->max, (float)box->min);
+	perf_box_draw(topology, methods, obj, c, obj->depth, box->val, box->max, box->min);
       }
     }
   }
@@ -37,8 +37,11 @@ replay_t replay, cairo_t *c, struct draw_methods * methods)
     while(nobj--){
       obj = hwloc_get_obj_by_depth(topology,replay->depths[i],nobj);
       box=(struct replay_node *)(hwloc_get_obj_by_depth(replay->topology,replay->depths[i],nobj)->userdata);
-      if(box)
-	perf_box_draw(topology, methods, obj, c, obj->depth, (float)replay_node_get_value(box), (float)box->max, (float)box->min);
+      if(box){
+	double val = replay_node_get_value(box);
+	//printf("remove val %f at [%d:%d]\n",val,replay->depths[i],nobj);
+	perf_box_draw(topology, methods, obj, c, obj->depth, val, box->max, box->min);
+      }
     }
   }
   cairo_show_page(c);

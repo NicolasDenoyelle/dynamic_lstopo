@@ -1310,7 +1310,7 @@ output_draw(struct draw_methods *methods, int logical, int legend, hwloc_topolog
 
 #ifdef HWLOC_HAVE_MONITOR
 void
-perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj_t level, void *output, unsigned depth, float value, float max, float min){
+perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj_t level, void *output, unsigned depth, double value, double max, double min){
   unsigned x,y,totwidth,totheight,mywidth,myheight,width,height,gridsize;
   struct dyna_save * ds = (struct dyna_save *) level->userdata;
   if(ds!=NULL){

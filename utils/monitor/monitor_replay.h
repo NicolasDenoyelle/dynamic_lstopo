@@ -47,6 +47,8 @@ struct replay_t{
   unsigned count; /* number of monitor levels */
   unsigned  * visited;/* topology_depth */  
   unsigned  * depths; /* [n_monitors] */  
+  unsigned n_nodes;
+  unsigned nodes_filled;
 
   /**** public ****/
   hwloc_topology_t topology; /* stores a replay_node in each obj sibling at depth "depths[i]" which first element is the value to be read */
