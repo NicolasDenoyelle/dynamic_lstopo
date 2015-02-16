@@ -60,12 +60,12 @@ input_line_content(FILE * in, struct line_content * out){
 }
 
 static inline void 
-chk_update_max(unsigned * max, unsigned depth, double val){
+chk_update_max(double * max, unsigned depth, double val){
   max[depth] = max[depth] > val ? max[depth] : val;
 }
 
 static inline void 
-chk_update_min(unsigned * min, unsigned depth, double val){
+chk_update_min(double * min, unsigned depth, double val){
   min[depth] = min[depth] < val ? min[depth] : val;
 }
 
@@ -110,6 +110,7 @@ delete_replay_node(struct replay_node * node)
 
 int
 replay_node_insert_value(struct replay_node * out, double in){
+  printf("insert: %lf\n",in);
   pthread_mutex_lock(&out->mtx);
   /* end of circular queue */
   if(out->tail==out->head){

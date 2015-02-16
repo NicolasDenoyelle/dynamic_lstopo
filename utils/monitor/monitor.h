@@ -7,7 +7,6 @@
 struct monitor_node{
   long long *     counters_val;
   double          val, old_val;
-  double          max, min;
   long long       real_usec, old_usec;
   int             uptodate;
   pthread_mutex_t read_lock;
@@ -45,6 +44,7 @@ struct monitors{
   char        **    names;             /* nb_monitors */
   double  (**compute)(long long *);    /* nb_monitors */
   unsigned int    * depths;            /* nb_monitors */
+  double          *max, *min;          /* nb_monitors */
  };
 
 typedef struct monitors * monitors_t;

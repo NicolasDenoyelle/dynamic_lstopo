@@ -41,7 +41,8 @@ struct replay_t{
 
   unsigned count; /* number of monitor levels */
   unsigned  * visited;/* topology_depth */  
-  unsigned  * depths, * max, * min; /* [n_monitors] */  
+  unsigned  * depths;
+  double    * max, * min; /* [n_monitors] */  
   unsigned n_nodes;
   unsigned nodes_filled;
 

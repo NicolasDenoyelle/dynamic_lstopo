@@ -10,7 +10,7 @@
 #include <fcntl.h>
 #include <sched.h>
 #include <math.h>
-#include <limits.h>
+#include <float.h>
 
 #include "monitor_utils.h"
 
@@ -57,8 +57,6 @@ new_monitor_node(unsigned int n_events)
   out->uptodate=0;
   out->val=0;
   out->old_val=0;
-  out->max=0;
-  out->min=0;
   return out;
 }
 
@@ -240,6 +238,8 @@ monitors_t new_Monitors(hwloc_topology_t topology,
   M_alloc(m->pthreads,m->n_PU,sizeof(pthread_t));
   M_alloc(m->depths,m->allocated_count,sizeof(int));
   M_alloc(m->compute,m->allocated_count,sizeof(double (*)(long long*)));
+  M_alloc(m->min,m->allocated_count,sizeof(double (*)(long long*)));
+  M_alloc(m->max,m->allocated_count,sizeof(double (*)(long long*)));
   M_alloc(m->names,m->allocated_count,sizeof(char *));
   M_alloc(m->event_names,n_events,sizeof(char*));
   M_alloc(m->PU_vals,m->n_PU,sizeof(struct monitor_node *));
@@ -249,8 +249,11 @@ monitors_t new_Monitors(hwloc_topology_t topology,
     m->PU_vals[i] = new_monitor_node(n_events);
   }
 
-  for(i=0;i<m->allocated_count;i++)
+  for(i=0;i<m->allocated_count;i++){
     m->depths[i]=0;
+    m->min[i] = DBL_MAX;
+    m->max[i] = DBL_MIN;
+  }
   /* allocate event names and eventset*/
   m->n_events = n_events;
   for(i=0;i<m->n_events;i++){
@@ -272,6 +275,10 @@ int add_Monitor(monitors_t m, const char * name, char * hwloc_obj_name, double (
       exit(EXIT_FAILURE);
     if((m->depths=realloc(m->depths, sizeof(int)*m->allocated_count))==NULL)
       exit(EXIT_FAILURE);
+    if((m->max=realloc(m->max, sizeof(int)*m->allocated_count))==NULL)
+      exit(EXIT_FAILURE);
+    if((m->min=realloc(m->min, sizeof(int)*m->allocated_count))==NULL)
+      exit(EXIT_FAILURE);
     if((m->compute=realloc(m->compute, sizeof(double(*)(long long*))*m->allocated_count))==NULL)
       exit(EXIT_FAILURE);
   }
@@ -292,12 +299,16 @@ int add_Monitor(monitors_t m, const char * name, char * hwloc_obj_name, double (
   for(j=m->count;j>i;j--){
     m->names[j] = m->names[j-1];
     m->depths[j] = m->depths[j-1];
+    m->max[j] = m->max[j-1];
+    m->min[j] = m->min[j-1];
     m->compute[j] = m->compute[j-1];
   }
 
   m->names[i] = strdup(name);
   m->depths[i] = depth;
   m->compute[i] = fun;
+  m->min[j] = DBL_MAX;
+  m->max[j] = DBL_MIN;
   m->count++;
 
   n_obj=hwloc_get_nbobjs_by_depth(m->topology,depth);
@@ -312,57 +323,6 @@ int add_Monitor(monitors_t m, const char * name, char * hwloc_obj_name, double (
   }
   
   return 0;
-}
-
-
-void 
-Monitors_print(monitors_t m, hwloc_cpuset_t alloc_tmp)
-{
-  unsigned m_idx,sibling_idx;
-  hwloc_obj_t obj;
-  unsigned topo_depth = hwloc_topology_get_depth(m->topology), obj_depth;
-  struct monitor_node * values;
-  char type[10];
-  pthread_mutex_lock(&(m->print_mtx));
-  for(m_idx=0;m_idx<m->count;m_idx++){
-    obj_depth = m->depths[m_idx];
-    for(sibling_idx=0; sibling_idx<hwloc_get_nbobjs_by_depth(m->topology,obj_depth); sibling_idx++){
-      obj = hwloc_get_obj_by_depth(m->topology,obj_depth,sibling_idx);
-      values = obj->userdata;
-      hwloc_obj_type_snprintf(type, 10, obj, 0);
-      dprintf(m->output_fd,"%6d",sibling_idx);
-      dprintf(m->output_fd,"%10s",type);
-      dprintf(m->output_fd,"%20lld",values->real_usec);
-      dprintf(m->output_fd,"%20s",m->names[m_idx]);
-      dprintf(m->output_fd,"%20lf\n",values->val);
-    }
-  }
-
-  /* write active PUs counters and monitors_t values */
-  /* double val; */
-  /* unsigned int p_idx,l_idx,i,nobj; */
-  /* hwloc_bitmap_t cpuset = (hwloc_bitmap_t)hwloc_topology_get_topology_cpuset(m->topology); */
-  /* if(m->pw!=NULL) */
-  /*   proc_watch_get_watched_in_cpuset(m->pw, cpuset, alloc_tmp); */
-  /* else */
-  /*   hwloc_bitmap_or(alloc_tmp,alloc_tmp,cpuset); */
-
-  /* hwloc_bitmap_foreach_begin(p_idx,alloc_tmp){ */
-  /*   l_idx=physical_to_logical(m->topology,p_idx); */
-  /*   dprintf(m->output_fd,"%8d ",l_idx); */
-  /*   dprintf(m->output_fd,"%20lld ",m->PU_vals[l_idx]->real_usec); */
-  /*   for(i=0;i<m->n_events;i++){ */
-  /*     dprintf(m->output_fd,"%20lld "  ,m->PU_vals[l_idx]->counters_val[i]); */
-  /*   } */
-  /*   for(i=0;i<m->count;i++){ */
-  /*     nobj = hwloc_get_nbobjs_by_depth(m->topology,m->depths[i]); */
-  /*     val = Monitors_get_monitor_value(m,i,(l_idx*nobj/m->n_PU)%nobj); */
-  /*     dprintf(m->output_fd,"%22lf",val);  */
-  /*   } */
-  /*   dprintf(m->output_fd,"\n"); */
-  /* } */
-  /* hwloc_bitmap_foreach_end(); */
-  pthread_mutex_unlock(&(m->print_mtx));
 }
 
 struct thread_junk{
@@ -512,17 +472,9 @@ void * monitors_thread(void* monitors){
 	out->old_val = out->val;
 	out->val = m->compute[i](out->counters_val);
 	
-	/* update min and max value in every node at depth i*/
-	if(isinf(out->max) || out->max<out->val){
-	  nobj=hwloc_get_nbobjs_by_depth(m->topology,m->depths[i]);
-	  while(nobj--)
-	    Monitors_get_monitor_node(m,i,nobj)->max=out->val;
-	}
-	if(isinf(out->min) || out->min>out->val){
-	  nobj=hwloc_get_nbobjs_by_depth(m->topology,m->depths[i]);
-	  while(nobj--)
-	    Monitors_get_monitor_node(m,i,nobj)->min=out->val;
-	}
+	/* update min and max value at depth i*/
+	m->max[i] = m->max[i] > out->val ? m->max[i] : out-> val;
+	m->min[i] = m->min[i] < out->val ? m->min[i] : out-> val;
 	/* compute real_usec mean value */
 	out->real_usec/=weight;
 	/* print to output_file */
@@ -823,6 +775,8 @@ delete_Monitors(monitors_t m)
   free(m->PU_vals);
   free(m->compute);
   free(m->depths);
+  free(m->max);
+  free(m->min);
   free(m->names);
 
   for(i=0;i<m->n_events;i++){

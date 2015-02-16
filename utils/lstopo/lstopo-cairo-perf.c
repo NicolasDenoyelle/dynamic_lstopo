@@ -19,7 +19,7 @@ monitors_t monitors, hwloc_bitmap_t active, cairo_t *c, struct draw_methods * me
       obj = hwloc_get_obj_by_depth(topology,monitors->depths[i],nobj);
       proc_watch_get_watched_in_cpuset(monitors->pw,obj->cpuset,active);
       if(!monitors->pw || !hwloc_bitmap_iszero(active)){
-	perf_box_draw(topology, methods, obj, c, obj->depth, box->val, box->max, box->min);
+	perf_box_draw(topology, methods, obj, c, obj->depth, box->val, monitors->max[i], monitors->min[i]);
       }
     }
   }
