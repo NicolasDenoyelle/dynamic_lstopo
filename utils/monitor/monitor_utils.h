@@ -22,9 +22,9 @@ struct parsed_names * parser(const char * file_name);
 /* utils from replay.c */
 struct line_content{
   unsigned sibling_idx;
-  char obj_name[10];
+  char obj_name[11];
   long long real_usec;
-  char name[20];
+  char name[21];
   double value;
 };
 

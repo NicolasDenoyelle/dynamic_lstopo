@@ -479,6 +479,8 @@ void * monitors_thread(void* monitors){
 	out->real_usec/=weight;
 	/* print to output_file */
 	pthread_mutex_lock(&(m->print_mtx));
+	memset(output.name,0,21);
+	memset(output.obj_name,0,11);
 	hwloc_obj_type_snprintf(output.obj_name, 10, obj, 0);
 	output.sibling_idx = obj->logical_index;
 	output.real_usec=out->real_usec;
