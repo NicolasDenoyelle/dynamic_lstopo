@@ -153,7 +153,7 @@ int replay_input_line(replay_t r){
   unsigned i,j, depth = hwloc_get_obj_depth_by_name(r->topology, lc.obj_name);
   hwloc_obj_t obj = hwloc_get_obj_by_depth(r->topology,depth,lc.sibling_idx);
   unsigned topo_depth = hwloc_topology_get_depth(r->topology);
-  if(depth==-1)
+  if(depth<0 || depth >=topo_depth)
     return -1;
 
   if(obj->userdata==NULL){
@@ -162,15 +162,7 @@ int replay_input_line(replay_t r){
     if(r->visited[depth]==0){
       i = 0; j = r->count;
       while (i<r->count && r->depths[i] < depth ) i++;
-      if(i>=topo_depth){
-	printf("debordement >\n");
-	exit(1);
-      }
       while (j>i) r->depths[j--] = r->depths[j];
-      if(j>=topo_depth || j<0){
-	printf("debordement <\n");
-	exit(1);
-      }
       r->depths[j] = depth;
       r->visited[depth]=1;
       r->count++;
@@ -236,10 +228,10 @@ new_replay(const char * filename, hwloc_topology_t topology)
   int depth, err=0, i=0;
   unsigned topo_depth = hwloc_topology_get_depth(rp->topology);
   M_alloc(rp->depths,topo_depth,sizeof(unsigned));
-  M_alloc(rp->max,topo_depth,sizeof(unsigned));
+  M_alloc(rp->max,topo_depth,sizeof(double));
   M_alloc(rp->min,topo_depth,sizeof(double));
-  M_alloc(rp->visited,topo_depth,sizeof(double));
-  for(i=0;i<=topo_depth;i++){
+  M_alloc(rp->visited,topo_depth,sizeof(unsigned));
+  for(i=0;i<topo_depth;i++){
     rp->depths[i]=0;
     rp->visited[i]=0;
     rp->max[i] = DBL_MIN;
@@ -307,7 +299,7 @@ delete_replay(replay_t r)
   free(r->max);
   free(r->min);
   fclose(r->input);
-  //hwloc_topology_destroy(r->topology);
+  hwloc_topology_destroy(r->topology);
   free(r);
 }
 
