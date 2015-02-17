@@ -19,7 +19,7 @@ hwloc_get_obj_depth_by_name(hwloc_topology_t topology, char * obj_name){
   int depthattrp;
   hwloc_obj_cache_type_t cache_type;
   if(hwloc_obj_type_sscanf(obj_name,&type,&depthattrp,&cache_type,sizeof(cache_type))==-1){
-    fprintf(stderr,"type %s was not recognized\n",obj_name);
+    fprintf(stderr,"type \"%s\" was not recognized\n",obj_name);
     return -1;
   }
   int depth = hwloc_get_type_depth(topology,type);
@@ -36,7 +36,7 @@ hwloc_get_obj_depth_by_name(hwloc_topology_t topology, char * obj_name){
       }
     }
     else{
-      fprintf(stderr,"type %s isn't handled...\n",obj_name);
+      fprintf(stderr,"type \"%s\" isn't handled...\n",obj_name);
       return -1;
     }
   }

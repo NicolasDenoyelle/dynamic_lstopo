@@ -153,10 +153,8 @@ int replay_input_line(replay_t r){
   unsigned i,j, depth = hwloc_get_obj_depth_by_name(r->topology, lc.obj_name);
   hwloc_obj_t obj = hwloc_get_obj_by_depth(r->topology,depth,lc.sibling_idx);
   unsigned topo_depth = hwloc_topology_get_depth(r->topology);
-  if(depth>=topo_depth || depth <0){
-    printf("debordement depth, %s\n",lc.obj_name);
-    exit(1);
-  }
+  if(depth==-1)
+    return -1;
 
   if(obj->userdata==NULL){
     obj->userdata = new_replay_node();
@@ -305,11 +303,11 @@ delete_replay(replay_t r)
     } while((obj=obj->next_sibling)!=NULL && obj->logical_index != 0);
   }
   free(r->visited);
-  //free(r->depths);
-  //free(r->max);
-  /* free(r->min); */
+  free(r->depths);
+  free(r->max);
+  free(r->min);
   fclose(r->input);
-  hwloc_topology_destroy(r->topology);
+  //hwloc_topology_destroy(r->topology);
   free(r);
 }
 
@@ -318,6 +316,8 @@ void * replay_fill_thread(void* arg){
   replay_t r = (replay_t)arg;
   long long usleep_len = r->sample_interval * BUF_MAX / 2;
   int err;
+  if(r->eof)
+    return NULL;
   while((err = replay_input_line(r)) > 0){
     /* buffers full */
     if(err==1){
@@ -325,6 +325,7 @@ void * replay_fill_thread(void* arg){
     }
   }
   r->eof=1;
+  return NULL;
 }
 
 int
