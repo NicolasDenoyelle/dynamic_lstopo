@@ -236,9 +236,9 @@ new_replay(const char * filename, hwloc_topology_t topology)
   int depth, err=0, i=0;
   unsigned topo_depth = hwloc_topology_get_depth(rp->topology);
   M_alloc(rp->depths,topo_depth,sizeof(unsigned));
-  M_alloc(rp->max,topo_depth,sizeof(unsigned));
+  M_alloc(rp->max,topo_depth,sizeof(double));
   M_alloc(rp->min,topo_depth,sizeof(double));
-  M_alloc(rp->visited,topo_depth,sizeof(double));
+  M_alloc(rp->visited,topo_depth,sizeof(unsigned));
   for(i=0;i<=topo_depth;i++){
     rp->depths[i]=0;
     rp->visited[i]=0;
@@ -307,7 +307,7 @@ delete_replay(replay_t r)
   free(r->max);
   free(r->min);
   fclose(r->input);
-  //hwloc_topology_destroy(r->topology);
+  hwloc_topology_destroy(r->topology);
   free(r);
 }
 
