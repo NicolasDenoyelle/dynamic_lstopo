@@ -2,7 +2,6 @@
 #define MONITOR_H
 
 #include "hwloc.h"
-#include <poll.h>
 
 struct monitor_node{
   long long *     counters_val;
@@ -20,7 +19,7 @@ struct monitors{
   hwloc_topology_t  topology;
 
   /**
-   * When -p option is used, the structure holds in a PU array pid childrens task id; 
+   * When -p option is used, the structure holds in a PU array with pid childrens task id; 
    *
    */
   struct proc_watch *pw;
@@ -49,8 +48,8 @@ struct monitors{
 
 typedef struct monitors * monitors_t;
 
-monitors_t   new_default_Monitors             (hwloc_topology_t topology, const char * output, unsigned int pid);
-monitors_t   load_Monitors_from_config        (hwloc_topology_t topology, const char * perf_group_file, const char * output, unsigned int pid);
+monitors_t   new_default_Monitors             (hwloc_topology_t topology, const char * output);
+monitors_t   load_Monitors_from_config        (hwloc_topology_t topology, const char * perf_group_file, const char * output);
 void         delete_Monitors                  (monitors_t m);
 unsigned int Monitors_watch_pid               (monitors_t m,unsigned int pid);
 
