@@ -125,6 +125,7 @@ replay_node_get_value(struct replay_node * rn){
   /* empty_queue */
   if(rn->tail==NULL){
     pthread_mutex_unlock(&rn->mtx);
+    //    printf("read value 0\n");
     return 0;
   }
   double val = rn->head->val;
@@ -134,6 +135,7 @@ replay_node_get_value(struct replay_node * rn){
     rn->tail=NULL;
   rn->count--;
   pthread_mutex_unlock(&rn->mtx);
+  //  printf("read value %lf\n",val);
   return val;
 }
 
@@ -143,12 +145,16 @@ int replay_input_line(replay_t r){
   if(r->last_read_read==0){
     lc = r->last_read;
     r->last_read_read=1;
+
   }
   else{
     read = input_line_content(r->input,&lc);
     /*error, end of file, or nothing read */
     if(read == -1){
-      return read;
+      pthread_mutex_lock(&r->mtx);
+      r->eof=1;
+      pthread_mutex_unlock(&r->mtx);
+      return -1;
     }
   }
   
@@ -218,6 +224,7 @@ new_replay(const char * filename, hwloc_topology_t topology)
   rp->eof=0;
   rp->n_nodes=0;
   rp->nodes_filled=0;
+  rp->usleep_len=0;
   rp->timestamps = new_replay_node();
 
   if(topology==NULL)
@@ -230,7 +237,7 @@ new_replay(const char * filename, hwloc_topology_t topology)
     exit(EXIT_FAILURE);
   }
 
-  if(pthread_mutex_init(&rp->pause_mtx, NULL)){
+  if(pthread_mutex_init(&rp->mtx, NULL)){
     perror("pthread_mutex_init");
     exit(EXIT_FAILURE);
   }
@@ -280,7 +287,7 @@ delete_replay(replay_t r)
   pthread_join(r->fill_thread,NULL);
   pthread_join(r->timer_thread,NULL);
   sem_destroy(&r->buffer_semaphore);
-  pthread_mutex_destroy(&r->pause_mtx);
+  pthread_mutex_destroy(&r->mtx);
   delete_replay_node(r->timestamps);
   for(i=0;i<r->count;i++){
     obj = hwloc_get_obj_by_depth(r->topology,r->depths[i],0);
@@ -302,19 +309,14 @@ delete_replay(replay_t r)
 void * replay_fill_thread(void* arg){
   replay_t r = (replay_t)arg;
   int err;
-  if(r->eof)
-    return NULL;
   while((err = replay_input_line(r)) > 0){
-    /* buffers full */
-    if(err==3){
-      r->usleep_len = (r->timestamps->head->next->val - r->timestamps->head->val) * BUF_MAX / 2;;
-    }
     /* buffers are full, so r->usleep_len is necessarily a valid value because there must be around BUF_MAX timestamps queued */
-    if(err==1){
+    if(err==1 ){
+      if(r->usleep_len==0)
+	r->usleep_len = (r->timestamps->head->next->val - r->timestamps->head->val) * BUF_MAX / 2;
       usleep(r->usleep_len);
     }
   }
-  r->eof=1;
   return NULL;
 }
 
@@ -345,12 +347,17 @@ timeval_subtract (struct timeval * result, struct timeval * x, struct timeval * 
 
 int
 replay_is_finished(replay_t r){
-  unsigned sem_count;
-  sem_getvalue(&r->buffer_semaphore,&sem_count);
-  if(r->eof==0 || sem_count)
-    return 0;
-  else 
-    return 1;
+  pthread_mutex_lock(&r->mtx);
+  int eof = r->eof;
+  pthread_mutex_unlock(&r->mtx);
+  if(eof==1){
+    unsigned sem_count;
+    sem_getvalue(&r->buffer_semaphore,&sem_count);
+    if(sem_count==0){
+      return 1;
+    }
+  }
+  return 0;
 }
 
 void * replay_timer_thread(void* arg){
@@ -367,7 +374,10 @@ void * replay_timer_thread(void* arg){
     if((diff = trace_elapsed - elapsed) > 0){
       usleep(diff);
     }
-    write(r->update_write_fd,"1",sizeof(uint64_t));
+    if(write(r->update_write_fd,"1",sizeof(uint64_t))==-1){
+      perror("write");
+      exit(EXIT_FAILURE);
+    }
   }
 }
 
