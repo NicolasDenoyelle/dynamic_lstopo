@@ -224,7 +224,7 @@ new_replay(const char * filename, hwloc_topology_t topology)
   rp->eof=0;
   rp->n_nodes=0;
   rp->nodes_filled=0;
-  rp->usleep_len=0;
+  rp->usleep_len = 50 * BUF_MAX ;
   rp->timestamps = new_replay_node();
 
   if(topology==NULL)
@@ -311,9 +311,7 @@ void * replay_fill_thread(void* arg){
   int err;
   while((err = replay_input_line(r)) > 0){
     /* buffers are full, so r->usleep_len is necessarily a valid value because there must be around BUF_MAX timestamps queued */
-    if(err==1 ){
-      if(r->usleep_len==0)
-	r->usleep_len = (r->timestamps->head->next->val - r->timestamps->head->val) * BUF_MAX / 2;
+    if(err==1){
       usleep(r->usleep_len);
     }
   }
