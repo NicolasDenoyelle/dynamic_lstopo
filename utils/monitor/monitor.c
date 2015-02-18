@@ -21,8 +21,8 @@
   }							
 
 #define Monitors_get_monitor_node(m,index,sibling) ((struct monitor_node*)(hwloc_get_obj_by_depth(m->topology,m->depths[index],sibling)->userdata))
-#define Monitors_get_monitor_max(m,i) Monitors_get_monitor_node(m,i,0)->max
-#define Monitors_get_monitor_min(m,i) Monitors_get_monitor_node(m,i,0)->min
+#define Monitors_get_level_max(m,i) m->max[i]
+#define Monitors_get_level_min(m,i) m->min[i]
 #define Monitors_get_monitor_value(m, monitor_idx, sibling_idx) Monitors_get_monitor_node(m,monitor_idx,sibling_idx)->val
 
 static inline void zerof(double * array, unsigned int size){
