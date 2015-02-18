@@ -59,7 +59,7 @@ void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_att
   topo_cairo_paint(&x11_draw_methods, logical, legend, topology, disp->cs);
   /* flush windows*/
   XMoveWindow(disp->dpy, disp->win, -disp->x, -disp->y);
-
+  XFlush(disp->dpy);
   cairo_t * c = cairo_create(disp->cs);
 
   /* passed to draw perf boxes methods to avoid drawing unactive boxes */
@@ -106,7 +106,9 @@ void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_att
 	  break;
       }
       if(FD_ISSET(itimer_fd,&in_fds)){
-	read(itimer_fd,&buf,sizeof(uint64_t));
+	if(read(itimer_fd,&buf,sizeof(uint64_t))==-1){
+	  perror("read");
+	}
 	Monitors_update_counters(monitors);
 	Monitors_wait_update(monitors);
 	topo_cairo_perf_boxes(topology, monitors, active, c, &x11_draw_methods);
@@ -134,6 +136,7 @@ void output_x11_perf_replay(hwloc_topology_t topology, const char *filename __hw
   topo_cairo_paint(&x11_draw_methods, logical, legend, topology, disp->cs);
   /* flush windows*/
   XMoveWindow(disp->dpy, disp->win, -disp->x, -disp->y);
+  XFlush(disp->dpy);
 
   cairo_t * c = cairo_create(disp->cs);
 
@@ -150,7 +153,7 @@ void output_x11_perf_replay(hwloc_topology_t topology, const char *filename __hw
   replay_start(replay);
   while(!replay_is_finished(replay)){
     in_fds = in_fds_original;
-    timeout.tv_sec=10;
+    timeout.tv_sec=1 ;
     timeout.tv_usec=0;
     if(select(nfds, &in_fds, NULL, NULL,&timeout)>0){
       if(FD_ISSET(x11_fd,&in_fds)){
@@ -158,7 +161,9 @@ void output_x11_perf_replay(hwloc_topology_t topology, const char *filename __hw
 	  break;
       }
       if(FD_ISSET(replay->update_read_fd,&in_fds)){
-	read(replay->update_read_fd,&buf,sizeof(uint64_t));
+	if(read(replay->update_read_fd,&buf,sizeof(uint64_t))==-1){
+	  perror("read");
+	}
 	topo_cairo_perf_replay_boxes(topology, replay, c, &x11_draw_methods);
     	XFlush(disp->dpy);
       }
