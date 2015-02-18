@@ -1007,10 +1007,12 @@ main (int argc, char *argv[])
     delete_replay(replay);
   }
   else if(perf){
-    monitors_t m=load_Monitors_from_config(topology,perf_input,perf_output,lstopo_pid);
+    monitors_t m=load_Monitors_from_config(topology,perf_input,perf_output);
     if(m==NULL)
-      m=new_default_Monitors(topology,perf_output,lstopo_pid);
+      m=new_default_Monitors(topology,perf_output);
     if(m!=NULL){
+      if(lstopo_pid!=0)
+	Monitors_watch_pid(m,lstopo_pid);
       if(perf==3){
 	pid_t pid=0;
 	if(argv[0]){
