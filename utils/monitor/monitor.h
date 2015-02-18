@@ -50,13 +50,12 @@ struct monitors{
 typedef struct monitors * monitors_t;
 
 
-monitors_t   new_default_Monitors             (hwloc_topology_t topology, const char * output, unsigned int pid);
-monitors_t   load_Monitors_from_config        (hwloc_topology_t topology, const char * perf_group_file, const char * output, unsigned int pid);
+monitors_t   new_default_Monitors             (hwloc_topology_t topology, const char * output);
+monitors_t   load_Monitors_from_config        (hwloc_topology_t topology, const char * perf_group_file, const char * output);
 unsigned int Monitors_watch_pid               (monitors_t m,unsigned int pid);
 int          Monitors_start                   (monitors_t m);
 void         Monitors_update_counters         (monitors_t m);
 void         Monitors_wait_update             (monitors_t m);
-long long    Monitors_get_counter_value       (monitors_t m, unsigned int counter_idx, unsigned int PU_idx);
 double       Monitors_get_monitor_max         (monitors_t m, unsigned int m_idx);
 double       Monitors_get_monitor_min         (monitors_t m, unsigned int m_idx);
 double       Monitors_get_monitor_value       (monitors_t m, unsigned int node_idx, unsigned int PU_idx);
