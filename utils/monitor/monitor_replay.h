@@ -36,7 +36,7 @@ struct replay_t{
   int last_read_read; /* 0 if the last_read has not be read yet, 1 if it has*/
   pthread_t fill_thread, timer_thread;
   long long usleep_len;
-  pthread_mutex_t pause_mtx;
+  pthread_mutex_t mtx;
 
   unsigned count; /* number of monitor levels */
   unsigned  * visited;/* topology_depth */  
