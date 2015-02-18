@@ -313,6 +313,7 @@ void usage(const char *name, FILE *where)
   fprintf (where, "  --no-bridges          Do not any I/O bridge except hostbridges\n");
   fprintf (where, "  --whole-io            Show all I/O devices and bridges\n");
 #ifdef HWLOC_HAVE_MONITOR
+  fprintf (where, "  --perf                Display live performance counters on topology\n");
   fprintf (where, "  --perf-output         Choose a file to keep monitors_t trace\n");
   fprintf (where, "  --perf-no-display     Record counters without direct printing for later display.\n");
   fprintf (where, "                        This option is usefull to reduce recording overhead.\n");
@@ -822,6 +823,10 @@ main (int argc, char *argv[])
         top = 1;
       }
 #ifdef HWLOC_HAVE_MONITOR
+      else if (!strcmp (argv[0], "--perf")){
+	if(perf!=2)
+	perf = 1;
+      }
       else if (!strcmp (argv[0], "--perf-output")){
 	if (argc < 2) {
 	  usage (callname, stderr);
