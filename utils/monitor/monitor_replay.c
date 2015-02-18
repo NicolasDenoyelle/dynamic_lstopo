@@ -53,7 +53,6 @@ input_line_content(FILE * in, struct line_content * out){
   out->sibling_idx=atoi(sibling_idx);
   out->real_usec=atoll(real_usec);
   out->value=atof(value);
-  output_line_content(1,out);
   return 0;
 }
 
@@ -77,6 +76,7 @@ new_replay_node(){
   current->next=node->head;
   current->next->prev = current;
   node->tail = NULL;
+  node->count = 0;
   pthread_mutex_unlock(&node->mtx);
   return node;
 }
@@ -114,6 +114,7 @@ replay_node_insert_value(struct replay_node * out, double in){
     out->tail->val=in;
     out->tail = out->tail->next;
   }
+  out->count++;
   pthread_mutex_unlock(&out->mtx);
   return 0;
 }
@@ -131,6 +132,7 @@ replay_node_get_value(struct replay_node * rn){
   /* the queue is empty */
   if(rn->head==rn->tail)
     rn->tail=NULL;
+  rn->count--;
   pthread_mutex_unlock(&rn->mtx);
   return val;
 }
@@ -152,8 +154,7 @@ int replay_input_line(replay_t r){
   
   unsigned i,j, depth = hwloc_get_obj_depth_by_name(r->topology, lc.obj_name);
   hwloc_obj_t obj = hwloc_get_obj_by_depth(r->topology,depth,lc.sibling_idx);
-  unsigned topo_depth = hwloc_topology_get_depth(r->topology);
-  if(depth<0 || depth >=topo_depth)
+  if(depth<0)
     return -1;
 
   if(obj->userdata==NULL){
@@ -181,15 +182,24 @@ int replay_input_line(replay_t r){
     r->last_read_read=0;
     return 1;
   }
-  else{ /* insert successed we also insert timestamp */
-    r->nodes_filled++;
-    if(r->nodes_filled%r->n_nodes == 0){
+  else{ /* insert successed we also insert timestamp if every node has more inserted value than semaphore value */
+    if(++r->nodes_filled/r->n_nodes>2){ 
+      int sval; sem_getvalue(&r->buffer_semaphore,&sval);
+      int i;
+      hwloc_obj_t obj;
+      for(i=0;i<r->count;i++){
+	obj = hwloc_get_obj_by_depth(r->topology,r->depths[i],0);
+	do{
+	  if(obj->userdata && ((struct replay_node*)obj->userdata)->count <= sval)
+	    return 2;
+	} while((obj=obj->next_sibling)!=NULL && obj->logical_index != 0);
+      }
       /* this one should never fail if precedent didn't fail */
       replay_node_insert_value(r->timestamps,lc.real_usec);
       sem_post(&r->buffer_semaphore);
     }
+    return 3;
   }
-  return 2;
 }
 
 replay_t
@@ -247,21 +257,6 @@ new_replay(const char * filename, hwloc_topology_t topology)
   }
   rp->trace_start = lc.real_usec;
   rewind(input);
-  /* fill topology_buffers */
-  do{
-    err = replay_input_line(rp);
-  } while(err == 2);
-  
-  /* filling stopped because buffers were full then we can have an approximation of the time interval between 
-     two sets of sample */
-  if(err==1){
-    rp->sample_interval = rp->timestamps->head->next->val - rp->timestamps->head->val;
-  }
-  else{
-    rp->eof=1;
-    rp->sample_interval = 0;
-  }
-
 
   /* set fd for updates */
   int update_fds[2];
@@ -306,14 +301,17 @@ delete_replay(replay_t r)
 
 void * replay_fill_thread(void* arg){
   replay_t r = (replay_t)arg;
-  long long usleep_len = r->sample_interval * BUF_MAX / 2;
   int err;
   if(r->eof)
     return NULL;
   while((err = replay_input_line(r)) > 0){
     /* buffers full */
+    if(err==3){
+      r->usleep_len = (r->timestamps->head->next->val - r->timestamps->head->val) * BUF_MAX / 2;;
+    }
+    /* buffers are full, so r->usleep_len is necessarily a valid value because there must be around BUF_MAX timestamps queued */
     if(err==1){
-      usleep(usleep_len);
+      usleep(r->usleep_len);
     }
   }
   r->eof=1;
@@ -370,15 +368,6 @@ void * replay_timer_thread(void* arg){
       usleep(diff);
     }
     write(r->update_write_fd,"1",sizeof(uint64_t));
-    
-    /* pause handling */
-    /* pthread_mutex_lock(&r->pause_mtx); */
-    /* pthread_mutex_unlock(&r->pause_mtx); */
-    /* gettimeofday(&pause,NULL); */
-    /* timeval_subtract(&pause, &pause, &now); */
-    /* start.tv_sec+=pause.tv_sec; */
-    /* start.tv_usec+=pause.tv_usec; */
-
   }
 }
 
@@ -386,17 +375,4 @@ void replay_start(replay_t r){
   pthread_create(&r->fill_thread,NULL,replay_fill_thread,r);
   pthread_create(&r->timer_thread,NULL,replay_timer_thread,r);
 }
-
-inline void
-replay_pause(replay_t r)
-{
-  pthread_mutex_lock(&r->pause_mtx);
-}
-
-inline void
-replay_resume(replay_t r)
-{
-  pthread_mutex_unlock(&r->pause_mtx);
-}
-
 

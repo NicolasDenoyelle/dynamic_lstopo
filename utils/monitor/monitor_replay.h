@@ -15,8 +15,8 @@ struct replay_queue{
 struct replay_node{
   struct replay_queue * head;
   struct replay_queue * tail;
-  pthread_mutex_t mtx;
-  
+  unsigned count;
+  pthread_mutex_t mtx;  
 };
 
 struct replay_node * new_replay_node();
@@ -35,8 +35,7 @@ struct replay_t{
   struct line_content last_read; /* if a node buffer was full when attempting to enqueue a value, we store read content here */
   int last_read_read; /* 0 if the last_read has not be read yet, 1 if it has*/
   pthread_t fill_thread, timer_thread;
-  long long sample_interval; /* time between the first and the second sample interval */
-
+  long long usleep_len;
   pthread_mutex_t pause_mtx;
 
   unsigned count; /* number of monitor levels */
@@ -56,8 +55,6 @@ typedef struct replay_t * replay_t;
 replay_t new_replay      (const char * filename, hwloc_topology_t topology);
 void     delete_replay   (replay_t r);
 void     replay_start    (replay_t r);
-void     replay_pause    (replay_t r);
-void     replay_resume   (replay_t r);
 int      replay_is_finished(replay_t r);
 
 #endif
