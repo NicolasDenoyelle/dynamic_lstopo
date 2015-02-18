@@ -59,7 +59,7 @@ void         Monitors_wait_update             (monitors_t m);
 
 double       Monitors_get_level_max           (monitors_t m, unsigned int level_idx);
 double       Monitors_get_level_min           (monitors_t m, unsigned int level_idx);
-double       Monitors_get_monitor_value       (monitors_t m, unsigned int node_idx, unsigned int PU_idx);
+double       Monitors_get_monitor_value       (monitors_t m, unsigned int depth, unsigned int sibling_idx);
 double       Monitors_get_monitor_variation   (monitors_t m, unsigned int depth, unsigned int sibling_idx);
 double       Monitors_wait_monitor_value      (monitors_t m, unsigned int depth, unsigned int sibling_idx);
 double       Monitors_wait_monitor_variation  (monitors_t m, unsigned int depth, unsigned int sibling_idx);
