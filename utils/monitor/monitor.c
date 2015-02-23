@@ -118,7 +118,7 @@ handle_error(int err)
     fprintf(stderr,"Internal error, please send mail to the developers.\n");
     break;
   default:
-    fprintf(stderr,"Unknown error ID\n");
+    fprintf(stderr,"Unknown error ID, sometimes this error is due to \"/proc/sys/kernel/perf_event_paranoid\" not set to -1\n");
     break;
   }
 }
