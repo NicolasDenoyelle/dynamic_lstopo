@@ -195,6 +195,7 @@ monitors_t new_Monitors(hwloc_topology_t topology,
   m->count=0;
   m->names=NULL;
   m->depths=NULL;
+  m->depth_names=NULL;
   m->output_fd=0;
   m->pw=NULL;
   m->topology = NULL;
@@ -234,6 +235,7 @@ monitors_t new_Monitors(hwloc_topology_t topology,
 
   M_alloc(m->pthreads,m->n_PU,sizeof(pthread_t));
   M_alloc(m->depths,m->allocated_count,sizeof(int));
+  M_alloc(m->depth_names,m->allocated_count,sizeof(char*));
   M_alloc(m->compute,m->allocated_count,sizeof(double (*)(long long*)));
   M_alloc(m->min,m->allocated_count,sizeof(double (*)(long long*)));
   M_alloc(m->max,m->allocated_count,sizeof(double (*)(long long*)));
@@ -272,6 +274,8 @@ int add_Monitor(monitors_t m, const char * name, char * hwloc_obj_name, double (
       exit(EXIT_FAILURE);
     if((m->depths=realloc(m->depths, sizeof(int)*m->allocated_count))==NULL)
       exit(EXIT_FAILURE);
+    if((m->depth_names=realloc(m->depth_names, sizeof(char*)*m->allocated_count))==NULL)
+      exit(EXIT_FAILURE);
     if((m->max=realloc(m->max, sizeof(int)*m->allocated_count))==NULL)
       exit(EXIT_FAILURE);
     if((m->min=realloc(m->min, sizeof(int)*m->allocated_count))==NULL)
@@ -296,6 +300,7 @@ int add_Monitor(monitors_t m, const char * name, char * hwloc_obj_name, double (
   for(j=m->count;j>i;j--){
     m->names[j] = m->names[j-1];
     m->depths[j] = m->depths[j-1];
+    m->depth_names[j] = m->depth_names[j-1];
     m->max[j] = m->max[j-1];
     m->min[j] = m->min[j-1];
     m->compute[j] = m->compute[j-1];
@@ -303,6 +308,7 @@ int add_Monitor(monitors_t m, const char * name, char * hwloc_obj_name, double (
 
   m->names[i] = strdup(name);
   m->depths[i] = depth;
+  m->depth_names[i] = strdup(hwloc_obj_name);
   m->compute[i] = fun;
   m->min[j] = DBL_MAX;
   m->max[j] = DBL_MIN;
@@ -478,7 +484,7 @@ void * monitors_thread(void* monitors){
 	pthread_mutex_lock(&(m->print_mtx));
 	memset(output.name,0,21);
 	memset(output.obj_name,0,11);
-	hwloc_obj_type_snprintf(output.obj_name, 10, obj, 0);
+	strncpy(output.obj_name,m->depth_names[i],10);
 	output.sibling_idx = obj->logical_index;
 	output.real_usec=out->real_usec;
 	strncpy(output.name,m->names[i],20);
@@ -762,6 +768,7 @@ delete_Monitors(monitors_t m)
   free(m->pthreads);
 
   for(i=0;i<m->count;i++){
+    free(m->depth_names[i]);
     free(m->names[i]);
     n_obj=hwloc_get_nbobjs_by_depth(m->topology,m->depths[i]);
     for(j=0;j<n_obj;j++){
@@ -778,6 +785,7 @@ delete_Monitors(monitors_t m)
   free(m->max);
   free(m->min);
   free(m->names);
+  free(m->depth_names);
 
   for(i=0;i<m->n_events;i++){
     free(m->event_names[i]);
