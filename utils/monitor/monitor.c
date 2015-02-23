@@ -21,8 +21,8 @@
   }							
 
 #define Monitors_get_monitor_node(m,index,sibling) ((struct monitor_node*)(hwloc_get_obj_by_depth(m->topology,m->depths[index],sibling)->userdata))
-#define Monitors_get_monitor_max(m,i) Monitors_get_monitor_node(m,i,0)->max
-#define Monitors_get_monitor_min(m,i) Monitors_get_monitor_node(m,i,0)->min
+#define Monitors_get_level_max(m,i) m->max[i]
+#define Monitors_get_level_min(m,i) m->min[i]
 #define Monitors_get_monitor_value(m, monitor_idx, sibling_idx) Monitors_get_monitor_node(m,monitor_idx,sibling_idx)->val
 
 static inline void zerof(double * array, unsigned int size){
@@ -173,8 +173,7 @@ init_eventset(int * eventset,unsigned int n_events,  char** event_names, unsigne
 monitors_t new_Monitors(hwloc_topology_t topology,
 			unsigned int n_events, 
 			char ** event_names, 
-			const char * output, 
-			unsigned int pid){
+			const char * output){
 
   unsigned int i, depth; 
   monitors_t m;
@@ -231,8 +230,6 @@ monitors_t new_Monitors(hwloc_topology_t topology,
   depth = hwloc_topology_get_depth(m->topology);
   m->n_PU = hwloc_get_nbobjs_by_depth(m->topology, depth-1);
   pthread_barrier_init(&m->barrier,NULL,m->n_PU);
-  if(pid!=0)
-    m->pw = new_proc_watch(pid);
   m->allocated_count=4;
 
   M_alloc(m->pthreads,m->n_PU,sizeof(pthread_t));
@@ -540,7 +537,7 @@ void unload_monitors_lib(monitors_t m){
 /*                                                   PUBLIC                                                    */
 /***************************************************************************************************************/
 monitors_t
-new_default_Monitors(hwloc_topology_t topology, const char * output,unsigned int pid)
+new_default_Monitors(hwloc_topology_t topology, const char * output)
 {
   unsigned i,depth = hwloc_topology_get_depth(topology)-1;
   int eventset = PAPI_NULL;
@@ -570,7 +567,7 @@ new_default_Monitors(hwloc_topology_t topology, const char * output,unsigned int
   PAPI_destroy_eventset(&eventset);
 
   monitors_t m;
-  m = new_Monitors(topology, count, event_names, output, pid);
+  m = new_Monitors(topology, count, event_names, output);
   if(m==NULL){
     fprintf(stderr,"default monitors_t creation failed\n");
     for(i=0;i<count;i++){
@@ -593,7 +590,7 @@ new_default_Monitors(hwloc_topology_t topology, const char * output,unsigned int
 
 
 monitors_t
-load_Monitors_from_config(hwloc_topology_t topology, const char * perf_group_file, const char * output, unsigned int pid)
+load_Monitors_from_config(hwloc_topology_t topology, const char * perf_group_file, const char * output)
 {
   struct parsed_names * pn;
   monitors_t m;
@@ -615,7 +612,7 @@ load_Monitors_from_config(hwloc_topology_t topology, const char * perf_group_fil
   }  
   dlerror();
 
-  m = new_Monitors(topology, pn->n_events,pn->event_names,output,pid);
+  m = new_Monitors(topology, pn->n_events,pn->event_names,output);
   m->dlhandle=dlhandle;
 
   for(i=0;i<pn->n_events;i++)
@@ -709,18 +706,18 @@ Monitors_get_counter_value(monitors_t m,unsigned int counter_idx,unsigned int PU
 }
 
 inline double 
-Monitors_get_monitor_variation(monitors_t m, unsigned int monitor_idx, unsigned int sibling_idx)
+Monitors_get_monitor_variation(monitors_t m, unsigned depth, unsigned int sibling_idx)
 { 
-  hwloc_obj_t obj;
-  obj = hwloc_get_obj_by_depth(m->topology,m->depths[monitor_idx],sibling_idx);
+  hwloc_obj_t obj = hwloc_get_obj_by_depth(m->topology,depth,sibling_idx);
   return ((struct monitor_node *)(obj->userdata))->val-((struct monitor_node *)(obj->userdata))->old_val;
 }
 
 
 double
-Monitors_wait_monitor_value(monitors_t m, unsigned int monitor_idx, unsigned int sibling_idx)
+Monitors_wait_monitor_value(monitors_t m, unsigned depth, unsigned int sibling_idx)
 {
-  struct monitor_node * box = Monitors_get_monitor_node(m,monitor_idx, sibling_idx);
+  hwloc_obj_t obj = hwloc_get_obj_by_depth(m->topology,depth,sibling_idx);
+  struct monitor_node * box = obj->userdata;
   double val;
   pthread_mutex_lock(&(box->update_lock));
   val = box->val;
@@ -729,9 +726,10 @@ Monitors_wait_monitor_value(monitors_t m, unsigned int monitor_idx, unsigned int
 }
 
 double
-Monitors_wait_monitor_variation(monitors_t m, unsigned int monitor_idx, unsigned int sibling_idx)
+Monitors_wait_monitor_variation(monitors_t m, unsigned depth, unsigned int sibling_idx)
 {
-  struct monitor_node * box = Monitors_get_monitor_node(m,monitor_idx, sibling_idx);
+  hwloc_obj_t obj = hwloc_get_obj_by_depth(m->topology,depth,sibling_idx);
+  struct monitor_node * box = obj->userdata;
   double val;
   pthread_mutex_lock(&(box->update_lock));
   val = box->val - box->old_val;
