@@ -65,6 +65,9 @@ Using PAPI to Monitor an application or a machine in lstopo (X) view:
 
 Requirements:
 	X output must be enabled.
+	You must ave permission to read every performance counters, it can be 
+	achieved by running the command 
+	"echo "-1" > /proc/sys/kernel/perf_event_paranoid" as root.
 	PAPI, bison and lex must be installed.
 	If you use a custom installation of these, you have to make configure 
 	know where to find headers and libraries:
