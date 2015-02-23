@@ -176,8 +176,6 @@ int replay_input_line(replay_t r){
     }
   }
 
-  r->max[depth] = r->max[depth] > lc.value ? r->max[depth] : lc.value;
-  r->min[depth] = r->min[depth] < lc.value ? r->min[depth] : lc.value;
   /* if we cannot insert the value, we save the content read to insert it next time */
   if(replay_node_insert_value(obj->userdata, lc.value)==-1){
     strncpy(r->last_read.obj_name,lc.obj_name,10);
@@ -274,6 +272,17 @@ new_replay(const char * filename, hwloc_topology_t topology)
   rp->update_read_fd = update_fds[0];
   rp->update_write_fd = update_fds[1];
 
+  /* read file once to gather maxs and mins*/
+  while(input_line_content(input,&lc)!=-1){
+    depth = hwloc_get_obj_depth_by_name(rp->topology,lc.obj_name);
+    if(rp->max[depth] < lc.value){
+      rp->max[depth] = lc.value;
+    }
+    if(rp->min[depth] > lc.value){
+      rp->min[depth] = lc.value;    
+    }
+  }
+  rewind(input);
   return rp;
 }
 
