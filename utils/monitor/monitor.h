@@ -43,6 +43,7 @@ struct monitors{
   char        **    names;             /* nb_monitors */
   double  (**compute)(long long *);    /* nb_monitors */
   unsigned int    * depths;            /* nb_monitors */
+  char        **    depth_names;       /* nb_monitors */
   double          *max, *min;          /* nb_monitors */
  };
 
