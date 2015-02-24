@@ -65,6 +65,7 @@ static unsigned int top  = 0;
 
 #ifdef HWLOC_HAVE_MONITOR
 static unsigned int perf = 0;
+static    int replay_phase = -1;
 static char * perf_output = NULL;
 static char * perf_input = NULL;
 static unsigned long refresh_usec=100000;
@@ -860,12 +861,25 @@ main (int argc, char *argv[])
 	  usage (callname, stderr);
 	  exit(EXIT_FAILURE);
 	}
-	if(perf!=0){
+	if(perf!=0 && perf !=2){
 	  fprintf(stderr,"option %s does not support other perf option.\n",argv[0]);
 	  exit(EXIT_FAILURE);
 	}
 	perf = 2;
 	perf_input = argv[1];
+	opt = 1;
+      }
+      else if (!strcmp (argv[0], "--perf-replay-phase")){
+	if (argc < 2) {
+	  usage (callname, stderr);
+	  exit(EXIT_FAILURE);
+	}
+	if(perf!=0 && perf !=2){
+	  fprintf(stderr,"option %s does not support other perf option.\n",argv[0]);
+	  exit(EXIT_FAILURE);
+	}
+	perf = 2;
+	replay_phase = atoi(argv[1]);
 	opt = 1;
       }
       else if (!strcmp (argv[0], "--refresh") || !strcmp (argv[0], "-r")) {
@@ -1002,7 +1016,7 @@ main (int argc, char *argv[])
 
 #ifdef HWLOC_HAVE_MONITOR
   if(perf==2){
-    replay_t replay = new_replay(perf_input,topology);
+    replay_t replay = new_replay(perf_input,topology,replay_phase);
     output_perf_replay(topology, filename, verbose_mode, callname, output_format, replay);
     delete_replay(replay);
   }
