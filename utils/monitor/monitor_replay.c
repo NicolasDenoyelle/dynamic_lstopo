@@ -17,24 +17,24 @@
 
 void output_header(int output_fd){
   const char * sep = "-------------------+";
-  dprintf(output_fd,"%6s%10s%20s%20s%20s\n","#----+","---------+",sep,sep,sep);
-  dprintf(output_fd,"%6s%10s%20s%20s%20s\n","#  idx","level","real_usec","monitor_name","monitor_value");
-  dprintf(output_fd,"%6s%10s%20s%20s%20s\n","#----+","---------+",sep,sep,sep);
+  dprintf(output_fd,"%6s%6s%10s%20s%20s%20s\n","#----+","-----+","---------+",sep,sep,sep);
+  dprintf(output_fd,"%6s%6s%10s%20s%20s%20s\n","#phase","idx","level","real_usec","monitor_name","monitor_value");
+  dprintf(output_fd,"%6s%6s%10s%20s%20s%20s\n","#----+","-----+","---------+",sep,sep,sep);
 }
 
 inline void
 output_line_content(int output_fd, struct line_content * in){
-  dprintf(output_fd,"%6d%10s%20lld%20s%20lf\n",
-	  in->sibling_idx, in->obj_name, in->real_usec, in->name, in->value);
+  dprintf(output_fd,"%6u%6d%10s%20lld%20s%20lf\n",
+	  in->phase, in->sibling_idx, in->obj_name, in->real_usec, in->name, in->value);
 }
 
 
 ssize_t
 input_line_content(FILE * in, struct line_content * out){
   ssize_t ret;
-  char line[78];
+  char line[84];
   memset(line,0,78);
-  if((ret = fread(line,1,77,in))<77){
+  if((ret = fread(line,1,83,in))<83){
     if(ret != 0){
       printf("read fail : %s\n",line);
     }
@@ -43,14 +43,16 @@ input_line_content(FILE * in, struct line_content * out){
   if(line[0] == '#')
     return input_line_content(in, out);
 
-  char sibling_idx[7], real_usec[21], value[21];
+  char phase[7], sibling_idx[7], real_usec[21], value[21];
   memset(out->name,0,21);
   memset(real_usec,0,21);
   memset(value,0,21);
   memset(out->obj_name,0,11);
   memset(sibling_idx,0,7);
-  sscanf(line,"%6s%10s%20s%20s%20s",sibling_idx,out->obj_name,real_usec,out->name,value);
+  memset(phase,0,7);
+  sscanf(line,"%6s%6s%10s%20s%20s%20s",phase,sibling_idx,out->obj_name,real_usec,out->name,value);
   out->sibling_idx=atoi(sibling_idx);
+  out->phase=atoi(phase);
   out->real_usec=atoll(real_usec);
   out->value=atof(value);
   return 0;
@@ -156,6 +158,8 @@ int replay_input_line(replay_t r){
       pthread_mutex_unlock(&r->mtx);
       return -1;
     }
+    if(r->phase!=-1 && lc.phase!=(unsigned)(r->phase))
+      return replay_input_line(r);
   }
   
   unsigned i,j, depth = hwloc_get_obj_depth_by_name(r->topology, lc.obj_name);
@@ -207,7 +211,7 @@ int replay_input_line(replay_t r){
 }
 
 replay_t
-new_replay(const char * filename, hwloc_topology_t topology)
+new_replay(const char * filename, hwloc_topology_t topology, int phase)
 {
   FILE * input = fopen(filename,"r");
   if(input==NULL){
@@ -224,6 +228,7 @@ new_replay(const char * filename, hwloc_topology_t topology)
   rp->nodes_filled=0;
   rp->usleep_len = 50 * BUF_MAX ;
   rp->timestamps = new_replay_node();
+  rp->phase=phase;
 
   if(topology==NULL)
     topology_init(&rp->topology);
