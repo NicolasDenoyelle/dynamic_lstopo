@@ -200,6 +200,7 @@ monitors_t new_Monitors(hwloc_topology_t topology,
   m->pw=NULL;
   m->topology = NULL;
   m->dlhandle=NULL;
+  m->phase=0;
 
   /* initialize topology */
   if(topology!=NULL){
@@ -487,6 +488,7 @@ void * monitors_thread(void* monitors){
 	strncpy(output.obj_name,m->depth_names[i],10);
 	output.sibling_idx = obj->logical_index;
 	output.real_usec=out->real_usec;
+	output.phase=(m->phase);
 	strncpy(output.name,m->names[i],20);
 	output.value = out->val;
 	output_line_content(m->output_fd,&output);
@@ -702,6 +704,14 @@ Monitors_update_counters(monitors_t m){
 inline void
 Monitors_wait_update(monitors_t m){
   pthread_mutex_lock(&m->update_mtx);
+  pthread_mutex_unlock(&m->update_mtx);
+}
+
+inline void         
+Monitors_set_phase(monitors_t m, unsigned phase)
+{
+  pthread_mutex_lock(&m->update_mtx);
+  m->phase = phase;
   pthread_mutex_unlock(&m->update_mtx);
 }
 
