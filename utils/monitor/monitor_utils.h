@@ -21,6 +21,7 @@ struct parsed_names * parser(const char * file_name);
 
 /* utils from replay.c */
 struct line_content{
+  unsigned phase;
   unsigned sibling_idx;
   char obj_name[11];
   long long real_usec;
