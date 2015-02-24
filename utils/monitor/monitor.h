@@ -44,7 +44,9 @@ struct monitors{
   double  (**compute)(long long *);    /* nb_monitors */
   unsigned int    * depths;            /* nb_monitors */
   char        **    depth_names;       /* nb_monitors */
-  double          *max, *min;          /* nb_monitors */
+  double           *max, *min;         /* nb_monitors */
+
+  int phase;
  };
 
 typedef struct monitors * monitors_t;
@@ -57,6 +59,7 @@ unsigned int Monitors_watch_pid               (monitors_t m,unsigned int pid);
 int          Monitors_start                   (monitors_t m);
 void         Monitors_update_counters         (monitors_t m);
 void         Monitors_wait_update             (monitors_t m);
+void         Monitors_set_phase(monitors_t m, unsigned phase);
 
 double       Monitors_get_level_max           (monitors_t m, unsigned int level_idx);
 double       Monitors_get_level_min           (monitors_t m, unsigned int level_idx);
