@@ -87,8 +87,8 @@ Usage:
 	node with --perf-input option, which takes in argument a file written 
 	as follow:
 	#commentary: The first one is the pattern and while trigger an error
-	counter_name0{hwloc_obj_name0:PAPI_COUNTER0}
-	my_counter{L1i:PAPI_FP_OPS*PAPI_L1_ICM/1000}
+	counter_name0{hwloc_obj_name0,PAPI_COUNTER0}
+	my_counter{L1i,PAPI_FP_OPS*PAPI_L1_ICM/1000}
 	...
 	If an object or a counter isn't available on your system, a list of 
 	availables items will be dumped.
