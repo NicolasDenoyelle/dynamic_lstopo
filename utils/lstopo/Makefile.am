@@ -81,6 +81,9 @@ endif
 	  -e 's/#PACKAGE_VERSION#/@PACKAGE_VERSION@/g' \
 	  -e 's/#HWLOC_DATE#/@HWLOC_RELEASE_DATE@/g' \
 	  > $@ < $<
+if HWLOC_HAVE_MONITOR
+	@sed -e '/#HWLOC_HAVE_MONITOR#/ {' -e 'r monitor.1in' -e 'd' -e '}' -i $@
+endif
 
 install-exec-hook: install-man
 	rm -f $(DESTDIR)$(bindir)/hwloc-ls$(EXEEXT)
