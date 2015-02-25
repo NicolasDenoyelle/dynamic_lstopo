@@ -55,7 +55,8 @@ application execution.
 
 This original lstopo option allows to attach to pid \fIpid\fR. Each time the counter will have to
 be read, the library will look where \fIpid\fR tasks are currently running and operate only on
-concerned counters.
+concerned counters. If a task is not in the state running, it will not be recorded. Consequently,
+programs as sleep won't give any result.
 .TP
 You can start an application at the end of lstopo command line. In this case, the heavy library
 stuff will be initialized before programms starts, then the programm will be started and recorded
