@@ -1,0 +1,70 @@
+.\" **************************
+.\"    Monitor section
+.\" **************************
+.SH PAPI MONITORING
+In its graphical output, lstopo, jointly with PAPI is able to read hardware counters and agregate
+ them on topology nodes. This option requires the file \fI/proc/sys/kernel/perf_event_paranoid\fR
+to be set to -1.
+Each time interval, selected counters are read on each core. The difference between the old value 
+and the new one is computed, then aggregated on selected nodes. If an arithmetic expression of 
+counters is provided, the expression is evaluated on each sibling after aggregation.
+.SH RECORD OPTIONS
+.TP
+\fB\-\-perf\fR
+
+Default perf option, will map random available counters on random nodes.
+.TP
+\fB\-\-perf\-output\fR \fIfile\fR
+
+Print a trace of execution in a \fIfile\fR
+.TP
+\fB\-\-perf\-input\fR \fIfile\fR
+
+Use a description \fIfile\fR as input to map counters on topology. The syntax must be as follow:
+
+# a comment line
+
+AN_identification_name0{a_valid_hwloc_obj_name, an_arithmetic_expression_of_valid_PAPI_counters_name}
+
+my_monitor0{L2, PAPI_L2_TCM/PAPI_TOT_CYC}
+
+#The parser skips new lines and spaces.
+.TP
+\fB\-\-perf\-no\-display\fR \fIfile\fR
+
+If you to avoid display overhead while recording counters you can use this option jointly with
+\fB\-\-perf\-output\fR to keep an execution trace to display later.
+.TP
+\fB\-\-refresh\fR \fIusec\fR
+
+Time in usec between two hardware counters update.
+.SH REPLAY OPTIONS
+.TP
+\fB\-\-perf\-replay\fR \fIfile\fR
+
+Replay an execution recorded with \fB\-\-perf\-output\fR \fIfile\fR option.
+.TP
+\fB\-\-perf\-replay\-phase\fR \fIphase_number\fR	
+If you use the monitor lib to profile your code, you were able to set record phases, and
+it is possible to replay a selected one.
+.SH RECORDING AN APPLICATION
+You can use monitoring features to display the machine state and restrict the display to one 
+application execution.
+.TP
+\fB\-\-pid\fR \fIpid\fR
+
+This original lstopo option allows to attach to pid \fIpid\fR. Each time the counter will have to
+be read, the library will look where \fIpid\fR tasks are currently running and operate only on
+concerned counters.
+.TP
+You can start an application at the end of lstopo command line. In this case, the heavy library
+stuff will be initialized before programms starts, then the programm will be started and recorded
+according to its pid, the same way it is done with \fB\-\-pid\fR option.
+.PP
+example: lstopo --perf top
+.TP
+You can annotate your code with functions in \fImonitor.h\fR and link with \fI\-lmonitor\fR.
+This way, a trace file will be created with counters updated at your tips, and phase defined 
+the way you want to isolate parts of execution. Then you will be able to watch it with 
+\fB\-\-perf\-replay\fR option once your programm exited.
+
