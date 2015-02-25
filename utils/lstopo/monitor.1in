@@ -60,11 +60,11 @@ concerned counters.
 You can start an application at the end of lstopo command line. In this case, the heavy library
 stuff will be initialized before programms starts, then the programm will be started and recorded
 according to its pid, the same way it is done with \fB\-\-pid\fR option.
-.PP
-example: lstopo --perf top
+
+lstopo --perf \fI<command>\fR
 .TP
 You can annotate your code with functions in \fImonitor.h\fR and link with \fI\-lmonitor\fR.
-This way, a trace file will be created with counters updated at your tips, and phase defined 
-the way you want to isolate parts of execution. Then you will be able to watch it with 
+This way, a trace file will be created with counters updated as you wish, and recording phases 
+defined the way you want to isolate parts of execution. Then you will be able to watch it with 
 \fB\-\-perf\-replay\fR option once your programm exited.
 
