@@ -341,6 +341,7 @@ void usage(const char *name, FILE *where)
   fprintf (where, "  --perf-input          Choose a file where monitors_t are defined as follow: \n");
   fprintf (where, "                        L1i_miss_per_cycle{L1i,PAPI_L1_ICM/PAPI_REF_CYC}\n");
   fprintf (where, "  --perf-replay         Choose a file output by --perf-output to replay an execution from trace.\n");
+  fprintf (where, "  --perf-replay-phase   Choose a phase defined in the trace file to replay.\n");
 #endif
   fprintf (where, "  --version             Report version and exit\n");
 }
