@@ -14,6 +14,10 @@ if BUILD_NETLOC
 include_HEADERS += netloc.h
 endif
 
+if HWLOC_HAVE_MONITOR
+include_HEADERS += monitor.h 
+endif HWLOC_HAVE_MONITOR
+
 include_hwlocdir = $(includedir)/hwloc
 include_hwloc_HEADERS = \
         hwloc/bitmap.h \
