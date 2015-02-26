@@ -5,7 +5,7 @@
 
 /*************************************************************/
 /**
- * Struct stored in hwloc_obj_t->userdata.
+ * @brief Struct stored in hwloc_obj_t->userdata.
  * It contains informations about hardware counters.
  * When building monitors_t every sibling at depths defined by hwloc_obj_types will store one of it.
  **/
@@ -40,7 +40,7 @@ struct monitor_node{
 
 /*************************************************************/
 /**
- * The struct to manipulate topological monitoring.
+ * @brief The struct to manipulate topological monitoring.
  **/
 struct monitors{
   /**
@@ -133,12 +133,12 @@ typedef struct monitors * monitors_t;
 
 /*************************************************************/
 /**
- *Instanciate monitors. 
- *@param topology
- *       The topology to use. If NULL, a new topology is created from the local computer.
- *@param output
- *       The filename where to write the trace.
- *@return New monitors
+ * @brief Instanciate monitors. 
+ * @param topology
+ *        The topology to use. If NULL, a new topology is created from the local computer.
+ * @param output
+ *        The filename where to write the trace.
+ * @return New monitors
  */
 monitors_t   new_default_Monitors             (hwloc_topology_t topology, const char * output);
 /*************************************************************/
@@ -146,14 +146,14 @@ monitors_t   new_default_Monitors             (hwloc_topology_t topology, const 
 
 /*************************************************************/
 /**
- *Instanciate monitors. 
- *@param topology
- *       The topology to use. If NULL, a new topology is created from the local computer.
- *@param perf_group_file
- *       The filename to parse in order to use custom monitors.
- *@param output
- *       The filename where to write the trace.
- *@return New monitors
+ * @brief Instanciate monitors. 
+ * @param topology
+ *        The topology to use. If NULL, a new topology is created from the local computer.
+ * @param perf_group_file
+ *        The filename to parse in order to use custom monitors.
+ * @param output
+ *        The filename where to write the trace.
+ * @return New monitors
  */
 monitors_t   load_Monitors_from_config        (hwloc_topology_t topology, const char * perf_group_file, const char * output);
 /*************************************************************/
@@ -161,7 +161,7 @@ monitors_t   load_Monitors_from_config        (hwloc_topology_t topology, const 
 
 /*************************************************************/
 /**
- * Free resources allocated in monitors_t
+ * @brief Free resources allocated in monitors_t
  * @param m
  *        The monitors to free.
  */
@@ -171,7 +171,8 @@ void         delete_Monitors                  (monitors_t m);
 
 /*************************************************************/
 /**
- * Record exection only for a chosen processus. Each call to Monitors_update_counters will induce a look in /proc/<pid>/task to list pid subtasks.
+ * @brief Record exection only for a chosen processus. Each call to Monitors_update_counters will induce a look in /proc/<pid>/task to list pid 
+ * subtasks.
  * Each subtask state and location is saved to bitmap arrays and then used by update threads to know if they have to start or stop reading 
  * counters.
  * @param m
@@ -186,7 +187,7 @@ unsigned int Monitors_watch_pid               (monitors_t m,unsigned int pid);
 
 /*************************************************************/
 /**
- * Spawns reading threads, initializes eventsets and starts PAPI_counters, then wait in a loop to be updated.
+ * @brief Spawns reading threads, initializes eventsets and starts PAPI_counters, then wait in a loop to be updated.
  * @param m
  *        The monitors to start.
  * @return Always return 0 and exit on failure.
@@ -197,7 +198,7 @@ int          Monitors_start                   (monitors_t m);
 
 /*************************************************************/
 /**
- * If a Monitors_watch_pid has been called, it look status and location of pid tasks, then it triggers pthread_cond_broadcast, which unlock
+ * @brief If a Monitors_watch_pid has been called, it look status and location of pid tasks, then it triggers pthread_cond_broadcast, which unlock
  * threads to immediately read counters.
  * @param m
  *        The monitors to update.
@@ -208,7 +209,7 @@ void         Monitors_update_counters         (monitors_t m);
 
 /*************************************************************/
 /**
- * Waits until every monitor node into the topology is uptodate.
+ * @brief Waits until every monitor node into the topology is uptodate.
  * @param m
  *        The monitors to wait for.
  */
@@ -218,7 +219,7 @@ void         Monitors_wait_update             (monitors_t m);
 
 /*************************************************************/
 /**
- * When using lstopo to replay an execution from trace, the phase ca be set to analyse only parts of execution.
+ * @brief When using lstopo to replay an execution from trace, the phase ca be set to analyse only parts of execution.
  * @param m
  *        The monitors to which has to be set.
  * @param phase
@@ -230,7 +231,7 @@ void         Monitors_set_phase(monitors_t m, unsigned phase);
 
 /*************************************************************/
 /**
- * Get the max value of a monitor at a given depth: depths[level_idx].
+ * @brief Get the max value of a monitor at a given depth: depths[level_idx].
  * @param m
  *        The monitors which max value has to be retrieved.
  * @param level_idx
@@ -243,7 +244,7 @@ double       Monitors_get_level_max           (monitors_t m, unsigned int level_
 
 /*************************************************************/
 /**
- * Get the min value of a monitor at a given depth: depths[level_idx].
+ * @brief Get the min value of a monitor at a given depth: depths[level_idx].
  * @param m
  *        The monitors which min value has to be retrieved.
  * @param level_idx
@@ -256,7 +257,7 @@ double       Monitors_get_level_min           (monitors_t m, unsigned int level_
 
 /*************************************************************/
 /**
- * Get a monitor node value.
+ * @brief Get a monitor node value.
  * @param m
  *        The monitors which value has to be retrieved.
  * @param depth
@@ -271,7 +272,7 @@ double       Monitors_get_monitor_value       (monitors_t m, unsigned int depth,
 
 /*************************************************************/
 /**
- * Get the difference between the last value of a monitor and its previous one.
+ * @brief Get the difference between the last value of a monitor and its previous one.
  * @param m
  *        The monitors which value has to be retrieved.
  * @param depth
@@ -286,7 +287,7 @@ double       Monitors_get_monitor_variation   (monitors_t m, unsigned int depth,
 
 /*************************************************************/
 /**
- * Wait only for a single monitor value to be uptodate and retrieve it.
+ * @brief Wait only for a single monitor value to be uptodate and retrieve it.
  * @param m
  *        The monitors which value has to be retrieved.
  * @param depth
@@ -301,7 +302,7 @@ double       Monitors_wait_monitor_value      (monitors_t m, unsigned int depth,
 
 /*************************************************************/
 /**
- * Wait only for a single monitor to be uptodate and retrieve the difference between its new value and the old one.
+ * @brief Wait only for a single monitor to be uptodate and retrieve the difference between its new value and the old one.
  * @param m
  *        The monitors which variation has to be retrieved.
  * @param depth
