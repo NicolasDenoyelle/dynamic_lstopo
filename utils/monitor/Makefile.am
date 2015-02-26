@@ -16,7 +16,6 @@ parser.c: parser.y
 
 LDADD = $(HWLOC_top_builddir)/libmonitor.la
 libmonitor_la_SOURCES = monitor_util.h monitor.c parser.c scanner.c pwatch.c list_avail.c monitor_replay.h monitor_replay.c
-include_HEADERS = monitor.h
 libmonitor_la_LDFLAGS = -lpapi -ldl -lpthread -lm
 AM_CPPFLAGS = $(HWLOC_CPPFLAGS) -I$(top_srcdir)/utils/hwloc
 libmonitor_la_LIBADD = $(top_builddir)/hwloc/libhwloc.la
