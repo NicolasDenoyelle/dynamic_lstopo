@@ -53,7 +53,7 @@ AC_DEFUN([HWLOC_DEFINE_ARGS],[
     #monitor ?			 
     AC_ARG_ENABLE([monitor],
        		  AS_HELP_STRING([--disable-monitor],
-				 [Disable PAPI monitoring back-end hwloc's lstopo command]))
+				 [Disable PAPI monitoring with lstopo command]))
 
     # Cairo?
     AC_ARG_ENABLE([cairo],
