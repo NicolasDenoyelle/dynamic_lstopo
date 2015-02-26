@@ -64,7 +64,7 @@ according to its pid, the same way it is done with \fB\-\-pid\fR option.
 
 lstopo --perf \fI<command>\fR
 .TP
-You can annotate your code with functions in \fImonitor.h\fR and link with \fI\-lmonitor\fR.
+You can annotate your code with functions in \fImonitor.h\fR and link with \fI\-lmonitor \-hwloc \-lpapi\fR.
 This way, a trace file will be created with counters updated as you wish, and recording phases 
 defined the way you want to isolate parts of execution. Then you will be able to watch it with 
 \fB\-\-perf\-replay\fR option once your programm exited.
