@@ -43,7 +43,7 @@ output_header_paje(monitors_t m)
     }
   }
 
-  dprintf(m->output_fd,"\n\n");
+  dprintf(m->output_fd,"\n");
 }
 
 inline void
@@ -105,10 +105,12 @@ replay_input_line(replay_t r){
     break;
     /*header line*/
   case HL:
+    return replay_input_line(r);
     return HL;
     break;
     /*value line*/
   case VL:
+    if(il.vl.phase!=r->phase)
     obj = r->nodes[il.vl.id];
     /* if we cannot insert the value, we save the content read to insert it next time */
     if(replay_node_insert_value(obj->userdata, il.vl.value)==-1){
@@ -119,16 +121,11 @@ replay_input_line(replay_t r){
       return 0;
     }
     else{ /* insert successed we also insert timestamp if every node has more inserted value than semaphore value */
-      int sval; sem_getvalue(&r->buffer_semaphore,&sval);
-      int i;
-      for(i=0;i<r->n_nodes;i++){
-	if(((struct replay_node*)((r->nodes[i])->userdata))->count <= sval){
-	  return VL;
-	}
+      if(il.vl.id==r->first_id){
+	/* this one should never fail if precedent didn't fail */
+	replay_node_insert_value(r->timestamps,il.vl.real_usec);
+	sem_post(&r->buffer_semaphore);
       }
-      /* this one should never fail if precedent didn't fail */
-      replay_node_insert_value(r->timestamps,il.vl.real_usec);
-      sem_post(&r->buffer_semaphore);
     }
     return VL;
     break;
@@ -237,11 +234,11 @@ new_replay(const char * filename, hwloc_topology_t topology, int phase)
   rp->last_read_read=1;
   rp->eof=0;
   rp->n_nodes=0;
-  rp->nodes_filled=0;
   rp->usleep_len = 50 * BUF_MAX ;
   rp->timestamps = new_replay_node();
   rp->phase=phase;
   rp->trace_start=-1;
+  rp->first_id=-1;
 
   if(topology==NULL)
     topology_init(&rp->topology);
@@ -285,6 +282,7 @@ new_replay(const char * filename, hwloc_topology_t topology, int phase)
   rp->update_write_fd = update_fds[1];
 
   /* read file once to gather maxs and mins*/
+  int looped = 0;
   err=0;
   do{
     union input_line il;
@@ -313,6 +311,9 @@ new_replay(const char * filename, hwloc_topology_t topology, int phase)
     if(err==VL){
       if(rp->trace_start==-1)
 	rp->trace_start = il.vl.real_usec;
+      if(rp->first_id==-1)
+	rp->first_id = il.vl.id;
+
       obj = rp->nodes[il.vl.id];
       if(rp->max[obj->depth] < il.vl.value){
 	rp->max[obj->depth] = il.vl.value;

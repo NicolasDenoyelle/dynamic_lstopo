@@ -39,13 +39,14 @@ struct replay_t{
   long long usleep_len;
   pthread_mutex_t mtx;
 
-  unsigned count; /* number of monitor levels */
-  unsigned  * visited;/* topology_depth */  
-  unsigned  * depths;
-  double    * max, * min; /* [n_monitors] */  
-  unsigned n_nodes;
+  unsigned  count;        /* number of monitor levels */
+  unsigned  * visited;    /* count */  
+  unsigned  * depths;     /* count */  
+  double    * max, * min; /* count */    
+
+  unsigned first_id; /* The first id attribute to be read in trace */
+  unsigned n_nodes;  /* The total amount of different ids in paje header trace file */
   hwloc_obj_t * nodes;
-  unsigned nodes_filled;
 
   /**** public ****/
   hwloc_topology_t topology; /* stores a replay_node in each obj sibling at depth "depths[i]" which first element is the value to be read */
