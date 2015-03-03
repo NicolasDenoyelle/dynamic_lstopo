@@ -33,7 +33,7 @@ struct replay_t{
 
   long long trace_start; /* the younger real_usec read from trace */
   struct replay_node * timestamps; /* The first sample's time stamp of each topology's set of samples */
-  struct line_content last_read; /* if a node buffer was full when attempting to enqueue a value, we store read content here */
+  struct value_line last_read; /* if a node buffer was full when attempting to enqueue a value, we store read content here */
   int last_read_read; /* 0 if the last_read has not be read yet, 1 if it has*/
   pthread_t fill_thread, timer_thread;
   long long usleep_len;
@@ -44,6 +44,7 @@ struct replay_t{
   unsigned  * depths;
   double    * max, * min; /* [n_monitors] */  
   unsigned n_nodes;
+  hwloc_obj_t * nodes;
   unsigned nodes_filled;
 
   /**** public ****/

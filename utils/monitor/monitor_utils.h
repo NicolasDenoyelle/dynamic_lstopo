@@ -20,18 +20,22 @@ struct parsed_names * parser(const char * file_name);
 /***********************/
 
 /* utils from replay.c */
-struct line_content{
+struct header_line{
+  int id;
+  char level[10];
+  unsigned sibling;
+};
+
+struct value_line{
+  int id;
   unsigned phase;
-  unsigned sibling_idx;
-  char obj_name[11];
   long long real_usec;
-  char name[21];
   double value;
 };
 
-ssize_t               input_line_content(FILE * in, struct line_content * out);
-void                  output_header(int output_fd);
-void                  output_line_content(int output_fd, struct line_content * in);
+
+void                  output_header_paje(monitors_t m);
+void                  output_line_content_paje(int output_fd, struct value_line * in);
 /***************************/
 
 /* utils from list_avail.c */

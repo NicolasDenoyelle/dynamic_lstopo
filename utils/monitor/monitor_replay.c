@@ -5,6 +5,8 @@
 #include <sys/time.h>
 #include <float.h>
 #include <unistd.h>
+#include <search.h>
+#include <stdint.h>
 #include "hwloc.h"
 #include "monitor_replay.h"
 #include "monitor_utils.h"
@@ -15,47 +17,126 @@
     exit(EXIT_FAILURE);					\
   }							
 
-void output_header(int output_fd){
-  const char * sep = "-------------------+";
-  dprintf(output_fd,"%6s%6s%10s%20s%20s%20s\n","#----+","-----+","---------+",sep,sep,sep);
-  dprintf(output_fd,"%6s%6s%10s%20s%20s%20s\n","#phase","idx","level","real_usec","monitor_name","monitor_value");
-  dprintf(output_fd,"%6s%6s%10s%20s%20s%20s\n","#----+","-----+","---------+",sep,sep,sep);
+void 
+output_header_paje(monitors_t m)
+{
+  unsigned i,j;
+  hwloc_obj_t obj;
+  dprintf(m->output_fd,"%%EventDef Node_val 0\n");
+  dprintf(m->output_fd,"%%   Id                int\n");
+  dprintf(m->output_fd,"%%   Phase             int\n");
+  dprintf(m->output_fd,"%%   Time_us           date\n");
+  dprintf(m->output_fd,"%%   Value             double\n");
+  dprintf(m->output_fd,"%%EndEventDef\n\n");
+
+  dprintf(m->output_fd,"%%EventDef Node_container 1\n");
+  dprintf(m->output_fd,"%%   Id                int\n");
+  dprintf(m->output_fd,"%%   Level             string\n");
+  dprintf(m->output_fd,"%%   Sibling           int\n");
+  dprintf(m->output_fd,"%%   Name              string\n");
+  dprintf(m->output_fd,"%%EndEventDef\n\n");
+
+  for(i=0;i<m->count;i++){
+    for(j=0;j<hwloc_get_nbobjs_by_depth(m->topology,m->depths[i]);j++){
+      obj = hwloc_get_obj_by_depth(m->topology,m->depths[i],j);
+      dprintf(m->output_fd,"1 %d %s %d %s\n",((struct monitor_node*)obj->userdata)->id, m->depth_names[i], j, m->names[i]);
+    }
+  }
+
+  dprintf(m->output_fd,"\n\n");
 }
 
 inline void
-output_line_content(int output_fd, struct line_content * in){
-  dprintf(output_fd,"%6u%6d%10s%20lld%20s%20lf\n",
-	  in->phase, in->sibling_idx, in->obj_name, in->real_usec, in->name, in->value);
+output_line_content_paje(int output_fd, struct value_line * in){
+  dprintf(output_fd,"0 %d %d %lld %lf\n",in->id, in->phase, in->real_usec, in->value);
 }
 
 
-ssize_t
-input_line_content(FILE * in, struct line_content * out){
-  ssize_t ret;
-  char line[84];
-  memset(line,0,78);
-  if((ret = fread(line,1,83,in))<83){
-    if(ret != 0){
-      printf("read fail : %s\n",line);
-    }
-    return -1;
-  }
-  if(line[0] == '#')
-    return input_line_content(in, out);
+#define HL 1
+#define VL 2
+union input_line{
+  struct header_line hl;
+  struct value_line vl;
+};
 
-  char phase[7], sibling_idx[7], real_usec[21], value[21];
-  memset(out->name,0,21);
-  memset(real_usec,0,21);
-  memset(value,0,21);
-  memset(out->obj_name,0,11);
-  memset(sibling_idx,0,7);
-  memset(phase,0,7);
-  sscanf(line,"%6s%6s%10s%20s%20s%20s",phase,sibling_idx,out->obj_name,real_usec,out->name,value);
-  out->sibling_idx=atoi(sibling_idx);
-  out->phase=atoi(phase);
-  out->real_usec=atoll(real_usec);
-  out->value=atof(value);
-  return 0;
+int replay_input_paje_line(replay_t r, union input_line * line){
+  char *read = NULL;
+  ssize_t len, err;
+
+  if(r->last_read_read==0){
+    line->vl = r->last_read;
+    r->last_read_read=1;
+    return VL;
+  }
+  else{
+    err = getline(&read,&len,r->input);
+    if(err==-1)
+      return err;
+    if(read[0]=='1'){
+      if(line!=NULL)
+	sscanf(read,"%*d %d %10s %d %*20s",&(line->hl.id),line->hl.level,&(line->hl.sibling));
+      free(read);
+      return HL;
+    }
+    if(read[0]=='0'){
+      if(line!=NULL)
+	sscanf(read,"%*d %d %u %lld %lf",&(line->vl.id),&(line->vl.phase),&(line->vl.real_usec),&(line->vl.value));
+      free(read);
+      return VL;
+    }
+    else {
+      free(read);
+      return replay_input_paje_line(r,line);
+    }
+  }    
+}
+
+int
+replay_input_line(replay_t r){
+  unsigned depth;
+  hwloc_obj_t obj;
+  int line_type, i,j;
+  union input_line il;
+  line_type = replay_input_paje_line(r,&il);
+  switch(line_type){
+    /*end of file*/
+  case -1:
+    return -1;
+    break;
+    /*header line*/
+  case HL:
+    return HL;
+    break;
+    /*value line*/
+  case VL:
+    obj = r->nodes[il.vl.id];
+    /* if we cannot insert the value, we save the content read to insert it next time */
+    if(replay_node_insert_value(obj->userdata, il.vl.value)==-1){
+      r->last_read.value = il.vl.value;
+      r->last_read.phase = il.vl.phase;
+      r->last_read.real_usec = il.vl.real_usec;
+      r->last_read_read=0;
+      return 0;
+    }
+    else{ /* insert successed we also insert timestamp if every node has more inserted value than semaphore value */
+      int sval; sem_getvalue(&r->buffer_semaphore,&sval);
+      int i;
+      for(i=0;i<r->n_nodes;i++){
+	if(((struct replay_node*)((r->nodes[i])->userdata))->count <= sval){
+	  return VL;
+	}
+      }
+      /* this one should never fail if precedent didn't fail */
+      replay_node_insert_value(r->timestamps,il.vl.real_usec);
+      sem_post(&r->buffer_semaphore);
+    }
+    return VL;
+    break;
+    /*never happens*/
+  default:
+    return 0;
+    break;
+  }
 }
 
 
@@ -141,75 +222,6 @@ replay_node_get_value(struct replay_node * rn){
   return val;
 }
 
-int replay_input_line(replay_t r){
-  struct line_content lc;
-  int read;
-  if(r->last_read_read==0){
-    lc = r->last_read;
-    r->last_read_read=1;
-
-  }
-  else{
-    read = input_line_content(r->input,&lc);
-    /*error, end of file, or nothing read */
-    if(read == -1){
-      pthread_mutex_lock(&r->mtx);
-      r->eof=1;
-      pthread_mutex_unlock(&r->mtx);
-      return -1;
-    }
-    if(r->phase!=-1 && lc.phase!=(unsigned)(r->phase))
-      return replay_input_line(r);
-  }
-  
-  unsigned i,j, depth = hwloc_get_obj_depth_by_name(r->topology, lc.obj_name);
-  hwloc_obj_t obj = hwloc_get_obj_by_depth(r->topology,depth,lc.sibling_idx);
-  if(depth<0)
-    return -1;
-
-  if(obj->userdata==NULL){
-    obj->userdata = new_replay_node();
-    r->n_nodes++;
-    if(r->visited[depth]==0){
-      i = 0; j = r->count;
-      while (i<r->count && r->depths[i] < depth ) i++;
-      while (j>i) r->depths[j--] = r->depths[j];
-      r->depths[j] = depth;
-      r->visited[depth]=1;
-      r->count++;
-    }
-  }
-
-  /* if we cannot insert the value, we save the content read to insert it next time */
-  if(replay_node_insert_value(obj->userdata, lc.value)==-1){
-    strncpy(r->last_read.obj_name,lc.obj_name,10);
-    strncpy(r->last_read.name,lc.name,20);
-    r->last_read.value = lc.value;
-    r->last_read.sibling_idx = lc.sibling_idx;
-    r->last_read.real_usec = lc.real_usec;
-    r->last_read_read=0;
-    return 1;
-  }
-  else{ /* insert successed we also insert timestamp if every node has more inserted value than semaphore value */
-    if(++r->nodes_filled/r->n_nodes>2){ 
-      int sval; sem_getvalue(&r->buffer_semaphore,&sval);
-      int i;
-      hwloc_obj_t obj;
-      for(i=0;i<r->count;i++){
-	obj = hwloc_get_obj_by_depth(r->topology,r->depths[i],0);
-	do{
-	  if(obj->userdata && ((struct replay_node*)obj->userdata)->count <= sval)
-	    return 2;
-	} while((obj=obj->next_sibling)!=NULL && obj->logical_index != 0);
-      }
-      /* this one should never fail if precedent didn't fail */
-      replay_node_insert_value(r->timestamps,lc.real_usec);
-      sem_post(&r->buffer_semaphore);
-    }
-    return 3;
-  }
-}
-
 replay_t
 new_replay(const char * filename, hwloc_topology_t topology, int phase)
 {
@@ -218,7 +230,7 @@ new_replay(const char * filename, hwloc_topology_t topology, int phase)
     perror("fopen");
     exit(EXIT_FAILURE);
   }
-
+  
   replay_t rp;
   M_alloc(rp,1,sizeof(struct replay_t));
   rp->input = input;
@@ -229,6 +241,7 @@ new_replay(const char * filename, hwloc_topology_t topology, int phase)
   rp->usleep_len = 50 * BUF_MAX ;
   rp->timestamps = new_replay_node();
   rp->phase=phase;
+  rp->trace_start=-1;
 
   if(topology==NULL)
     topology_init(&rp->topology);
@@ -245,12 +258,14 @@ new_replay(const char * filename, hwloc_topology_t topology, int phase)
     exit(EXIT_FAILURE);
   }
 
-  int depth, err=0, i=0;
+  int depth, err=0, i=0, j=0;
   unsigned topo_depth = hwloc_topology_get_depth(rp->topology);
+
   M_alloc(rp->depths,topo_depth,sizeof(unsigned));
   M_alloc(rp->max,topo_depth,sizeof(double));
   M_alloc(rp->min,topo_depth,sizeof(double));
   M_alloc(rp->visited,topo_depth,sizeof(unsigned));
+  M_alloc(rp->nodes,topo_depth*hwloc_get_nbobjs_by_depth(rp->topology,topo_depth-1),sizeof(hwloc_obj_t));
   for(i=0;i<topo_depth;i++){
     rp->depths[i]=0;
     rp->visited[i]=0;
@@ -259,14 +274,6 @@ new_replay(const char * filename, hwloc_topology_t topology, int phase)
   }
   i=0;
   hwloc_obj_t obj = hwloc_get_root_obj (rp->topology);
-  struct line_content lc;
-
-  if((err = input_line_content(rp->input,&lc))==-1){
-    fprintf(stderr,"nothing to read in %s\n",filename);
-    exit(EXIT_SUCCESS);
-  }
-  rp->trace_start = lc.real_usec;
-  rewind(input);
 
   /* set fd for updates */
   int update_fds[2];
@@ -278,15 +285,44 @@ new_replay(const char * filename, hwloc_topology_t topology, int phase)
   rp->update_write_fd = update_fds[1];
 
   /* read file once to gather maxs and mins*/
-  while(input_line_content(input,&lc)!=-1){
-    depth = hwloc_get_obj_depth_by_name(rp->topology,lc.obj_name);
-    if(rp->max[depth] < lc.value){
-      rp->max[depth] = lc.value;
+  err=0;
+  do{
+    union input_line il;
+    err = replay_input_paje_line(rp,&il);
+    if(err==HL){
+      depth = hwloc_get_obj_depth_by_name(rp->topology, il.hl.level);
+      obj = hwloc_get_obj_by_depth(rp->topology,depth,il.hl.sibling);
+      if(obj==NULL){
+	fprintf(stderr, "error while reading trace, can't find obj %s:%u\n",il.hl.level,il.hl.sibling);
+	exit(1);
+      }
+      if(obj->userdata==NULL){
+	rp->nodes[rp->n_nodes++] = obj;
+	obj->userdata = new_replay_node();
+	/*insert sorted*/
+	if(rp->visited[depth]==0){
+	  i = 0; j = rp->count;
+	  while (i<rp->count && rp->depths[i] < depth ) i++;
+	  while (j>i) rp->depths[j--] = rp->depths[j];
+	  rp->depths[j] = depth;
+	  rp->visited[depth]=1;
+	  rp->count++;
+	}
+      }
     }
-    if(rp->min[depth] > lc.value){
-      rp->min[depth] = lc.value;    
-    }
-  }
+    if(err==VL){
+      if(rp->trace_start==-1)
+	rp->trace_start = il.vl.real_usec;
+      obj = rp->nodes[il.vl.id];
+      if(rp->max[obj->depth] < il.vl.value){
+	rp->max[obj->depth] = il.vl.value;
+      }
+      if(rp->min[obj->depth] > il.vl.value){
+	rp->min[obj->depth] = il.vl.value;    
+      }
+    } 
+  } while(err!=-1);
+
   rewind(input);
   return rp;
 }
@@ -303,13 +339,10 @@ delete_replay(replay_t r)
   sem_destroy(&r->buffer_semaphore);
   pthread_mutex_destroy(&r->mtx);
   delete_replay_node(r->timestamps);
-  for(i=0;i<r->count;i++){
-    obj = hwloc_get_obj_by_depth(r->topology,r->depths[i],0);
-    do{
-      if(obj->userdata)
-	delete_replay_node((struct replay_node *)obj->userdata);
-    } while((obj=obj->next_sibling)!=NULL && obj->logical_index != 0);
+  for(i=0;i<r->n_nodes;i++){
+    delete_replay_node(r->nodes[i]->userdata);
   }
+  free(r->nodes);
   free(r->visited);
   free(r->depths);
   free(r->max);
@@ -317,15 +350,16 @@ delete_replay(replay_t r)
   fclose(r->input);
   hwloc_topology_destroy(r->topology);
   free(r);
+  hdestroy();
 }
 
 
 void * replay_fill_thread(void* arg){
   replay_t r = (replay_t)arg;
   int err;
-  while((err = replay_input_line(r)) > 0){
+  while((err = replay_input_line(r)) >= 0){
     /* buffers are full, so r->usleep_len is necessarily a valid value because there must be around BUF_MAX timestamps queued */
-    if(err==1){
+    if(err==0){
       usleep(r->usleep_len);
     }
   }

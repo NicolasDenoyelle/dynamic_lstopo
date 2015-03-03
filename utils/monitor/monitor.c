@@ -36,7 +36,7 @@ static inline void zerod(long long * array, unsigned int size){
 }
 
 struct monitor_node *
-new_monitor_node(unsigned int n_events)
+new_monitor_node(unsigned int n_events, unsigned depth, unsigned sibling, unsigned id)
 {
   struct monitor_node * out = malloc(sizeof(*out));
   if(out==NULL){
@@ -57,6 +57,9 @@ new_monitor_node(unsigned int n_events)
   out->uptodate=0;
   out->val=0;
   out->old_val=0;
+  out->depth = depth;
+  out->sibling = sibling;
+  out->id = id;
   return out;
 }
 
@@ -201,6 +204,7 @@ monitors_t new_Monitors(hwloc_topology_t topology,
   m->topology = NULL;
   m->dlhandle=NULL;
   m->phase=0;
+  m->n_nodes=0;
 
   /* initialize topology */
   if(topology!=NULL){
@@ -246,7 +250,7 @@ monitors_t new_Monitors(hwloc_topology_t topology,
 
   for(i=0;i<m->n_PU;i++){
     m->pthreads[i]=0;
-    m->PU_vals[i] = new_monitor_node(n_events);
+    m->PU_vals[i] = new_monitor_node(n_events,depth-1,i,(unsigned)-1);
   }
 
   for(i=0;i<m->allocated_count;i++){
@@ -291,7 +295,7 @@ int add_Monitor(monitors_t m, const char * name, char * hwloc_obj_name, double (
     return 1;
 
   i=0;
-  while (i<m->count && m->depths[i] < depth ) i++;
+  while (i<m->count && m->depths[i] < depth ){i++;}
   if(m->depths[i]==depth){
     fprintf(stderr,"cannot insert monitor %s at depth %u because another monitor already exists at this depth\n",name,depth);
     return 1;
@@ -323,7 +327,8 @@ int add_Monitor(monitors_t m, const char * name, char * hwloc_obj_name, double (
 
   while(n_obj--){
     node=hwloc_get_obj_by_depth(m->topology,depth,n_obj);
-    node->userdata = new_monitor_node(m->n_events);
+    node->userdata = new_monitor_node(m->n_events,depth,n_obj,m->n_nodes);
+    m->n_nodes++;
   }
   
   return 0;
@@ -354,7 +359,7 @@ void * monitors_thread(void* monitors){
   long long * values, * old_values, * tmp;
   hwloc_obj_t obj,cpu;
   struct monitor_node * out, * PU_vals;
-  struct line_content output;
+  struct value_line output;
   char type[10];
   if(monitors==NULL)
     pthread_exit(NULL);
@@ -483,15 +488,11 @@ void * monitors_thread(void* monitors){
 	out->real_usec/=weight;
 	/* print to output_file */
 	pthread_mutex_lock(&(m->print_mtx));
-	memset(output.name,0,21);
-	memset(output.obj_name,0,11);
-	strncpy(output.obj_name,m->depth_names[i],10);
-	output.sibling_idx = obj->logical_index;
 	output.real_usec=out->real_usec;
 	output.phase=(m->phase);
-	strncpy(output.name,m->names[i],20);
 	output.value = out->val;
-	output_line_content(m->output_fd,&output);
+	output.id = out->id;
+	output_line_content_paje(m->output_fd,&output);
 	pthread_mutex_unlock(&(m->print_mtx));
 	pthread_mutex_unlock(&(out->update_lock));
 	pthread_mutex_unlock(&(out->read_lock));
@@ -679,7 +680,7 @@ Monitors_start(monitors_t m)
 
  PAPI_thread_init(pthread_self);
  
- output_header(m->output_fd);
+ output_header_paje(m);
  for(i=0;i<m->n_PU;i++){
  err=pthread_create(&(m->pthreads[i]),NULL,monitors_thread,(void*)m);
  if(err!=0){
