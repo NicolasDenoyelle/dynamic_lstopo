@@ -65,7 +65,7 @@ static unsigned int top  = 0;
 
 #ifdef HWLOC_HAVE_MONITOR
 static unsigned int perf = 0;
-static    int replay_phase = -1;
+static    int replay_phase = 0;
 static char * perf_output = NULL;
 static char * perf_input = NULL;
 static unsigned long refresh_usec=100000;
