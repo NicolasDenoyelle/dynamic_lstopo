@@ -106,12 +106,13 @@ replay_input_line(replay_t r){
     /*header line*/
   case HL:
     return replay_input_line(r);
-    return HL;
     break;
     /*value line*/
   case VL:
-    if(il.vl.phase!=r->phase)
+    if(il.vl.phase!=r->phase){
       return replay_input_line(r);
+      break;
+    }
     obj = r->nodes[il.vl.id];
     /* if we cannot insert the value, we save the content read to insert it next time */
     if(replay_node_insert_value(obj->userdata, il.vl.value)==-1){
@@ -120,6 +121,7 @@ replay_input_line(replay_t r){
       r->last_read.real_usec = il.vl.real_usec;
       r->last_read_read=0;
       return 0;
+      break;
     }
     else{ /* insert successed we also insert timestamp if every node has more inserted value than semaphore value */
       if(il.vl.id==r->first_id){
@@ -296,7 +298,8 @@ new_replay(const char * filename, hwloc_topology_t topology, int phase)
 	exit(1);
       }
       if(obj->userdata==NULL){
-	rp->nodes[rp->n_nodes++] = obj;
+	rp->nodes[il.hl.id] = obj;
+	rp->n_nodes++;
 	obj->userdata = new_replay_node();
 	/*insert sorted*/
 	if(rp->visited[depth]==0){
