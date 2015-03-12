@@ -13,6 +13,7 @@ struct replay_queue{
 };
 
 struct replay_node{
+  double val, val1, val2;
   struct replay_queue * head;
   struct replay_queue * tail;
   unsigned count;

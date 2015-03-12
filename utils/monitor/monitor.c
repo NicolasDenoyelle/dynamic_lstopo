@@ -55,8 +55,7 @@ new_monitor_node(unsigned int n_events, unsigned depth, unsigned sibling, unsign
   out->real_usec=0;
   out->old_usec=0;
   out->uptodate=0;
-  out->val=0;
-  out->old_val=0;
+  out->val = out->val1 = out->val2 = 0;
   out->depth = depth;
   out->sibling = sibling;
   out->id = id;
@@ -231,6 +230,7 @@ monitors_t new_Monitors(hwloc_topology_t topology,
   pthread_mutex_init(&m->update_mtx,NULL);
   pthread_mutex_init(&m->print_mtx,NULL);
   pthread_mutex_init(&m->cond_mtx,NULL);
+  pthread_mutex_init(&m->bound_mtx,NULL);
   pthread_cond_init(&m->cond,NULL);
   /* count core number */
   depth = hwloc_topology_get_depth(m->topology);
@@ -475,15 +475,18 @@ void * monitors_thread(void* monitors){
 
       out->real_usec += PU_vals->real_usec;
       out->uptodate++;
-      /* I am the last to update values, i update monitor value */
+      /* I am the last to update value on current node, i update monitor value */
       if(out->uptodate==weight){
 	out->uptodate=0;
-	out->old_val = out->val;
+	out->val2 = out->val1;
+	out->val1 = out->val;
 	out->val = m->compute[i](out->counters_val);
 	
 	/* update min and max value at depth i*/
-	m->max[i] = m->max[i] > out->val ? m->max[i] : out-> val;
-	m->min[i] = m->min[i] < out->val ? m->min[i] : out-> val;
+	pthread_mutex_lock(&(m->bound_mtx));
+	m->max[i] = out->val > m->max[i] ? out->val : m->max[i];
+	m->min[i] = out->val < m->min[i] ? out->val : m->min[i];
+	pthread_mutex_unlock(&(m->bound_mtx));
 	/* compute real_usec mean value */
 	out->real_usec/=weight;
 	/* print to output_file */
@@ -726,7 +729,7 @@ inline double
 Monitors_get_monitor_variation(monitors_t m, unsigned depth, unsigned int sibling_idx)
 { 
   hwloc_obj_t obj = hwloc_get_obj_by_depth(m->topology,depth,sibling_idx);
-  return ((struct monitor_node *)(obj->userdata))->val-((struct monitor_node *)(obj->userdata))->old_val;
+  return ((struct monitor_node *)(obj->userdata))->val-((struct monitor_node *)(obj->userdata))->val1;
 }
 
 
@@ -749,7 +752,7 @@ Monitors_wait_monitor_variation(monitors_t m, unsigned depth, unsigned int sibli
   struct monitor_node * box = obj->userdata;
   double val;
   pthread_mutex_lock(&(box->update_lock));
-  val = box->val - box->old_val;
+  val = box->val - box->val1;
   pthread_mutex_unlock(&(box->update_lock));
   return val;
 }
@@ -775,6 +778,7 @@ delete_Monitors(monitors_t m)
   pthread_mutex_destroy(&(m->cond_mtx));
   pthread_mutex_destroy(&m->update_mtx);
   pthread_mutex_destroy(&m->print_mtx);
+  pthread_mutex_destroy(&m->bound_mtx);
   pthread_barrier_destroy(&(m->barrier));
   free(m->pthreads);
 

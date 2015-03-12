@@ -155,7 +155,8 @@ new_replay_node(){
     current->next->prev = current;
     current = current->next;
   }
-  current->val=0;
+  current->val = 0;
+  node->val = node->val1 = node->val2 = 0;
   current->next=node->head;
   current->next->prev = current;
   node->tail = NULL;
@@ -211,7 +212,9 @@ replay_node_get_value(struct replay_node * rn){
     //    printf("read value 0\n");
     return 0;
   }
-  double val = rn->head->val;
+  rn->val2 = rn->val1;
+  rn->val1 = rn->val;
+  rn->val = rn->head->val;
   rn->head = rn->head->next;
   /* the queue is empty */
   if(rn->head==rn->tail)
@@ -219,7 +222,7 @@ replay_node_get_value(struct replay_node * rn){
   rn->count--;
   pthread_mutex_unlock(&rn->mtx);
   //  printf("read value %lf\n",val);
-  return val;
+  return rn->val;
 }
 
 replay_t

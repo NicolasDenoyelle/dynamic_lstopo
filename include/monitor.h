@@ -16,8 +16,11 @@ struct monitor_node{
   long long *     counters_val;
   /**
    * The monitor node value computed from aggregated counters value.
+   * val = current, val1 = old val, val2 = old old val.
    **/
-  double          val, old_val;
+  double val;
+  double val1;
+  double val2; 
   /**
    * The average timestamp at chich the counters were read.
    **/
@@ -34,6 +37,10 @@ struct monitor_node{
    * Locked while a leaf aggregation is occuring.
    **/
   pthread_mutex_t update_lock;
+  /**
+   * Node identifiers in topology.
+   **/
+  unsigned depth,sibling,id;
 };
 /*************************************************************/
 
@@ -47,7 +54,6 @@ struct monitors{
    * The machine topology where are stored the counters.
    */
   hwloc_topology_t  topology;
-
   /**
    * A structure which holds a PU bitmap with bit set to 1 when <pid>'s children task's state is running on this PU.
    */
@@ -93,7 +99,7 @@ struct monitors{
   /**
    * Lock for cond, lock to wait until each monitor nodes is uptodate, lock for threads which have to print to trace file. 
    **/
-  pthread_mutex_t   cond_mtx, update_mtx, print_mtx;
+  pthread_mutex_t   cond_mtx, update_mtx, print_mtx, bound_mtx;
   /**
    * The number of monitors described. Only one depth per monitor is accepted. 
    **/
@@ -126,6 +132,11 @@ struct monitors{
    * An integer printed to trace file used to replay a part of the recorded execution.
    */
   int phase;
+  /**
+   * The number of monitor nodes stored in topology.
+   **/
+  unsigned int      n_nodes;
+
  };
 typedef struct monitors * monitors_t;
 /*************************************************************/

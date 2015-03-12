@@ -1310,21 +1310,24 @@ output_draw(struct draw_methods *methods, int logical, int legend, hwloc_topolog
 
 #ifdef HWLOC_HAVE_MONITOR
 void
-perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj_t level, void *output, unsigned depth, double value, double max, double min){
+perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj_t level, void *output, unsigned depth, double value, double variation, double max, double min){
+
   unsigned x,y,totwidth,totheight,mywidth,myheight,width,height,gridsize;
+
   struct dyna_save * ds = (struct dyna_save *) level->userdata;
-  if(ds!=NULL){
-    x = ds->x;
-    y = ds->y;
-    totwidth = ds->totwidth;
-    totheight = ds->totheight;
-    mywidth = ds->mywidth;
-    myheight = ds->myheight;
-    width = ds->width;
-    height = ds->height;
-    gridsize = ds->gridsize;
-    lstopo_set_object_color(methods, topology, level, 0 /* node */, &ds->style);
-  }
+  if(ds==NULL)
+    return;
+
+  x = ds->x;
+  y = ds->y;
+  totwidth = ds->totwidth;
+  totheight = ds->totheight;
+  mywidth = ds->mywidth;
+  myheight = ds->myheight;
+  width = ds->width;
+  height = ds->height;
+  gridsize = ds->gridsize;
+  lstopo_set_object_color(methods, topology, level, 0 /* node */, &ds->style);
 
   switch(level->type){
   case HWLOC_OBJ_SYSTEM: 
@@ -1379,17 +1382,31 @@ perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj
 
  
   char text[64];
-  unsigned precision = ((mywidth-gridsize)/fontsize)-4;
+  unsigned precision = (mywidth-gridsize-4*fontsize)/fontsize;
   precision = precision>10? 10 : precision;
   sprintf(text,"%1.*e",precision,value);
-  value=(value - min)/(max - min);
-  height = myheight*value;
-  float r = value>0.5? 255:510*value;
-  float g = value>0.5? 510*(1-value):255;
+  value=(value - min)/(max - min);     /* normalized value in [0,1]*/
+  variation/=(2*(max - min)); /* normalized variation in [-1/2, 1/2]*/
+  /* overflow may happen when nodes values are set for the first time and no variation can be defined */
+  if(variation >0.5 || variation <-0.5)
+    variation = 0;
+
+  float r = value>0.5? 255:510*value, g;
+  /* change a bit value to make color transition from yellow to green slower */
+  if(value>0.5){
+    value = (value -0.5) * 2;
+    value *= value/2;
+    value += 0.5;
+    g = 510*(1-value);
+  }
+  else g =255;
   float b = 0;
 
-  methods->box(output,ds->style.bg.r,ds->style.bg.g,ds->style.bg.b,depth,x,mywidth,y,myheight);
-  methods->box(output,(unsigned)r,(unsigned)g,(unsigned)b,depth,x,mywidth,y+myheight-height,height);
+  float liney = y+(variation+0.5)*myheight;
+
+  methods->box(output,(unsigned)r,(unsigned)g,(unsigned)b,depth,x,mywidth,y,myheight);
+  methods->line(output,0,0,0, depth, x, liney, x+fontsize, liney);
+  methods->line(output,0,0,0, depth, x+(fontsize*(4+precision)), liney, x+mywidth, liney);
   methods->text(output, ds->style.t2.r, ds->style.t2.g, ds->style.t2.b, fontsize, depth-2, x+fontsize, y+fontsize, text);
 }
 

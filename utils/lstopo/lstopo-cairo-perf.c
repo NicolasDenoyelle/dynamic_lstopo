@@ -1,6 +1,7 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <math.h>
 #include "lstopo-cairo.h"
 #include "monitor.h"
 #include "monitor_replay.h"
@@ -19,7 +20,7 @@ monitors_t monitors, hwloc_bitmap_t active, cairo_t *c, struct draw_methods * me
       obj = hwloc_get_obj_by_depth(topology,monitors->depths[i],nobj);
       proc_watch_get_watched_in_cpuset(monitors->pw,obj->cpuset,active);
       if(!monitors->pw || !hwloc_bitmap_iszero(active)){
-	perf_box_draw(topology, methods, obj, c, obj->depth, box->val, monitors->max[i], monitors->min[i]);
+	perf_box_draw(topology, methods, obj, c, obj->depth, box->val, box->val - box->val1, monitors->max[i], monitors->min[i]);
       }
     }
   }
@@ -39,7 +40,7 @@ replay_t replay, cairo_t *c, struct draw_methods * methods)
       box=(struct replay_node *)(hwloc_get_obj_by_depth(replay->topology,replay->depths[i],nobj)->userdata);
       if(box){
 	double val = replay_node_get_value(box);
-	perf_box_draw(topology, methods, obj, c, obj->depth, val, replay->max[replay->depths[i]], replay->min[replay->depths[i]]);
+	perf_box_draw(topology, methods, obj, c, obj->depth, val, val - box->val1, replay->max[replay->depths[i]], replay->min[replay->depths[i]]);
       }
     }
   }
