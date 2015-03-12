@@ -111,6 +111,7 @@ replay_input_line(replay_t r){
     /*value line*/
   case VL:
     if(il.vl.phase!=r->phase)
+      return replay_input_line(r);
     obj = r->nodes[il.vl.id];
     /* if we cannot insert the value, we save the content read to insert it next time */
     if(replay_node_insert_value(obj->userdata, il.vl.value)==-1){
