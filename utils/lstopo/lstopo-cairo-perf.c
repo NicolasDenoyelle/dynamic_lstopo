@@ -1,7 +1,6 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <math.h>
 #include "lstopo-cairo.h"
 #include "monitor.h"
 #include "monitor_replay.h"
@@ -30,20 +29,17 @@ monitors_t monitors, hwloc_bitmap_t active, cairo_t *c, struct draw_methods * me
 void topo_cairo_perf_replay_boxes(hwloc_topology_t topology, 
 replay_t replay, cairo_t *c, struct draw_methods * methods)
 {
-  unsigned int i, nobj;
+  unsigned int i, old_val;
   hwloc_obj_t obj;
-  struct replay_node * box;
-  for(i=0;i<replay->count;i++){
-    nobj = hwloc_get_nbobjs_by_depth(replay->topology,replay->depths[i]);
-    while(nobj--){
-      obj = hwloc_get_obj_by_depth(topology,replay->depths[i],nobj);
-      box=(struct replay_node *)(hwloc_get_obj_by_depth(replay->topology,replay->depths[i],nobj)->userdata);
-      if(box){
-	double val = replay_node_get_value(box);
-	perf_box_draw(topology, methods, obj, c, obj->depth, val, val - box->val1, replay->max[replay->depths[i]], replay->min[replay->depths[i]]);
-      }
-    }
-  }
+  struct value_line vl;
+  replay_get_value(replay,&vl);
+  obj = replay->nodes[vl.id];
+  old_val = ((double*)obj->userdata)[1];
+  obj = hwloc_get_obj_by_depth(topology,obj->depth,obj->logical_index);
+  perf_box_draw(topology, methods, obj, c, obj->depth, 
+		vl.value, vl.value-old_val, 
+		replay->max[obj->depth], 
+		replay->min[obj->depth]);
   cairo_show_page(c);
 }
 

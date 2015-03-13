@@ -15,7 +15,7 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
-
+#include <math.h>
 #include "lstopo.h"
 
 #define EPOXY_R_COLOR 0xe7
@@ -1379,27 +1379,25 @@ perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj
     y = y + totheight;
     break;
   }
-
- 
+  
   char text[64];
   unsigned precision = (mywidth-gridsize-4*fontsize)/fontsize;
   precision = precision>10? 10 : precision;
   sprintf(text,"%1.*e",precision,value);
-  value=(value - min)/(max - min);     /* normalized value in [0,1]*/
+
+/* log scale */
   variation/=(2*(max - min)); /* normalized variation in [-1/2, 1/2]*/
+  max = log(max);
+  min = log(min);
+  value = log(value);
+  value=(value - min)/(max - min);     /* normalized value in [0,1]*/
+
   /* overflow may happen when nodes values are set for the first time and no variation can be defined */
   if(variation >0.5 || variation <-0.5)
     variation = 0;
 
-  float r = value>0.5? 255:510*value, g;
-  /* change a bit value to make color transition from yellow to green slower */
-  if(value>0.5){
-    value = (value -0.5) * 2;
-    value *= value/2;
-    value += 0.5;
-    g = 510*(1-value);
-  }
-  else g =255;
+  float r = value>0.5 ? 255           : 510*value;
+  float g = value>0.5 ? 510*(1-value) : 255;
   float b = 0;
 
   float liney = y+(variation+0.5)*myheight;

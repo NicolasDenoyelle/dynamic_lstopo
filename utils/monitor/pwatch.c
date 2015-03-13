@@ -113,7 +113,6 @@ proc_watch_update(struct proc_watch * pw)
   while((task_dir=readdir(pw->p_dir))!=NULL){
     if(!strcmp(task_dir->d_name,".") || !strcmp(task_dir->d_name,".."))
       continue;
-
     sprintf(task_path,"/proc/%d/task/%s/stat",pw->pid,task_dir->d_name);
     read_task(task_path,pw->t_stat);
     if(pw->t_stat->state)
