@@ -99,7 +99,7 @@ struct monitors{
   /**
    * Lock for cond, lock to wait until each monitor nodes is uptodate, lock for threads which have to print to trace file. 
    **/
-  pthread_mutex_t   cond_mtx, update_mtx, print_mtx, bound_mtx;
+  pthread_mutex_t   cond_mtx, update_mtx, print_mtx;
   /**
    * The number of monitors described. Only one depth per monitor is accepted. 
    **/

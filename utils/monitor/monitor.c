@@ -230,7 +230,6 @@ monitors_t new_Monitors(hwloc_topology_t topology,
   pthread_mutex_init(&m->update_mtx,NULL);
   pthread_mutex_init(&m->print_mtx,NULL);
   pthread_mutex_init(&m->cond_mtx,NULL);
-  pthread_mutex_init(&m->bound_mtx,NULL);
   pthread_cond_init(&m->cond,NULL);
   /* count core number */
   depth = hwloc_topology_get_depth(m->topology);
@@ -481,24 +480,21 @@ void * monitors_thread(void* monitors){
 	out->val2 = out->val1;
 	out->val1 = out->val;
 	out->val = m->compute[i](out->counters_val);
-	
-	/* update min and max value at depth i*/
-	pthread_mutex_lock(&(m->bound_mtx));
-	m->max[i] = out->val > m->max[i] ? out->val : m->max[i];
-	m->min[i] = out->val < m->min[i] ? out->val : m->min[i];
-	pthread_mutex_unlock(&(m->bound_mtx));
 	/* compute real_usec mean value */
 	out->real_usec/=weight;
-	/* print to output_file */
+	/* update min and max value at depth i*/
 	pthread_mutex_lock(&(m->print_mtx));
+	m->max[i] = out->val > m->max[i] ? out->val : m->max[i];
+	m->min[i] = out->val < m->min[i] ? out->val : m->min[i];
+	/* print to output_file */
 	output.real_usec=out->real_usec;
 	output.phase=(m->phase);
 	output.value = out->val;
 	output.id = out->id;
 	output_line_content_paje(m->output_fd,&output);
 	pthread_mutex_unlock(&(m->print_mtx));
-	pthread_mutex_unlock(&(out->update_lock));
 	pthread_mutex_unlock(&(out->read_lock));
+	pthread_mutex_unlock(&(out->update_lock));
       }
       else
 	pthread_mutex_unlock(&(out->read_lock));
@@ -778,7 +774,6 @@ delete_Monitors(monitors_t m)
   pthread_mutex_destroy(&(m->cond_mtx));
   pthread_mutex_destroy(&m->update_mtx);
   pthread_mutex_destroy(&m->print_mtx);
-  pthread_mutex_destroy(&m->bound_mtx);
   pthread_barrier_destroy(&(m->barrier));
   free(m->pthreads);
 
