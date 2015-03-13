@@ -1026,12 +1026,14 @@ main (int argc, char *argv[])
     if(m==NULL)
       m=new_default_Monitors(topology,perf_output);
     if(m!=NULL){
-      if(lstopo_pid!=0)
+      if(lstopo_pid!=0){
 	Monitors_watch_pid(m,lstopo_pid);
+      }
       if(perf==3){
 	pid_t pid=0;
 	if(argv[0]){
 	  pid = start_executable(argv[0],argv);
+	  printf("monitoring pid %d\n",pid);
 	  Monitors_watch_pid(m,pid);
 	}
 	Monitors_start(m);

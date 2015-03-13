@@ -447,7 +447,6 @@ void * monitors_thread(void* monitors){
     tmp = values;
     values = old_values;
     old_values = tmp;
-
     /* reduce counters for every monitors_t */
     for(i=0;i<m->count;i++){
       obj = hwloc_get_ancestor_obj_by_depth(m->topology,m->depths[i],cpu);
@@ -496,8 +495,9 @@ void * monitors_thread(void* monitors){
 	pthread_mutex_unlock(&(out->read_lock));
 	pthread_mutex_unlock(&(out->update_lock));
       }
-      else
+      else{
 	pthread_mutex_unlock(&(out->read_lock));
+      }
     }
   next_loop:;
     pthread_barrier_wait(&(m->barrier));
