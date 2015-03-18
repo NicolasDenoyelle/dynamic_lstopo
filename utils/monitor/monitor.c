@@ -426,14 +426,18 @@ void * monitors_thread(void* monitors){
     /* check actually sampling PUs */
     if(m->pw!=NULL){
       /* A pid is specified */
-      if(proc_watch_check_start_pu(m->pw,p_tidx))
+      if(proc_watch_check_start_pu(m->pw,p_tidx)){
+	printf("PU %d on\n",tidx);
 	PAPI_start(eventset);
+      }
       else if(proc_watch_check_stop_pu(m->pw,p_tidx)){
+	printf("PU %d off\n",tidx);
 	PAPI_stop(eventset,PU_vals->counters_val);
 	goto next_loop;
       }
-      else if(!proc_watch_get_pu_state(m->pw,p_tidx))
+      else if(!proc_watch_get_pu_state(m->pw,p_tidx)){
 	goto next_loop;
+      }
     }
     /* gathers counters */
     PAPI_read(eventset,values);
@@ -481,15 +485,15 @@ void * monitors_thread(void* monitors){
 	out->val = m->compute[i](out->counters_val);
 	/* compute real_usec mean value */
 	out->real_usec/=weight;
-	/* update min and max value at depth i*/
-	pthread_mutex_lock(&(m->print_mtx));
-	m->max[i] = out->val > m->max[i] ? out->val : m->max[i];
-	m->min[i] = out->val < m->min[i] ? out->val : m->min[i];
-	/* print to output_file */
 	output.real_usec=out->real_usec;
 	output.phase=(m->phase);
 	output.value = out->val;
 	output.id = out->id;
+	pthread_mutex_lock(&(m->print_mtx));
+	/* update min and max value at depth i*/
+	m->max[i] = out->val > m->max[i] ? out->val : m->max[i];
+	m->min[i] = out->val < m->min[i] ? out->val : m->min[i];
+	/* print to output_file */
 	output_line_content_paje(m->output_fd,&output);
 	pthread_mutex_unlock(&(m->print_mtx));
 	pthread_mutex_unlock(&(out->read_lock));
@@ -694,11 +698,11 @@ Monitors_start(monitors_t m)
 void
 Monitors_update_counters(monitors_t m){
   pthread_mutex_lock(&m->cond_mtx);
-  pthread_mutex_trylock(&m->update_mtx);
-  pthread_cond_broadcast(&(m->cond));
-  pthread_mutex_unlock(&m->cond_mtx);
+  pthread_mutex_lock(&m->update_mtx);
   if(m->pw!=NULL)
     proc_watch_update(m->pw);
+  pthread_cond_broadcast(&(m->cond));
+  pthread_mutex_unlock(&m->cond_mtx);
 }
 
 inline void
