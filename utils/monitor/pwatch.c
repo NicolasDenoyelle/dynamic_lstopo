@@ -42,6 +42,7 @@ read_task(const char * task_path, struct task_stat * t_info)
     t_info->state=0;
   else
     t_info->state=1;
+  //fprintf(stderr,"\t%s:pu_num=%d, pu_state=%c\n",task_path,t_info->pu_num,state);
   return;
 }
 
@@ -58,8 +59,10 @@ logical_to_physical(hwloc_topology_t topology, int logical_idx){
 inline int
 proc_watch_check_start_pu(struct proc_watch * pw,unsigned int physical_PU)
 {
-  if(!hwloc_bitmap_isset(pw->old_state,physical_PU) && hwloc_bitmap_isset(pw->state,physical_PU))
+  if(!hwloc_bitmap_isset(pw->old_state,physical_PU) && hwloc_bitmap_isset(pw->state,physical_PU)){
+    hwloc_bitmap_set(pw->old_state,physical_PU);
     return 1;
+  }
   return 0;
 }
 
@@ -70,8 +73,10 @@ inline unsigned int proc_watch_get_pid(struct proc_watch * pw){
 inline int
 proc_watch_check_stop_pu(struct proc_watch * pw, unsigned int physical_PU)
 {
-  if(hwloc_bitmap_isset(pw->old_state,physical_PU) && !hwloc_bitmap_isset(pw->state,physical_PU))
+  if(hwloc_bitmap_isset(pw->old_state,physical_PU) && !hwloc_bitmap_isset(pw->state,physical_PU)){
+    hwloc_bitmap_clr(pw->old_state,physical_PU);
     return 1;
+  }
   return 0;
 }
 
@@ -118,10 +123,7 @@ proc_watch_update(struct proc_watch * pw)
     if(pw->t_stat->state)
       hwloc_bitmap_set(pw->tmp_state,pw->t_stat->pu_num);
   }
-
-  hwloc_bitmap_copy(pw->old_state,pw->state);  
-  hwloc_bitmap_copy(pw->state    ,pw->tmp_state);
-
+  hwloc_bitmap_copy(pw->state, pw->tmp_state);
   rewinddir(pw->p_dir);
 }
 
