@@ -24,6 +24,7 @@ struct replay_t{
   int    eof;
   sem_t buffer_semaphore; /* increment each time a timestamp is enqueued in timestamps */
   int phase;
+  float speed;
 
   long long trace_start; /* the younger real_usec read from trace */
   struct value_line last_read; /* if a node buffer was full when attempting to enqueue a value, we store read content here */
@@ -41,7 +42,7 @@ struct replay_t{
 };
 typedef struct replay_t * replay_t;
 
-replay_t new_replay        (const char * filename, hwloc_topology_t topology, int phase);
+replay_t new_replay        (const char * filename, hwloc_topology_t topology, int phase, float speed);
 void     delete_replay     (replay_t r);
 void     replay_start      (replay_t r);
 int      replay_is_finished(replay_t r);
