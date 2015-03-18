@@ -241,7 +241,7 @@ replay_get_value(replay_t r, struct value_line * out)
 }
 
 replay_t
-new_replay(const char * filename, hwloc_topology_t topology, int phase)
+new_replay(const char * filename, hwloc_topology_t topology, int phase, float speed)
 {
   FILE * input = fopen(filename,"r");
   if(input==NULL){
@@ -259,7 +259,10 @@ new_replay(const char * filename, hwloc_topology_t topology, int phase)
   rp->timestamp_queue = new_replay_queue();
   rp->phase=phase;
   rp->trace_start=-1;
-
+  if(speed > 0)
+    rp->speed = speed;
+  else
+    rp->speed = 1;
   if(topology==NULL)
     topology_init(&rp->topology);
   else
@@ -411,6 +414,7 @@ void * replay_timer_thread(void* arg){
     sem_wait(&r->buffer_semaphore);
     replay_queue_pop(r->timestamp_queue,&vl);
     trace_elapsed = vl.real_usec - r->trace_start;
+    trace_elapsed /= r->speed;
     gettimeofday(&now,NULL);
     elapsed = 1000000*(now.tv_sec - start.tv_sec) + now.tv_usec -start.tv_usec;
     if((diff = trace_elapsed - elapsed) > 0){
