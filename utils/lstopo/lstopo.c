@@ -65,7 +65,8 @@ static unsigned int top  = 0;
 
 #ifdef HWLOC_HAVE_MONITOR
 static unsigned int perf = 0;
-static    int replay_phase = 0;
+static int replay_phase = 0;
+static float replay_speed=1;
 static char * perf_output = NULL;
 static char * perf_input = NULL;
 static unsigned long refresh_usec=100000;
@@ -342,6 +343,8 @@ void usage(const char *name, FILE *where)
   fprintf (where, "                        L1i_miss_per_cycle{L1i,PAPI_L1_ICM/PAPI_REF_CYC}\n");
   fprintf (where, "  --perf-replay         Choose a file output by --perf-output to replay an execution from trace.\n");
   fprintf (where, "  --perf-replay-phase   Choose a phase defined in the trace file to replay.\n");
+  fprintf (where, "  --perf-replay-speed   Choose the speed, the replay has to be run. Ex: 0.5 will multiply per 2 the "); 
+  fprintf (where, "execution time.\n");
 #endif
   fprintf (where, "  --version             Report version and exit\n");
 }
@@ -883,6 +886,19 @@ main (int argc, char *argv[])
 	replay_phase = atoi(argv[1]);
 	opt = 1;
       }
+      else if (!strcmp (argv[0], "--perf-replay-speed")){
+	if (argc < 2) {
+	  usage (callname, stderr);
+	  exit(EXIT_FAILURE);
+	}
+	if(perf!=0 && perf !=2){
+	  fprintf(stderr,"option %s does not support other perf option.\n",argv[0]);
+	  exit(EXIT_FAILURE);
+	}
+	perf = 2;
+	replay_speed = atof(argv[1]);
+	opt = 1;
+      }
       else if (!strcmp (argv[0], "--refresh") || !strcmp (argv[0], "-r")) {
 	if (argc < 2) {
 	  usage (callname, stderr);
@@ -1017,7 +1033,7 @@ main (int argc, char *argv[])
 
 #ifdef HWLOC_HAVE_MONITOR
   if(perf==2){
-    replay_t replay = new_replay(perf_input,topology,replay_phase);
+    replay_t replay = new_replay(perf_input,topology,replay_phase,replay_speed);
     output_perf_replay(topology, filename, verbose_mode, callname, output_format, replay);
     delete_replay(replay);
   }
