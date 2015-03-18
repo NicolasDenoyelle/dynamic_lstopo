@@ -427,11 +427,9 @@ void * monitors_thread(void* monitors){
     if(m->pw!=NULL){
       /* A pid is specified */
       if(proc_watch_check_start_pu(m->pw,p_tidx)){
-	printf("PU %d on\n",tidx);
 	PAPI_start(eventset);
       }
       else if(proc_watch_check_stop_pu(m->pw,p_tidx)){
-	printf("PU %d off\n",tidx);
 	PAPI_stop(eventset,PU_vals->counters_val);
 	goto next_loop;
       }
