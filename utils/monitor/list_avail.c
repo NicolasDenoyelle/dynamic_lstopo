@@ -60,10 +60,10 @@ start_executable(char * executable, char * exe_args[])
   pid_t *child = mmap(NULL, sizeof *child, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
   *child=0;
   pid_t pid2, pid1 = fork();
-  if(!pid1){
+  if(pid1){
     wait(NULL);
   }
-  else if(pid1){
+  else if(!pid1){
     pid2=fork();
     if(pid2){
       *child = pid2;
