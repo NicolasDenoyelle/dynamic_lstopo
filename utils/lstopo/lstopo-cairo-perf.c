@@ -10,16 +10,19 @@ void topo_cairo_perf_boxes(hwloc_topology_t topology,
 monitors_t monitors, hwloc_bitmap_t active, cairo_t *c, struct draw_methods * methods)
 {
   unsigned int i, nobj;
-  struct monitor_node * box;
   hwloc_obj_t obj;
+  double val, variation;
+  struct monitor_node * box;
   for(i=0;i<monitors->count;i++){
     nobj = hwloc_get_nbobjs_by_depth(monitors->topology,monitors->depths[i]);
     while(nobj--){
-      box=(struct monitor_node *)(hwloc_get_obj_by_depth(monitors->topology,monitors->depths[i],nobj)->userdata);
       obj = hwloc_get_obj_by_depth(topology,monitors->depths[i],nobj);
+      box = ((struct monitor_node*)(hwloc_get_obj_by_depth(monitors->topology,monitors->depths[i],nobj)->userdata));
+      val = box->val;
+      variation = val - box->val1;
       proc_watch_get_watched_in_cpuset(monitors->pw,obj->cpuset,active);
       if(!monitors->pw || !hwloc_bitmap_iszero(active)){
-	perf_box_draw(topology, methods, obj, c, obj->depth, box->val, box->val - box->val1, monitors->max[i], monitors->min[i]);
+	perf_box_draw(topology, methods, obj, c, obj->depth, val, variation, monitors->max[i], monitors->min[i]);
       }
     }
   }
@@ -88,7 +91,9 @@ void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_att
 
   /* start executable to watch */
   if(executable){
-    Monitors_watch_pid(monitors,start_executable(executable,exe_args));
+    int pid = start_executable(executable,exe_args);
+    Monitors_watch_pid(monitors,pid);
+    printf("monitoring pid %d\n",pid);
   }
 
   /* start timer */
@@ -107,7 +112,6 @@ void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_att
 	  perror("read");
 	}
 	Monitors_update_counters(monitors);
-	Monitors_wait_update(monitors);
 	topo_cairo_perf_boxes(topology, monitors, active, c, &x11_draw_methods);
 	XFlush(disp->dpy);
       }
