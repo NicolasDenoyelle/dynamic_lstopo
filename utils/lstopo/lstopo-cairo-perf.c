@@ -205,7 +205,6 @@ output_png_perf(hwloc_topology_t topology, const char *filename, int overwrite, 
   unsigned i;
   for(i=0;i<10;i++){
     Monitors_update_counters(monitors);
-    Monitors_wait_update(monitors);
   }
   topo_cairo_perf_boxes(topology, monitors, active, c, &png_draw_methods);
   cairo_destroy(c);
@@ -239,7 +238,6 @@ output_pdf_perf(hwloc_topology_t topology, const char *filename __hwloc_attribut
   unsigned i;
   for(i=0;i<10;i++){
     Monitors_update_counters(monitors);
-    Monitors_wait_update(monitors);
   }
   output_draw( &pdf_draw_methods, logical, legend, topology, c);
   topo_cairo_perf_boxes(topology, monitors, active, c, &pdf_draw_methods);
@@ -274,7 +272,6 @@ output_ps_perf(hwloc_topology_t topology, const char *filename, int overwrite, i
   unsigned i;
   for(i=0;i<100;i++){
     Monitors_update_counters(monitors);
-    Monitors_wait_update(monitors);
   }
   output_draw( &ps_draw_methods, logical, legend, topology, c);
   topo_cairo_perf_boxes(topology, monitors, active, c, &png_draw_methods);
@@ -311,7 +308,6 @@ output_svg_perf(hwloc_topology_t topology, const char *filename, int overwrite, 
   unsigned i;
   for(i=0;i<100;i++){
     Monitors_update_counters(monitors);
-    Monitors_wait_update(monitors);
   }
   output_draw( &svg_draw_methods, logical, legend, topology, c);
   topo_cairo_perf_boxes(topology, monitors, active, c, &png_draw_methods);
