@@ -216,16 +216,6 @@ void         Monitors_update_counters         (monitors_t m);
 
 /*************************************************************/
 /**
- * @brief Waits until every monitor node into the topology is uptodate.
- * @param m
- *        The monitors to wait for.
- */
-void         Monitors_wait_update             (monitors_t m);
-/*************************************************************/
-
-
-/*************************************************************/
-/**
  * @brief When using lstopo to replay an execution from trace, the phase ca be set to analyse only parts of execution.
  * @param m
  *        The monitors to which has to be set.
