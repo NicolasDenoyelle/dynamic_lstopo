@@ -93,13 +93,9 @@ struct monitors{
    **/
   pthread_barrier_t barrier;
   /**
-   * Cond for each thread to wait until update is triggered. It avoids to create a n_PU pthreads at each update.
-   **/
-  pthread_cond_t    cond;
-  /**
    * Lock for cond, lock to wait until each monitor nodes is uptodate, lock for threads which have to print to trace file. 
    **/
-  pthread_mutex_t   cond_mtx, update_mtx, print_mtx;
+  pthread_mutex_t   update_mtx, print_mtx;
   /**
    * The number of monitors described. Only one depth per monitor is accepted. 
    **/
