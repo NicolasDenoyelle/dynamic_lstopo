@@ -34,10 +34,6 @@ struct monitor_node{
    **/
   pthread_mutex_t read_lock;
   /**
-   * Locked while a leaf aggregation is occuring.
-   **/
-  pthread_mutex_t update_lock;
-  /**
    * Node identifiers in topology.
    **/
   unsigned depth,sibling,id;
