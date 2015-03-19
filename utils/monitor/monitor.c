@@ -226,15 +226,13 @@ monitors_t new_Monitors(hwloc_topology_t topology,
     }
   }
 
-  /* set condition for reading counters */
+  /* set mutex for reading and printing counters */
   pthread_mutex_init(&m->update_mtx,NULL);
   pthread_mutex_init(&m->print_mtx,NULL);
-  pthread_mutex_init(&m->cond_mtx,NULL);
-  pthread_cond_init(&m->cond,NULL);
   /* count core number */
   depth = hwloc_topology_get_depth(m->topology);
   m->n_PU = hwloc_get_nbobjs_by_depth(m->topology, depth-1);
-  pthread_barrier_init(&m->barrier,NULL,m->n_PU);
+  pthread_barrier_init(&m->barrier,NULL,m->n_PU+1);
   m->allocated_count=4;
 
   M_alloc(m->pthreads,m->n_PU,sizeof(pthread_t));
@@ -411,15 +409,15 @@ void * monitors_thread(void* monitors){
 
   if(m->pw==NULL)
     PAPI_start(eventset);
-  pthread_barrier_wait(&(m->barrier));
 
   /**************** Thread actual work ****************/
   for(;;){
-    pthread_mutex_lock(&m->cond_mtx);
     /* signal we are ready for new update*/
+  next_loop:;
+    pthread_barrier_wait(&(m->barrier));
     pthread_mutex_unlock(&m->update_mtx);
-    pthread_cond_wait(&(m->cond),&m->cond_mtx);
-    pthread_mutex_unlock(&m->cond_mtx);
+    pthread_barrier_wait(&(m->barrier));
+
     /* update time stamp*/
     PU_vals->old_usec=PU_vals->real_usec;
     PU_vals->real_usec=PAPI_get_real_usec();
@@ -440,6 +438,7 @@ void * monitors_thread(void* monitors){
     /* gathers counters */
     PAPI_read(eventset,values);
     /* calculate difference to get total counter variation between samples */
+    pthread_mutex_trylock(&m->update_mtx);
     for(i=0;i<m->n_events;i++){
       /* overflow ? */
       if(values[i]>=old_values[i])
@@ -501,8 +500,6 @@ void * monitors_thread(void* monitors){
 	pthread_mutex_unlock(&(out->read_lock));
       }
     }
-  next_loop:;
-    pthread_barrier_wait(&(m->barrier));
   }
   pthread_cleanup_pop(0);
   return NULL;
@@ -695,12 +692,13 @@ Monitors_start(monitors_t m)
 
 void
 Monitors_update_counters(monitors_t m){
-  pthread_mutex_lock(&m->cond_mtx);
-  pthread_mutex_lock(&m->update_mtx);
+  /* update application threads location */
+  pthread_barrier_wait(&(m->barrier));
   if(m->pw!=NULL)
     proc_watch_update(m->pw);
-  pthread_cond_broadcast(&(m->cond));
-  pthread_mutex_unlock(&m->cond_mtx);
+  
+  /* broadcast signal to take a sample */
+  pthread_barrier_wait(&(m->barrier));
 }
 
 inline void
@@ -767,13 +765,10 @@ delete_Monitors(monitors_t m)
   for(i=0;i<m->n_PU;i++)
     pthread_cancel(m->pthreads[i]);
 
-  /** BLOCK ON JOIN even when every thread is waiting on cond_wait ! **/
-  /* for(i=0;i<m->n_PU;i++){ */
-  /*   pthread_join(m->pthreads[i],NULL); */
-  /* } */
+  for(i=0;i<m->n_PU;i++){
+    pthread_join(m->pthreads[i],NULL);
+  }
 
-  pthread_cond_destroy(&(m->cond));
-  pthread_mutex_destroy(&(m->cond_mtx));
   pthread_mutex_destroy(&m->update_mtx);
   pthread_mutex_destroy(&m->print_mtx);
   pthread_barrier_destroy(&(m->barrier));
@@ -807,7 +802,7 @@ delete_Monitors(monitors_t m)
     delete_proc_watch(m->pw);
   unload_monitors_lib(m);
   free(m);
-  //hwloc_topology_destroy(m->topology);
+  hwloc_topology_destroy(m->topology);
   PAPI_shutdown();
 }
 
