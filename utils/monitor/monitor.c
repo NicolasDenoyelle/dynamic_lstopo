@@ -227,7 +227,6 @@ monitors_t new_Monitors(hwloc_topology_t topology,
   }
 
   /* set mutex for reading and printing counters */
-  pthread_mutex_init(&m->update_mtx,NULL);
   pthread_mutex_init(&m->print_mtx,NULL);
   /* count core number */
   depth = hwloc_topology_get_depth(m->topology);
@@ -415,7 +414,6 @@ void * monitors_thread(void* monitors){
     /* signal we are ready for new update*/
   next_loop:;
     pthread_barrier_wait(&(m->barrier));
-    pthread_mutex_unlock(&m->update_mtx);
     pthread_barrier_wait(&(m->barrier));
 
     /* update time stamp*/
@@ -438,7 +436,6 @@ void * monitors_thread(void* monitors){
     /* gathers counters */
     PAPI_read(eventset,values);
     /* calculate difference to get total counter variation between samples */
-    pthread_mutex_trylock(&m->update_mtx);
     for(i=0;i<m->n_events;i++){
       /* overflow ? */
       if(values[i]>=old_values[i])
@@ -701,18 +698,10 @@ Monitors_update_counters(monitors_t m){
   pthread_barrier_wait(&(m->barrier));
 }
 
-inline void
-Monitors_wait_update(monitors_t m){
-  pthread_mutex_lock(&m->update_mtx);
-  pthread_mutex_unlock(&m->update_mtx);
-}
-
 inline void         
 Monitors_set_phase(monitors_t m, unsigned phase)
 {
-  pthread_mutex_lock(&m->update_mtx);
   m->phase = phase;
-  pthread_mutex_unlock(&m->update_mtx);
 }
 
 inline long long
@@ -769,7 +758,6 @@ delete_Monitors(monitors_t m)
     pthread_join(m->pthreads[i],NULL);
   }
 
-  pthread_mutex_destroy(&m->update_mtx);
   pthread_mutex_destroy(&m->print_mtx);
   pthread_barrier_destroy(&(m->barrier));
   free(m->pthreads);
