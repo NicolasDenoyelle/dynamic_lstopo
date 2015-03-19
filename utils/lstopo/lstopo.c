@@ -908,7 +908,8 @@ main (int argc, char *argv[])
 	  fprintf(stderr,"option %s cannot be used with option %s simultaneously\n",argv[0],"--perf-replay");
 	  exit(EXIT_FAILURE);
 	}
-	perf = 1;
+	if(perf==0)
+	  perf = 1;
 	refresh_usec = atoll(argv[1]);
 	opt = 1;
       }
