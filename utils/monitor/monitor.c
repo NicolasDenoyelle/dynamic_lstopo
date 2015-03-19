@@ -688,12 +688,9 @@ Monitors_start(monitors_t m)
 
 void
 Monitors_update_counters(monitors_t m){
-  /* update application threads location */
   pthread_barrier_wait(&(m->barrier));
   if(m->pw!=NULL)
     proc_watch_update(m->pw);
-  
-  /* broadcast signal to take a sample */
   pthread_barrier_wait(&(m->barrier));
 }
 
@@ -753,9 +750,9 @@ delete_Monitors(monitors_t m)
   for(i=0;i<m->n_PU;i++)
     pthread_cancel(m->pthreads[i]);
 
-  for(i=0;i<m->n_PU;i++){
-    pthread_join(m->pthreads[i],NULL);
-  }
+  /* for(i=0;i<m->n_PU;i++){ */
+  /*   pthread_join(m->pthreads[i],NULL); */
+  /* } */
 
   pthread_mutex_destroy(&m->print_mtx);
   pthread_barrier_destroy(&(m->barrier));
@@ -789,7 +786,7 @@ delete_Monitors(monitors_t m)
     delete_proc_watch(m->pw);
   unload_monitors_lib(m);
   free(m);
-  hwloc_topology_destroy(m->topology);
+  // hwloc_topology_destroy(m->topology);
   PAPI_shutdown();
 }
 
