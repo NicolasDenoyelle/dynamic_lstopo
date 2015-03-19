@@ -683,7 +683,6 @@ Monitors_start(monitors_t m)
    exit(EXIT_FAILURE);
  }
  }
- Monitors_wait_update(m);
  return 0;
 }
 
