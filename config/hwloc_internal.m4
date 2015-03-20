@@ -55,6 +55,11 @@ AC_DEFUN([HWLOC_DEFINE_ARGS],[
        		  AS_HELP_STRING([--disable-monitor],
 				 [Disable PAPI monitoring with lstopo command]))
 
+    #monitor ?			 
+    AC_ARG_ENABLE([mbench],
+       		  AS_HELP_STRING([--disable-mbench],
+				 [Disable benchmark driven hardware discovery]))
+
     # Cairo?
     AC_ARG_ENABLE([cairo],
                   AS_HELP_STRING([--disable-cairo],
@@ -258,6 +263,27 @@ AC_DEFUN([HWLOC_SETUP_UTILS],[
 ### Configuring hwloc command line utilities
 ###
 EOF
+
+# Benchmark support
+hwloc_mbench_happy=no
+mbench_lib_happy=no
+mbench_header_happy=no
+
+if test "x$enable_mbench" != "xno"; then
+hwloc_mbench_happy=yes     
+AC_CHECK_LIB([mbench],[mbench_rdtsc],[mbench_lib_happy=yes],[hwloc_mbench_happy=no])
+AC_CHECK_HEADER([libmbench.h],[mbench_header_happy=yes],[hwloc_mbench_happy=no])
+fi
+
+if test "x$hwloc_mbench_happy" = "xyes"; then
+AC_DEFINE([HWLOC_HAVE_MBENCH], [1], [Define to 1 if you are able to compile the 'benchmark discovery plugin'.])
+else
+AS_IF([test "$enable_mbench" = "yes"],
+[AS_IF([test "$mbench_lib_happy" = "no"],  [AC_MSG_WARN([--enable-mbench requested, but mbench lib was not found, LDFLAGS=$LDFLAGS])])
+AS_IF([test "$mbench_header_happy" = "no"],[AC_MSG_WARN([--enable-mbench requested, but libmbench.h header was not found])])
+AC_MSG_ERROR([Cannot continue])])
+fi
+
 
 # Monitor support
 hwloc_monitor_happy=no
