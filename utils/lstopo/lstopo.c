@@ -1069,8 +1069,8 @@ main (int argc, char *argv[])
       }
       else{
 	output_perf(topology, filename, verbose_mode, callname, output_format, m, refresh_usec, argv[0], argv);
-	delete_Monitors(m);
       }
+      delete_Monitors(m);
     }
   }
   else
