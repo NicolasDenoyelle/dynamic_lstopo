@@ -7,7 +7,6 @@
 #include <hwloc.h>
 #include <libmbench.h>
 #include <private/private.h>
-
 #include <stdlib.h>
 
 
@@ -18,20 +17,11 @@ hwloc_bench_memory_node(hwloc_obj_t obj)
 }
 
 static int
-hwloc_bench_new_obj(struct hwloc_backend *backend, struct hwloc_backend *caller, struct hwloc_obj *obj)
-{
-  printf("Benchmark notify new object.\n");
-  return 0;
-}
-
-static int
 hwloc_bench(struct hwloc_backend *backend)
 {
   printf("Benchmark discovery starts...\n");
   return 0;
 }
-
-
 
 
 static struct hwloc_backend *
@@ -47,27 +37,7 @@ hwloc_bench_component_instantiate(struct hwloc_disc_component *component __hwloc
     return NULL;
   backend->flags = HWLOC_BACKEND_FLAG_NEED_LEVELS;
   backend->discover = hwloc_bench;
-  backend->notify_new_object = hwloc_bench_new_obj;
   return backend;
-}
-
-static int
-hwloc_bench_component_init(unsigned long flags)
-{
-  if (flags)
-    return -1;
-  if (hwloc_plugin_check_namespace("bench", "hwloc_backend_alloc") < 0)
-    return -1;
-  printf("bench component initialized\n");
-  return 0;
-}
-
-static void
-hwloc_bench_component_finalize(unsigned long flags)
-{
-  if (flags)
-    return;
-    printf("bench component finalized\n");
 }
 
 static struct hwloc_disc_component hwloc_bench_disc_component = {
@@ -83,8 +53,8 @@ HWLOC_DECLSPEC extern const struct hwloc_component hwloc_bench_component; /* nev
 
 const struct hwloc_component hwloc_bench_component = {
   HWLOC_COMPONENT_ABI,
-  hwloc_bench_component_init, 
-  hwloc_bench_component_finalize,
+  NULL,
+  NULL,
   HWLOC_COMPONENT_TYPE_DISC,
   0,
   &hwloc_bench_disc_component
