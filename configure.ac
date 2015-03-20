@@ -272,6 +272,7 @@ Graphical output (Cairo):    $hwloc_cairo_happy
 XML input / output:          $hwloc_xml_status
 Netloc functionality:        $netloc_happy
 Monitor functionality:       $hwloc_monitor_happy
+mbench plugin:               $hwloc_mbench_happy
 EOF
 
 # Linux specific support
