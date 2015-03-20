@@ -22,6 +22,7 @@ struct proc_watch{
   hwloc_bitmap_t     state;       /* physical */ /* 0 = must stop, 1 = must start */
   hwloc_bitmap_t     old_state;   /* physical */ /* 0 = stopped,   1 = started */
   hwloc_bitmap_t     tmp_state;
+  pthread_mutex_t    mtx;
   struct task_stat * t_stat;
 };
 
@@ -56,11 +57,13 @@ logical_to_physical(hwloc_topology_t topology, int logical_idx){
   return hwloc_bitmap_first(hwloc_get_obj_by_depth(topology,hwloc_topology_get_depth(topology)-1,logical_idx)->cpuset);
 }
 
-inline int
+int
 proc_watch_check_start_pu(struct proc_watch * pw,unsigned int physical_PU)
 {
   if(!hwloc_bitmap_isset(pw->old_state,physical_PU) && hwloc_bitmap_isset(pw->state,physical_PU)){
+    pthread_mutex_lock(&pw->mtx);
     hwloc_bitmap_set(pw->old_state,physical_PU);
+    pthread_mutex_unlock(&pw->mtx);
     return 1;
   }
   return 0;
@@ -70,11 +73,13 @@ inline unsigned int proc_watch_get_pid(struct proc_watch * pw){
   return pw->pid;
 }
 
-inline int
+int
 proc_watch_check_stop_pu(struct proc_watch * pw, unsigned int physical_PU)
 {
   if(hwloc_bitmap_isset(pw->old_state,physical_PU) && !hwloc_bitmap_isset(pw->state,physical_PU)){
+    pthread_mutex_lock(&pw->mtx);
     hwloc_bitmap_clr(pw->old_state,physical_PU);
+    pthread_mutex_unlock(&pw->mtx);
     return 1;
   }
   return 0;
@@ -123,7 +128,9 @@ proc_watch_update(struct proc_watch * pw)
     if(pw->t_stat->state)
       hwloc_bitmap_set(pw->tmp_state,pw->t_stat->pu_num);
   }
+  pthread_mutex_lock(&pw->mtx);
   hwloc_bitmap_copy(pw->state, pw->tmp_state);
+  pthread_mutex_unlock(&pw->mtx);
   rewinddir(pw->p_dir);
 }
 
@@ -166,6 +173,7 @@ new_proc_watch(unsigned int pid)
 
   hwloc_bitmap_zero(pw->state);
   hwloc_bitmap_zero(pw->old_state);
+  pthread_mutex_init(&pw->mtx,NULL);
   proc_watch_update(pw);
   return pw;
 }
@@ -178,6 +186,7 @@ delete_proc_watch(struct proc_watch * pw){
   free(pw->p_dir_path);
   free(pw->t_stat);
   closedir(pw->p_dir);
+  pthread_mutex_destroy(&pw->mtx);
   free(pw);
 }
 
