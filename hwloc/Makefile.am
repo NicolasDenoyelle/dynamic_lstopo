@@ -160,6 +160,11 @@ if HWLOC_HAVE_X86_CPUID
 sources += topology-x86.c
 endif HWLOC_HAVE_X86_CPUID
 
+if HWLOC_HAVE_MBENCH
+sources += topology-bench.c
+ldflags += -lmbench
+endif HWLOC_HAVE_MBENCH
+
 if HWLOC_HAVE_GCC
 ldflags += -no-undefined
 endif HWLOC_HAVE_GCC
