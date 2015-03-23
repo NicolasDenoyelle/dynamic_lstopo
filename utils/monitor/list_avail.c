@@ -80,9 +80,7 @@ start_executable(char * executable, char * exe_args[])
     }
   }
   msync(child, sizeof(*child), MS_SYNC);
-  if(*child>0 && !ret){
-    ret = *child;
-  }
+  ret = *child;
   munmap(child, sizeof *child);
   return ret; 
 }
