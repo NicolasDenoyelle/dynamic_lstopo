@@ -9,17 +9,22 @@
 #include <private/private.h>
 #include <stdlib.h>
 
+long long
+hwloc_bench_memory_node(hwloc_obj_t node){
+  return 10;
+}
 
 static int
-hwloc_bench_memory_level(hwloc_topology_t topology, hwloc_obj_t level)
+hwloc_bench_memory_level(hwloc_obj_t level)
 {
   hwloc_obj_t sibling = level;
-  hwloc_obj_t memory_infos;
+  unsigned bandwidth;
+  char bw_str[64];
   do{
-    //memory_info = malloc(sizeof(hwloc_obj));
-    //hwloc__duplicate_object(memory_info,level);
-    //hwloc_insert_object_by_parent(topology, level, memory_infos);
-    hwloc_obj_add_info(sibling, "bandwidth", "0GB/s");
+    bandwidth = hwloc_bench_memory_node(sibling);
+    memset(bw_str,0,64);
+    sprintf(bw_str,"%uGB/s",bandwidth);
+    hwloc_obj_add_info(sibling, "bandwidth", bw_str);
     sibling = sibling->next_cousin;
   } while(sibling != level && sibling != NULL);
   return 0;
@@ -35,7 +40,7 @@ hwloc_bench_memory_type(struct hwloc_backend *backend, const hwloc_obj_type_t ty
     if(level!=NULL){
       hwloc_obj_type_snprintf(level_type,64,level,1); 
       //      printf("benchmark %s ...\n",level_type);
-      hwloc_bench_memory_level(backend->topology,level);
+      hwloc_bench_memory_level(level);
     }
   }
   return 0;
