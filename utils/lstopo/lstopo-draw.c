@@ -842,6 +842,12 @@ cache_draw(hwloc_topology_t topology, struct draw_methods *methods, int logical,
   unsigned myheight = gridsize + (fontsize ? (fontsize + gridsize) : 0) + gridsize, totheight;
   unsigned mywidth = 0, totwidth;
   unsigned textwidth = fontsize ? ((logical ? level->logical_index : level->os_index) == (unsigned) -1 ? 8*fontsize : 10*fontsize) : 0;
+
+#ifdef HWLOC_HAVE_MBENCH
+  const char * bandwidth = hwloc_obj_get_info_by_name(level, "bandwidth");
+  myheight += fontsize+gridsize;
+#endif
+
   /* Do not separate objects when in L1 (SMT) */
   unsigned separator = level->attr->cache.depth > 1 ? gridsize : 0;
   struct style style;
@@ -853,10 +859,12 @@ cache_draw(hwloc_topology_t topology, struct draw_methods *methods, int logical,
 
   lstopo_set_object_color(methods, topology, level, 0, &style);
   methods->box(output, style.bg.r, style.bg.g, style.bg.b, depth, x, totwidth, y, myheight - gridsize);
-
   if (fontsize) {
     lstopo_obj_snprintf(text, sizeof(text), level, logical);
     methods->text(output, style.t.r, style.t.g, style.t.b, fontsize, depth-1, x + gridsize, y + gridsize, text);
+#ifdef HWLOC_HAVE_MBENCH
+    methods->text(output, style.t.r, style.t.g, style.t.b, fontsize, depth-1, x + gridsize, y + 2*gridsize + fontsize, bandwidth);
+#endif
   }
 
   RECURSE_RECT(level, methods, separator, 0);
@@ -921,6 +929,10 @@ node_draw(hwloc_topology_t topology, struct draw_methods *methods, int logical, 
 {
   /* Reserve room for the heading memory box and separator */
   unsigned myheight = (fontsize ? (gridsize + fontsize) : 0) + gridsize + gridsize;
+#ifdef HWLOC_HAVE_MBENCH
+  const char * bandwidth = hwloc_obj_get_info_by_name(level, "bandwidth");
+  myheight += fontsize+gridsize;
+#endif
   /* Currently filled height */
   unsigned totheight;
   /* Nothing on the left */
@@ -948,6 +960,9 @@ node_draw(hwloc_topology_t topology, struct draw_methods *methods, int logical, 
     /* Output text */
     lstopo_obj_snprintf(text, sizeof(text), level, logical);
     methods->text(output, style.t2.r, style.t2.g, style.t2.b, fontsize, depth-2, x + 2 * gridsize, y + 2 * gridsize, text);
+#ifdef HWLOC_HAVE_MBENCH
+    methods->text(output, style.t2.r, style.t2.g, style.t2.b, fontsize, depth-2, x + 2 * gridsize, y + 3 * gridsize + fontsize, bandwidth);
+#endif
   }
 
   /* Restart, now really drawing sublevels */
