@@ -11,22 +11,43 @@
 
 
 static int
-hwloc_bench_memory_node(hwloc_obj_t obj)
+hwloc_bench_memory_level(hwloc_topology_t topology, hwloc_obj_t level)
 {
+  hwloc_obj_t sibling = level;
+  hwloc_obj_t memory_infos;
+  do{
+    //memory_info = malloc(sizeof(hwloc_obj));
+    //hwloc__duplicate_object(memory_info,level);
+    //hwloc_insert_object_by_parent(topology, level, memory_infos);
+    hwloc_obj_add_info(sibling, "bandwidth", "0GB/s");
+    sibling = sibling->next_cousin;
+  } while(sibling != level && sibling != NULL);
   return 0;
 }
 
 static int
-hwloc_bench(struct hwloc_backend *backend)
-{
-  //printf("Benchmark discovery starts...\n");
+hwloc_bench_memory_type(struct hwloc_backend *backend, const hwloc_obj_type_t type){
   unsigned    depth = hwloc_topology_get_depth(backend->topology);
   hwloc_obj_t level = hwloc_get_obj_by_depth(backend->topology,--depth,0);
-  
-  //while(level!=NULL){
-    //    level = hwloc_get_ancestor_obj_by_type(backend->topology,HWLOC_OBJ_CACHE || HWLOC_OBJ_NODE);
-  //}
+  char level_type[64];
+  while(level!=NULL){
+    level = hwloc_get_ancestor_obj_by_type(backend->topology,type, level);
+    if(level!=NULL){
+      hwloc_obj_type_snprintf(level_type,64,level,1); 
+      //      printf("benchmark %s ...\n",level_type);
+      hwloc_bench_memory_level(backend->topology,level);
+    }
+  }
+  return 0;
+}
 
+static int
+hwloc_bench_memory(struct hwloc_backend *backend)
+{
+  //  printf("Benchmark discovery starts...\n");
+  hwloc_bench_memory_type(backend, HWLOC_OBJ_CACHE);
+  hwloc_bench_memory_type(backend, HWLOC_OBJ_NODE);
+  //  printf("Benchmark discovery ends\n");
   return 0;
 }
 
@@ -43,7 +64,7 @@ hwloc_bench_component_instantiate(struct hwloc_disc_component *component __hwloc
   if (!backend)
     return NULL;
   backend->flags = HWLOC_BACKEND_FLAG_NEED_LEVELS;
-  backend->discover = hwloc_bench;
+  backend->discover = hwloc_bench_memory;
   return backend;
 }
 
