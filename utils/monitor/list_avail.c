@@ -56,17 +56,23 @@ chk_input_file(const char * filename)
 pid_t 
 start_executable(char * executable, char * exe_args[])
 {
+  printf("starting %s\n",executable);
   pid_t ret=0;
   pid_t *child = mmap(NULL, sizeof *child, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
   *child=0;
   pid_t pid2, pid1 = fork();
-  if(pid1){
+  if(pid1<0){
+    perror("fork");
+    exit(EXIT_FAILURE);
+  }
+  if(pid1>0){
     wait(NULL);
   }
-  else if(!pid1){
+  else if(pid1==0){
     pid2=fork();
     if(pid2){
       *child = pid2;
+      msync(child, sizeof(*child), MS_SYNC);
       exit(0);
     }
     else if(!pid2){
@@ -80,9 +86,7 @@ start_executable(char * executable, char * exe_args[])
     }
   }
   msync(child, sizeof(*child), MS_SYNC);
-  if(*child>0 && !ret){
-    ret = *child;
-  }
+  ret = *child;
   munmap(child, sizeof *child);
   return ret; 
 }
