@@ -19,7 +19,14 @@ hwloc_bench_memory_node(hwloc_obj_t obj)
 static int
 hwloc_bench(struct hwloc_backend *backend)
 {
-  printf("Benchmark discovery starts...\n");
+  //printf("Benchmark discovery starts...\n");
+  unsigned    depth = hwloc_topology_get_depth(backend->topology);
+  hwloc_obj_t level = hwloc_get_obj_by_depth(backend->topology,--depth,0);
+  
+  //while(level!=NULL){
+    //    level = hwloc_get_ancestor_obj_by_type(backend->topology,HWLOC_OBJ_CACHE || HWLOC_OBJ_NODE);
+  //}
+
   return 0;
 }
 
