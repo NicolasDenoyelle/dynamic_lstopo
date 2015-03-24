@@ -441,10 +441,27 @@ lstopo_obj_snprintf(char *text, size_t textlen, hwloc_obj_t obj, int logical)
     snprintf(totmemstr, sizeof(totmemstr), " (%lu%s total)",
              (unsigned long) hwloc_memory_size_printf_value(obj->memory.total_memory, 0),
              hwloc_memory_size_printf_unit(obj->memory.total_memory, 0));
+
+#ifdef HWLOC_HAVE_MBENCH
+  const char * attrbdwidth = hwloc_obj_get_info_by_name(obj,"bandwidth");
+  if(attrbdwidth!=NULL){
+    if (attrlen > 0)
+      return snprintf(text, textlen, "%s%s (%s)%s (%s)", typestr, indexstr, attrstr, totmemstr, attrbdwidth);
+    else
+      return snprintf(text, textlen, "%s%s%s (%s)", typestr, indexstr, totmemstr, attrbdwidth);
+  }
+  else{
+    if (attrlen > 0)
+      return snprintf(text, textlen, "%s%s (%s)%s", typestr, indexstr, attrstr, totmemstr);
+    else
+      return snprintf(text, textlen, "%s%s%s", typestr, indexstr, totmemstr);
+  }
+#else
   if (attrlen > 0)
     return snprintf(text, textlen, "%s%s (%s)%s", typestr, indexstr, attrstr, totmemstr);
   else
     return snprintf(text, textlen, "%s%s%s", typestr, indexstr, totmemstr);
+#endif
 }
 
 static struct draw_methods getmax_draw_methods;
@@ -804,7 +821,11 @@ static void
 pu_draw(hwloc_topology_t topology, struct draw_methods *methods, int logical, hwloc_obj_t level, void *output, unsigned depth, unsigned x, unsigned *retwidth, unsigned y, unsigned *retheight)
 {
   unsigned myheight = (fontsize ? (fontsize + gridsize) : 0), totheight;
+#ifdef HWLOC_HAVE_MBENCH
+  unsigned textwidth = fontsize ? 10*fontsize : gridsize;
+#else
   unsigned textwidth = fontsize ? 6*fontsize : gridsize;
+#endif
   unsigned mywidth = 0, totwidth;
   struct style style;
   int colorarg;
@@ -842,12 +863,6 @@ cache_draw(hwloc_topology_t topology, struct draw_methods *methods, int logical,
   unsigned myheight = gridsize + (fontsize ? (fontsize + gridsize) : 0) + gridsize, totheight;
   unsigned mywidth = 0, totwidth;
   unsigned textwidth = fontsize ? ((logical ? level->logical_index : level->os_index) == (unsigned) -1 ? 8*fontsize : 10*fontsize) : 0;
-
-#ifdef HWLOC_HAVE_MBENCH
-  const char * bandwidth = hwloc_obj_get_info_by_name(level, "bandwidth");
-  myheight += fontsize+gridsize;
-#endif
-
   /* Do not separate objects when in L1 (SMT) */
   unsigned separator = level->attr->cache.depth > 1 ? gridsize : 0;
   struct style style;
@@ -862,9 +877,6 @@ cache_draw(hwloc_topology_t topology, struct draw_methods *methods, int logical,
   if (fontsize) {
     lstopo_obj_snprintf(text, sizeof(text), level, logical);
     methods->text(output, style.t.r, style.t.g, style.t.b, fontsize, depth-1, x + gridsize, y + gridsize, text);
-#ifdef HWLOC_HAVE_MBENCH
-    methods->text(output, style.t.r, style.t.g, style.t.b, fontsize, depth-1, x + gridsize, y + 2*gridsize + fontsize, bandwidth);
-#endif
   }
 
   RECURSE_RECT(level, methods, separator, 0);
@@ -929,10 +941,6 @@ node_draw(hwloc_topology_t topology, struct draw_methods *methods, int logical, 
 {
   /* Reserve room for the heading memory box and separator */
   unsigned myheight = (fontsize ? (gridsize + fontsize) : 0) + gridsize + gridsize;
-#ifdef HWLOC_HAVE_MBENCH
-  const char * bandwidth = hwloc_obj_get_info_by_name(level, "bandwidth");
-  myheight += fontsize+gridsize;
-#endif
   /* Currently filled height */
   unsigned totheight;
   /* Nothing on the left */
@@ -960,9 +968,6 @@ node_draw(hwloc_topology_t topology, struct draw_methods *methods, int logical, 
     /* Output text */
     lstopo_obj_snprintf(text, sizeof(text), level, logical);
     methods->text(output, style.t2.r, style.t2.g, style.t2.b, fontsize, depth-2, x + 2 * gridsize, y + 2 * gridsize, text);
-#ifdef HWLOC_HAVE_MBENCH
-    methods->text(output, style.t2.r, style.t2.g, style.t2.b, fontsize, depth-2, x + 2 * gridsize, y + 3 * gridsize + fontsize, bandwidth);
-#endif
   }
 
   /* Restart, now really drawing sublevels */
@@ -1420,19 +1425,7 @@ perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj
   methods->box(output,(unsigned)r,(unsigned)g,(unsigned)b,depth,x,mywidth,y,myheight);
   methods->line(output,0,0,0, depth, x, liney, x+fontsize, liney);
   methods->line(output,0,0,0, depth, x+(fontsize*(4+precision)), liney, x+mywidth, liney);
-
-#ifdef HWLOC_HAVE_MBENCH
-  if(level->type == HWLOC_OBJ_CACHE || level->type == HWLOC_OBJ_NODE){
-    char obj_info[64];
-    lstopo_obj_snprintf(obj_info, sizeof(obj_info), level, 0);
-    methods->text(output, ds->style.t2.r, ds->style.t2.g, ds->style.t2.b, fontsize, depth-2, x+fontsize, y+fontsize, obj_info);
-    methods->text(output, ds->style.t2.r, ds->style.t2.g, ds->style.t2.b, fontsize, depth-2, x+fontsize, y+fontsize*2+gridsize, text);
-  }
-  else
-    methods->text(output, ds->style.t2.r, ds->style.t2.g, ds->style.t2.b, fontsize, depth-2, x+fontsize, y+fontsize, text);
-#else
   methods->text(output, ds->style.t2.r, ds->style.t2.g, ds->style.t2.b, fontsize, depth-2, x+fontsize, y+fontsize, text);
-#endif
 }
 
 #endif /* HWLOC_HAVE_MONITOR */
