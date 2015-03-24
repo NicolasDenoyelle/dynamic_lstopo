@@ -1420,7 +1420,19 @@ perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj
   methods->box(output,(unsigned)r,(unsigned)g,(unsigned)b,depth,x,mywidth,y,myheight);
   methods->line(output,0,0,0, depth, x, liney, x+fontsize, liney);
   methods->line(output,0,0,0, depth, x+(fontsize*(4+precision)), liney, x+mywidth, liney);
+
+#ifdef HWLOC_HAVE_MBENCH
+  if(level->type == HWLOC_OBJ_CACHE || level->type == HWLOC_OBJ_NODE){
+    char obj_info[64];
+    lstopo_obj_snprintf(obj_info, sizeof(obj_info), level, 0);
+    methods->text(output, ds->style.t2.r, ds->style.t2.g, ds->style.t2.b, fontsize, depth-2, x+fontsize, y+fontsize, obj_info);
+    methods->text(output, ds->style.t2.r, ds->style.t2.g, ds->style.t2.b, fontsize, depth-2, x+fontsize, y+fontsize*2+gridsize, text);
+  }
+  else
+    methods->text(output, ds->style.t2.r, ds->style.t2.g, ds->style.t2.b, fontsize, depth-2, x+fontsize, y+fontsize, text);
+#else
   methods->text(output, ds->style.t2.r, ds->style.t2.g, ds->style.t2.b, fontsize, depth-2, x+fontsize, y+fontsize, text);
+#endif
 }
 
 #endif /* HWLOC_HAVE_MONITOR */
