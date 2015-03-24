@@ -56,7 +56,6 @@ bench_stream_thread(void * arg)
   gettimeofday(&t_start,NULL);
   p = parg->sh_arg->bench_fun.mbench_fun1(s);
   gettimeofday(&t_end, NULL);
-
   pthread_barrier_wait(&parg->sh_arg->br);
 
   pthread_mutex_lock(&parg->sh_arg->mtx);
@@ -85,7 +84,6 @@ bench_stream_stream_thread(void * arg)
   gettimeofday(&t_start,NULL);
   p = parg->sh_arg->bench_fun.mbench_fun2(s1,s2);
   gettimeofday(&t_end, NULL);
-
   pthread_barrier_wait(&parg->sh_arg->br);
 
   pthread_mutex_lock(&parg->sh_arg->mtx);
@@ -120,17 +118,7 @@ hwloc_bench_memory_node(hwloc_topology_t topology, hwloc_obj_t node, int bench_f
   pthread_mutex_init(&sh_arg.mtx,NULL);
   sh_arg.bandwidth=0;
   sh_arg.topology=topology;
-  switch(bench_fun_type){
-  case BENCH_FUN_TYPE_STREAM:
-    sh_arg.bench_fun = fun;    
-    break;
-  case BENCH_FUN_TYPE_STREAM_STREAM:
-    sh_arg.bench_fun = fun;    
-    break;
-  default:
-    return -1;
-    break;
-  }
+  sh_arg.bench_fun = fun;    
   
   if(node->memory.local_memory==0 || node->memory.page_types==NULL){
     if(attr->size==0 || attr->linesize == 0){
