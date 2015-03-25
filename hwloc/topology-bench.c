@@ -10,13 +10,17 @@
 #include <bench.h>
 #include <private/private.h>
 #include <stdlib.h>
-#include <math.h>
 #include <sys/time.h>
 
 #define HWLOC_BENCH_MAX(a,b) (a>b?a:b)
 
 #define BENCH_FUN_TYPE_STREAM 1
 #define BENCH_FUN_TYPE_STREAM_STREAM 2
+
+#define KiB 1024
+#define MiB 1048576
+#define GiB 1073741824
+
 
 struct shared_thread_arg{
   hwloc_topology_t  topology;
@@ -32,7 +36,6 @@ struct private_thread_arg{
   struct shared_thread_arg * sh_arg;
   hwloc_bitmap_t             cpuset;
 };
-
 
 static void *
 bench_stream_thread(void * arg)
@@ -150,7 +153,7 @@ hwloc_bench_memory_node(hwloc_topology_t topology, hwloc_obj_t node, int bench_f
   return sh_arg.bandwidth;
 }
 
-#define hwloc_bandwidth_to_str(str,bandwidth,KiB,MiB,GiB)		\
+#define hwloc_bandwidth_to_str(str,bandwidth)				\
   memset(str,0,sizeof(str));						\
   if(bandwidth>=GiB)							\
     snprintf(str,sizeof(str),"%lldGiB/s",(long long)bandwidth/GiB);	\
@@ -165,6 +168,7 @@ hwloc_bench_memory_node(hwloc_topology_t topology, hwloc_obj_t node, int bench_f
 struct bench_info{
   double bandwidth;
   char bandwidth_str[64];
+  float ecart_type;
 };
 
 static int 
@@ -173,13 +177,12 @@ benchmark_and_get_info(hwloc_topology_t topology, hwloc_obj_t level,
 		       perf_t (*fun)(), 
 		       const char * bench_str, 
 		       struct bench_info * infos,
-		       const long long KiB, const long long MiB, const long long GiB,
 		       double * max_bandwidth)
 {
   infos->bandwidth  = hwloc_bench_memory_node(topology, level, bench_type, fun);
   if(infos->bandwidth == -1)
     return 1;
-  hwloc_bandwidth_to_str(infos->bandwidth_str, infos->bandwidth ,KiB,MiB,GiB);
+  hwloc_bandwidth_to_str(infos->bandwidth_str, infos->bandwidth);
   *max_bandwidth = HWLOC_BENCH_MAX(*max_bandwidth,infos->bandwidth);  
   printf("\t%s bandwidth = %s\n", bench_str, infos->bandwidth_str);   
   return 0;
@@ -194,10 +197,6 @@ hwloc_bench_memory_level(hwloc_topology_t topology, hwloc_obj_t level)
     return -1;
   }
 
-  const long long KiB = pow(2,10);
-  const long long MiB = pow(KiB,2);
-  const long long GiB = pow(KiB,3);
-
   double max_bandwidth = 0;
   char   max_bandwidth_str[64];
 
@@ -207,25 +206,30 @@ hwloc_bench_memory_level(hwloc_topology_t topology, hwloc_obj_t level)
   hwloc_obj_type_snprintf(level_type,64,level,1); 
   printf("benchmark %s ...\n",level_type);
 
-  if(benchmark_and_get_info(topology, level, 1, mbench_load, "load", &load, KiB, MiB, GiB, &max_bandwidth) == 1)
+  if(benchmark_and_get_info(topology, level, 1, mbench_load, "load", &load, &max_bandwidth) == 1)
     return 1;
 
-  if(benchmark_and_get_info(topology, level, 1, mbench_store, "store", &store, KiB, MiB, GiB, &max_bandwidth) == 1)
+  if(benchmark_and_get_info(topology, level, 1, mbench_store, "store", &store, &max_bandwidth) == 1)
     return 1;
 
-  if(benchmark_and_get_info(topology, level, 2, mbench_copy, "copy", &copy, KiB, MiB, GiB, &max_bandwidth) == 1)
+  if(benchmark_and_get_info(topology, level, 2, mbench_copy, "copy", &copy, &max_bandwidth) == 1)
     return 1;
 
-  if(benchmark_and_get_info(topology, level, 2, mbench_ll, "ll", &ll, KiB, MiB, GiB, &max_bandwidth) == 1)
+  if(benchmark_and_get_info(topology, level, 2, mbench_ll, "ll", &ll, &max_bandwidth) == 1)
     return 1;
 
-  hwloc_bandwidth_to_str(max_bandwidth_str, max_bandwidth ,KiB,MiB,GiB);
+  /* if(benchmark_and_get_info(topology, level, 2, mbench_ls, "ls", &ls, &max_bandwidth) == 1) */
+  /*   return 1; */
+  
+
+  hwloc_bandwidth_to_str(max_bandwidth_str, max_bandwidth);
   hwloc_obj_t sibling = level;
   do{
     hwloc_obj_add_info(sibling, "bandwidth_load" , load.bandwidth_str);
     hwloc_obj_add_info(sibling, "bandwidth_store", store.bandwidth_str);
     hwloc_obj_add_info(sibling, "bandwidth_copy" , copy.bandwidth_str);
     hwloc_obj_add_info(sibling, "bandwidth_ll"   , ll.bandwidth_str);
+    hwloc_obj_add_info(sibling, "bandwidth_ls"   , ls.bandwidth_str);
     hwloc_obj_add_info(sibling, "bandwidth"      , max_bandwidth_str);
     
     sibling = sibling->next_cousin;
