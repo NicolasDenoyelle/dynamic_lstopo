@@ -28,6 +28,7 @@ struct shared_thread_arg{
   pthread_mutex_t   mtx;
   uint64_t          size;
   uint64_t          align_size;
+  double            parallel_bandwidth;
   double            bandwidth;
   perf_t            (*bench_fun)();
 };
@@ -35,6 +36,7 @@ struct shared_thread_arg{
 struct private_thread_arg{
   struct shared_thread_arg * sh_arg;
   hwloc_bitmap_t             cpuset;
+  unsigned tid;
 };
 
 static void *
@@ -51,13 +53,24 @@ bench_stream_thread(void * arg)
   s = mbench_stream_new (parg->sh_arg->size,parg->sh_arg->align_size);
 
   pthread_barrier_wait(&parg->sh_arg->br);
+  if(parg->tid==0){
+    gettimeofday(&t_start,NULL);
+    p = parg->sh_arg->bench_fun(s);
+    gettimeofday(&t_end, NULL);
+    parg->sh_arg->bandwidth = 1000000 * (double) p.bytes / ((t_end.tv_sec * 1000000 + t_end.tv_usec) - (t_start.tv_sec * 1000000 + t_start.tv_usec));
+  }
+
+  int physical_PU = hwloc_bitmap_first(parg->cpuset);
+  hwloc_get_cpubind(parg->sh_arg->topology,parg->cpuset,HWLOC_CPUBIND_THREAD);
+  assert(hwloc_bitmap_first(parg->cpuset) == physical_PU);
+  pthread_barrier_wait(&parg->sh_arg->br);
   gettimeofday(&t_start,NULL);
   p = parg->sh_arg->bench_fun(s);
   gettimeofday(&t_end, NULL);
   pthread_barrier_wait(&parg->sh_arg->br);
 
   pthread_mutex_lock(&parg->sh_arg->mtx);
-  parg->sh_arg->bandwidth += 1000000 * (double) p.bytes / ((t_end.tv_sec * 1000000 + t_end.tv_usec) - (t_start.tv_sec * 1000000 + t_start.tv_usec));
+  parg->sh_arg->parallel_bandwidth += 1000000 * (double) p.bytes / ((t_end.tv_sec * 1000000 + t_end.tv_usec) - (t_start.tv_sec * 1000000 + t_start.tv_usec));
   pthread_mutex_unlock(&parg->sh_arg->mtx);
 
   mbench_stream_free(s);
@@ -79,13 +92,20 @@ bench_stream_stream_thread(void * arg)
   s2 = mbench_stream_new (parg->sh_arg->size/2,parg->sh_arg->align_size);
 
   pthread_barrier_wait(&parg->sh_arg->br);
+  if(parg->tid==0){
+    gettimeofday(&t_start,NULL);
+    p = parg->sh_arg->bench_fun(s1,s2);
+    gettimeofday(&t_end, NULL);
+    parg->sh_arg->bandwidth = 1000000 * (double) p.bytes / ((t_end.tv_sec * 1000000 + t_end.tv_usec) - (t_start.tv_sec * 1000000 + t_start.tv_usec));
+  }
+  pthread_barrier_wait(&parg->sh_arg->br);
   gettimeofday(&t_start,NULL);
   p = parg->sh_arg->bench_fun(s1,s2);
   gettimeofday(&t_end, NULL);
   pthread_barrier_wait(&parg->sh_arg->br);
 
   pthread_mutex_lock(&parg->sh_arg->mtx);
-  parg->sh_arg->bandwidth += 1000000 * (double) p.bytes / ((t_end.tv_sec * 1000000 + t_end.tv_usec) - (t_start.tv_sec * 1000000 + t_start.tv_usec));
+  parg->sh_arg->parallel_bandwidth += 1000000 * (double) p.bytes / ((t_end.tv_sec * 1000000 + t_end.tv_usec) - (t_start.tv_sec * 1000000 + t_start.tv_usec));
   pthread_mutex_unlock(&parg->sh_arg->mtx);
 
   mbench_stream_free(s1);
@@ -93,7 +113,7 @@ bench_stream_stream_thread(void * arg)
   return NULL;
 }
 
-static double
+static struct shared_thread_arg
 hwloc_bench_memory_node(hwloc_topology_t topology, hwloc_obj_t node, int bench_fun_type, perf_t (*fun)())
 {  
   struct hwloc_cache_attr_s * attr = (struct hwloc_cache_attr_s *)node->attr;  
@@ -104,6 +124,7 @@ hwloc_bench_memory_node(hwloc_topology_t topology, hwloc_obj_t node, int bench_f
   hwloc_bitmap_t node_cpuset = hwloc_bitmap_dup(node->cpuset);
 
   sh_arg.bandwidth=0;
+  sh_arg.parallel_bandwidth=0;
   sh_arg.topology=topology;
   sh_arg.bench_fun = fun;      
   if(node->memory.local_memory==0 || node->memory.page_types==NULL){
@@ -111,7 +132,7 @@ hwloc_bench_memory_node(hwloc_topology_t topology, hwloc_obj_t node, int bench_f
       char level_type[64];
       hwloc_obj_type_snprintf(level_type,64,node,1); 
       fprintf(stderr,"node %s is not a memory node and cannot be benchmarked.\n",level_type);
-      return -1;
+      return sh_arg;
     }
     sh_arg.size = attr->size/n_threads;
     sh_arg.align_size = attr->linesize;
@@ -127,6 +148,7 @@ hwloc_bench_memory_node(hwloc_topology_t topology, hwloc_obj_t node, int bench_f
   for(i=0;i<n_threads;i++){
     t_arg[i].sh_arg = &sh_arg;
     t_arg[i].cpuset = hwloc_bitmap_dup(node_cpuset);
+    t_arg[i].tid = i;
     hwloc_bitmap_only(t_arg[i].cpuset,hwloc_bitmap_first(t_arg[i].cpuset));
     hwloc_bitmap_clr(node_cpuset, hwloc_bitmap_first(t_arg[i].cpuset));
     switch(bench_fun_type){
@@ -137,7 +159,7 @@ hwloc_bench_memory_node(hwloc_topology_t topology, hwloc_obj_t node, int bench_f
       pthread_create(&threads[i],NULL,bench_stream_stream_thread,&t_arg[i]);
       break;
     default:
-      return -1;
+      return sh_arg;
       break;
     }
   }
@@ -150,22 +172,23 @@ hwloc_bench_memory_node(hwloc_topology_t topology, hwloc_obj_t node, int bench_f
   pthread_mutex_destroy(&sh_arg.mtx);
   hwloc_bitmap_free(node_cpuset);
   
-  return sh_arg.bandwidth;
+  return sh_arg;
 }
 
 #define hwloc_bandwidth_to_str(str,bandwidth)				\
   memset(str,0,sizeof(str));						\
   if(bandwidth>=GiB)							\
-    snprintf(str,sizeof(str),"%lldGiB/s",(long long)bandwidth/GiB);	\
+    snprintf(str,sizeof(str),"%lldGiB/s",(long long)(bandwidth/GiB));	\
   else if(bandwidth>=MiB)						\
-    snprintf(str,sizeof(str),"%lldMiB/s",(long long)bandwidth/MiB);	\
+    snprintf(str,sizeof(str),"%lldMiB/s",(long long)(bandwidth/MiB));	\
  else if(bandwidth>=KiB)						\
-   snprintf(str,sizeof(str),"%lldKiB/s",(long long)bandwidth/KiB);	\
+   snprintf(str,sizeof(str),"%lldKiB/s",(long long)(bandwidth/KiB));	\
  else									\
    snprintf(str,sizeof(str),"%lldiB/s",(long long)bandwidth);		
 
 
 struct bench_info{
+  double parallel_bandwidth;
   double bandwidth;
   char bandwidth_str[64];
   float ecart_type;
@@ -179,12 +202,17 @@ benchmark_and_get_info(hwloc_topology_t topology, hwloc_obj_t level,
 		       struct bench_info * infos,
 		       double * max_bandwidth)
 {
-  infos->bandwidth  = hwloc_bench_memory_node(topology, level, bench_type, fun);
-  if(infos->bandwidth == -1)
+  struct shared_thread_arg sh_arg = hwloc_bench_memory_node(topology, level, bench_type, fun);
+  if(sh_arg.bandwidth == 0)
     return 1;
-  hwloc_bandwidth_to_str(infos->bandwidth_str, infos->bandwidth);
-  *max_bandwidth = HWLOC_BENCH_MAX(*max_bandwidth,infos->bandwidth);  
-  printf("\t%s bandwidth = %s\n", bench_str, infos->bandwidth_str);   
+
+  infos->parallel_bandwidth  = sh_arg.parallel_bandwidth; 
+  infos->bandwidth  = sh_arg.bandwidth; 
+
+  hwloc_bandwidth_to_str(infos->bandwidth_str, infos->parallel_bandwidth);
+  *max_bandwidth = HWLOC_BENCH_MAX(*max_bandwidth,infos->parallel_bandwidth);  
+  printf("%8s parallel bandwidth = %8s (%2d hyperthreads), speedup = %.1lf\n", 
+	 bench_str, infos->bandwidth_str, hwloc_bitmap_weight(level->cpuset), infos->parallel_bandwidth/infos->bandwidth);   
   return 0;
 }
 
@@ -218,8 +246,8 @@ hwloc_bench_memory_level(hwloc_topology_t topology, hwloc_obj_t level)
   if(benchmark_and_get_info(topology, level, 2, mbench_ll, "ll", &ll, &max_bandwidth) == 1)
     return 1;
 
-  /* if(benchmark_and_get_info(topology, level, 2, mbench_ls, "ls", &ls, &max_bandwidth) == 1) */
-  /*   return 1; */
+  if(benchmark_and_get_info(topology, level, 2, mbench_ls, "ls", &ls, &max_bandwidth) == 1)
+    return 1;
   
 
   hwloc_bandwidth_to_str(max_bandwidth_str, max_bandwidth);
@@ -229,7 +257,7 @@ hwloc_bench_memory_level(hwloc_topology_t topology, hwloc_obj_t level)
     hwloc_obj_add_info(sibling, "bandwidth_store", store.bandwidth_str);
     hwloc_obj_add_info(sibling, "bandwidth_copy" , copy.bandwidth_str);
     hwloc_obj_add_info(sibling, "bandwidth_ll"   , ll.bandwidth_str);
-    hwloc_obj_add_info(sibling, "bandwidth_ls"   , ls.bandwidth_str);
+    //hwloc_obj_add_info(sibling, "bandwidth_ls"   , ls.bandwidth_str);
     hwloc_obj_add_info(sibling, "bandwidth"      , max_bandwidth_str);
     
     sibling = sibling->next_cousin;
