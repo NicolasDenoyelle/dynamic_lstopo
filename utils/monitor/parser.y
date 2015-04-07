@@ -5,7 +5,7 @@
 #include <dlfcn.h>
 #include <papi.h>
 #include "hwloc.h"
-#include "parser.h"
+#include "monitor_utils.h"
 
   hwloc_topology_t topology;
   int yyerror(char * s);
@@ -15,8 +15,8 @@
   void print_func(char * name,char* code);
   unsigned int nb_counters, nb_monitors, topodepth, i;
   char * err;
-  char ** event_names, ** monitor_names, ** monitor_obj;
-  
+  char ** event_names, ** monitor_names, ** monitor_obj;  
+  FILE * tmp;
 
 %}
 
@@ -113,15 +113,7 @@ extern int yylineno;
 
 void print_func(char * name,char* code){
   /* {{{ */
-  FILE  * header = fopen(PARSED_CODE_SRC,"a+");
-  if(header==NULL){
-    fflush(stdout);
-    fprintf(stderr,"could not create or open %s\n",PARSED_CODE_SRC);
-    exit(1);
-  }
-  fprintf(header,"double %s(long long * in){\n\treturn (double) %s;\n}\n\n",name,code);
-  fclose(header);
-
+  fprintf(tmp,"double %s(long long * in){\n\treturn (double) %s;\n}\n\n",name,code);
   /* }}} */
 }
 
@@ -207,13 +199,19 @@ struct parsed_names * parser(const char * file_name) {
   }
 
   /* prepare file for functions copy */
-  remove(PARSED_CODE_SRC);
-  FILE * output = fopen (PARSED_CODE_SRC, "a+");
-  if(output==NULL){
-    fprintf (stderr, "%s: Could not create %s\n", file_name,PARSED_CODE_SRC);
+  char tmp_name[strlen("tmp.XXXXXX.c")];
+  memset(tmp_name,0,sizeof(tmp_name));
+  strcat(tmp_name,"tmp.XXXXXX.c");
+  if(mkstemps(tmp_name,2)==-1){
+    perror("mkstemps");
+    exit(EXIT_FAILURE);
+  }
+
+  tmp = fopen(tmp_name,"a+");
+  if(tmp==NULL){
+    fprintf (stderr, "%s: Could not create a temporary file %s\n", file_name, tmp_name);
     exit(1);
   }
-  fflush(output);
 
   /* parsing input file and creating functions.c file */
   FILE *input = NULL;
@@ -233,26 +231,37 @@ struct parsed_names * parser(const char * file_name) {
     fprintf (stderr, "error: invalid input file name\n");
     return NULL;
   }
+  fclose(tmp);
+  hwloc_topology_destroy(topology);
 
   struct parsed_names * pn = malloc(sizeof(*pn));
   if(pn==NULL){
     perror("malloc");
     exit(1);
   }
+
+
+  
+  pn->libso_path = malloc(strlen(tmp_name)+1);
+  if(pn->libso_path==NULL){
+    perror("malloc");
+    exit(EXIT_FAILURE);
+  }
+  memset(pn->libso_path,0,sizeof(pn->libso_path)+1);
+  strncpy(pn->libso_path,tmp_name,strlen(tmp_name));
+  pn->libso_path[strlen(tmp_name)-1] = 's';
+  pn->libso_path[strlen(tmp_name)] = 'o';
+
   pn->n_events = nb_counters;
   pn->n_monitors = nb_monitors;
   pn->monitor_names = monitor_names;
   pn->event_names = event_names;
   pn->monitor_obj = monitor_obj;
 
-  fclose(output);
-
   /* create shared library with monitors.c */
   char command[1024]; command[0]='\0'; 
-  sprintf(command,"gcc -shared -fpic -rdynamic %s -o %s",PARSED_CODE_SRC,PARSED_CODE_LIB);
+  sprintf(command,"gcc -shared -fpic -rdynamic %s -o %s",tmp_name, pn->libso_path);
   system(command);
-
-  hwloc_topology_destroy(topology);
   return pn;
 }
 
