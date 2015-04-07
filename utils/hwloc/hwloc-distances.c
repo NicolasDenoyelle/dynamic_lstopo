@@ -1,5 +1,5 @@
 /*
- * Copyright © 2009-2013 Inria.  All rights reserved.
+ * Copyright © 2009-2014 Inria.  All rights reserved.
  * Copyright © 2009-2010 Université Bordeaux
  * Copyright © 2009-2011 Cisco Systems, Inc.  All rights reserved.
  * See COPYING in top-level directory.
@@ -100,7 +100,7 @@ int main(int argc, char *argv[])
 	goto next;
       }
       else if (!strcmp (argv[0], "--version")) {
-          printf("%s %s\n", callname, VERSION);
+          printf("%s %s\n", callname, HWLOC_VERSION);
           exit(EXIT_SUCCESS);
       }
 
@@ -147,7 +147,7 @@ int main(int argc, char *argv[])
 	struct hwloc_distances_s *distances = obj->distances[k];
 	if (!distances->latency)
 	  continue;
-	printf("Latency matrix between %u %ss (depth %u) by %s indexes (below %s%s%u):\n",
+	printf("Relative latency matrix between %u %ss (depth %u) by %s indexes (below %s%s%u):\n",
 	       distances->nbobjs,
 	       hwloc_obj_type_string(hwloc_get_depth_type(topology, i+distances->relative_depth)),
 	       i+distances->relative_depth,

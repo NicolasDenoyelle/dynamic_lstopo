@@ -1,6 +1,6 @@
 /*
  * Copyright © 2009      CNRS
- * Copyright © 2009-2014 Inria.  All rights reserved.
+ * Copyright © 2009-2015 Inria.  All rights reserved.
  * Copyright © 2009-2012 Université Bordeaux
  * Copyright © 2009-2011 Cisco Systems, Inc.  All rights reserved.
  *
@@ -57,6 +57,7 @@ struct hwloc_topology {
   enum hwloc_ignore_type_e ignored_types[HWLOC_OBJ_TYPE_MAX];
   int is_thissystem;
   int is_loaded;
+  int modified;                                         /* >0 if objects were added/removed recently, which means a reconnect is needed */
   hwloc_pid_t pid;                                      /* Process ID the topology is view from, 0 for self */
   void *userdata;
 
@@ -69,6 +70,9 @@ struct hwloc_topology {
   unsigned osdev_nbobjects;
   struct hwloc_obj **osdev_level;
   struct hwloc_obj *first_osdev, *last_osdev;
+  unsigned misc_nbobjects;
+  struct hwloc_obj **misc_level;
+  struct hwloc_obj *first_misc, *last_misc;
 
   struct hwloc_binding_hooks {
     int (*set_thisproc_cpubind)(hwloc_topology_t topology, hwloc_const_cpuset_t set, int flags);
@@ -136,6 +140,9 @@ extern int hwloc_get_sysctl(int name[], unsigned namelen, int *n);
 extern unsigned hwloc_fallback_nbprocessors(struct hwloc_topology *topology);
 extern void hwloc_connect_children(hwloc_obj_t obj);
 extern int hwloc_connect_levels(hwloc_topology_t topology);
+
+extern int hwloc__object_cpusets_compare_first(hwloc_obj_t obj1, hwloc_obj_t obj2);
+extern void hwloc__reorder_children(hwloc_obj_t parent);
 
 extern void hwloc_topology_setup_defaults(struct hwloc_topology *topology);
 extern void hwloc_topology_clear(struct hwloc_topology *topology);
@@ -311,4 +318,18 @@ extern int hwloc_snprintf(char *str, size_t size, const char *format, ...) __hwl
 
 extern void hwloc_obj_add_info_nodup(hwloc_obj_t obj, const char *name, const char *value, int nodup);
 
+/* Return the name of the currently running program, if supported.
+ * If not NULL, must be freed by the caller.
+ */
+extern char * hwloc_progname(struct hwloc_topology *topology);
+
+#define HWLOC_BITMAP_EQUAL 0       /* Bitmaps are equal */
+#define HWLOC_BITMAP_INCLUDED 1    /* First bitmap included in second */
+#define HWLOC_BITMAP_CONTAINS 2    /* First bitmap contains second */
+#define HWLOC_BITMAP_INTERSECTS 3  /* Bitmaps intersect without any inclusion */
+#define HWLOC_BITMAP_DIFFERENT  4  /* Bitmaps do not intersect */
+
+/** \brief Compare bitmaps \p bitmap1 and \p bitmap2 from an inclusion point of view.
+ */
+HWLOC_DECLSPEC int hwloc_bitmap_compare_inclusion(hwloc_const_bitmap_t bitmap1, hwloc_const_bitmap_t bitmap2) __hwloc_attribute_pure;
 #endif /* HWLOC_PRIVATE_H */

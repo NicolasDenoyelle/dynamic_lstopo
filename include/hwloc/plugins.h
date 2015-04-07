@@ -1,5 +1,5 @@
 /*
- * Copyright © 2013-2014 Inria.  All rights reserved.
+ * Copyright © 2013-2015 Inria.  All rights reserved.
  * See COPYING in top-level directory.
  */
 
@@ -303,9 +303,13 @@ HWLOC_DECLSPEC struct hwloc_obj *hwloc__insert_object_by_cpuset(struct hwloc_top
  * The cpuset is completely ignored, so strange objects such as I/O devices should
  * preferably be inserted with this.
  *
- * The given object may have children.
+ * When used for "normal" children with cpusets (when importing from XML
+ * when duplicating a topology), the caller should make sure that:
+ * - children are inserted in order,
+ * - children cpusets do not intersect.
  *
- * Remember to call topology_connect() afterwards to fix handy pointers.
+ * The given object may have normal, I/O or Misc children, as long as they are in order as well.
+ * These children must have valid parent and next_sibling pointers.
  */
 HWLOC_DECLSPEC void hwloc_insert_object_by_parent(struct hwloc_topology *topology, hwloc_obj_t parent, hwloc_obj_t obj);
 
@@ -325,11 +329,13 @@ hwloc_alloc_setup_object(hwloc_obj_type_t type, signed os_index)
 
 /** \brief Setup object cpusets/nodesets by OR'ing its children.
  *
- * Used when adding an object late in the topology, after propagating sets up and down.
- * The caller should use this after inserting by cpuset (which means the cpusets is already OK).
- * Typical case: PCI backend adding a hostbridge parent.
+ * Used when adding an object late in the topology.
+ * Will update the new object by OR'ing all its new children sets.
+ *
+ * Used when PCI backend adds a hostbridge parent, when distances
+ * add a new Group, etc.
  */
-HWLOC_DECLSPEC int hwloc_fill_object_sets(hwloc_obj_t obj);
+HWLOC_DECLSPEC int hwloc_obj_add_children_sets(hwloc_obj_t obj);
 
 /** \brief Make sure that plugins can lookup core symbols.
  *

@@ -9,7 +9,7 @@ dnl Copyright © 2004-2005 The Regents of the University of California.
 dnl                         All rights reserved.
 dnl Copyright © 2004-2008 High Performance Computing Center Stuttgart,
 dnl                         University of Stuttgart.  All rights reserved.
-dnl Copyright © 2010-2014 Inria.  All rights reserved.
+dnl Copyright © 2010-2015 Inria.  All rights reserved.
 dnl Copyright © 2006-2014 Cisco Systems, Inc.  All rights reserved.
 dnl
 dnl See COPYING in top-level directory.
@@ -162,21 +162,7 @@ EOF
     AS_IF([test "x$hwloc_generate_doxs" = xyes -a "x$HWLOC_DOXYGEN_VERSION" = x1.6.2],
                  [hwloc_generate_doxs="no"; AC_MSG_WARN([doxygen 1.6.2 has broken short name support, disabling])])
 
-    # Linux and OS X take different sed arguments.
-    AC_PROG_SED
-    AC_MSG_CHECKING([if the sed -i option requires an argument])
-    rm -f conftest
-    cat > conftest <<EOF
-hello
-EOF
-    $SED -i -e s/hello/goodbye/ conftest 2> /dev/null
-    AS_IF([test -f conftest-e],
-          [SED_I="$SED -i ''"
-           AC_MSG_RESULT([yes])],
-          [SED_I="$SED -i"
-           AC_MSG_RESULT([no])])
-    rm -f conftest conftest-e
-    AC_SUBST([SED_I])
+    AC_REQUIRE([AC_PROG_SED])
 
     # Making the top-level README requires w3m or lynx.
     AC_ARG_VAR([W3M], [Location of the w3m program (required to building the top-level hwloc README file)])
@@ -301,10 +287,13 @@ AS_IF([test "$yacc_happy" = "no"],[AC_MSG_WARN([--enable-monitor requested, but 
 AC_MSG_ERROR([Cannot continue])])
 fi
 
+    AC_REQUIRE([AC_PROG_SED])
+
+
     # Cairo support
     hwloc_cairo_happy=no
     if test "x$enable_cairo" != "xno"; then
-      HWLOC_PKG_CHECK_MODULES([CAIRO], [cairo], [cairo_fill],
+      HWLOC_PKG_CHECK_MODULES([CAIRO], [cairo], [cairo_fill], [cairo.h],
                               [hwloc_cairo_happy=yes],
                               [hwloc_cairo_happy=no])
     fi
@@ -443,12 +432,12 @@ int foo(void) {
         hwloc_config_prefix[tests/hwloc/xml/Makefile]
         hwloc_config_prefix[tests/hwloc/ports/Makefile]
         hwloc_config_prefix[tests/hwloc/rename/Makefile]
-        hwloc_config_prefix[tests/hwloc/linux/hwloc-gather-topology]
         hwloc_config_prefix[tests/hwloc/linux/gather/test-gather-topology.sh]
         hwloc_config_prefix[tests/hwloc/linux/test-topology.sh]
         hwloc_config_prefix[tests/hwloc/xml/test-topology.sh]
         hwloc_config_prefix[tests/hwloc/wrapper.sh]
         hwloc_config_prefix[utils/hwloc/hwloc-compress-dir]
+        hwloc_config_prefix[utils/hwloc/hwloc-gather-topology]
         hwloc_config_prefix[utils/hwloc/test-hwloc-annotate.sh]
         hwloc_config_prefix[utils/hwloc/test-hwloc-calc.sh]
         hwloc_config_prefix[utils/hwloc/test-hwloc-compress-dir.sh]
@@ -465,10 +454,10 @@ int foo(void) {
     AC_CONFIG_COMMANDS([chmoding-scripts], [
 chmod +x ]hwloc_config_prefix[tests/hwloc/linux/test-topology.sh \
       ]hwloc_config_prefix[tests/hwloc/xml/test-topology.sh \
-      ]hwloc_config_prefix[tests/hwloc/linux/hwloc-gather-topology \
       ]hwloc_config_prefix[tests/hwloc/linux/gather/test-gather-topology.sh \
       ]hwloc_config_prefix[tests/hwloc/wrapper.sh \
       ]hwloc_config_prefix[utils/hwloc/hwloc-compress-dir \
+      ]hwloc_config_prefix[utils/hwloc/hwloc-gather-topology \
       ]hwloc_config_prefix[utils/hwloc/test-hwloc-annotate.sh \
       ]hwloc_config_prefix[utils/hwloc/test-hwloc-calc.sh \
       ]hwloc_config_prefix[utils/hwloc/test-hwloc-compress-dir.sh \

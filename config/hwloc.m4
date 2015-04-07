@@ -1,6 +1,6 @@
 dnl -*- Autoconf -*-
 dnl
-dnl Copyright © 2009-2014 Inria.  All rights reserved.
+dnl Copyright © 2009-2015 Inria.  All rights reserved.
 dnl Copyright © 2009-2012 Université Bordeaux
 dnl Copyright © 2004-2005 The Trustees of Indiana University and Indiana
 dnl                         University Research and Technology
@@ -77,6 +77,19 @@ EOF])
     if test "$HWLOC_top_builddir" != "$HWLOC_top_srcdir"; then
         AC_MSG_NOTICE([Detected VPATH build])
     fi
+
+    # Get the version of hwloc that we are installing
+    AC_MSG_CHECKING([for hwloc version])
+    HWLOC_VERSION="`$HWLOC_top_srcdir/config/hwloc_get_version.sh $HWLOC_top_srcdir/VERSION`"
+    if test "$?" != "0"; then
+        AC_MSG_ERROR([Cannot continue])
+    fi
+    HWLOC_RELEASE_DATE="`$HWLOC_top_srcdir/config/hwloc_get_version.sh $HWLOC_top_srcdir/VERSION --release-date`"
+    AC_SUBST(HWLOC_VERSION)
+    AC_DEFINE_UNQUOTED([HWLOC_VERSION], ["$HWLOC_VERSION"],
+                       [The library version, always available, even in embedded mode, contrary to VERSION])
+    AC_SUBST(HWLOC_RELEASE_DATE)
+    AC_MSG_RESULT([$HWLOC_VERSION])
 
     # Debug mode?
     AC_MSG_CHECKING([if want hwloc maintainer support])
@@ -491,6 +504,33 @@ EOF])
                 [return sysctlbyname(NULL,NULL,NULL,NULL,0);],
                 AC_DEFINE([HAVE_SYSCTLBYNAME],[1],[Define to '1' if sysctlbyname is present and usable]))
 
+    AC_CHECK_DECLS([getprogname], [], [], [AC_INCLUDES_DEFAULT])
+    AC_CHECK_DECLS([getexecname], [], [], [AC_INCLUDES_DEFAULT])
+    AC_CHECK_DECLS([GetModuleFileName], [], [], [#include <windows.h>])
+    # program_invocation_name and __progname may be available but not exported in headers
+    AC_MSG_CHECKING([for program_invocation_name])
+    AC_TRY_LINK([
+		#define _GNU_SOURCE
+		#include <errno.h>
+		#include <stdio.h>
+		extern char *program_invocation_name;
+		],[
+		return printf("%s\n", program_invocation_name);
+		],
+		[AC_DEFINE([HAVE_PROGRAM_INVOCATION_NAME], [1], [Define to '1' if program_invocation_name is present and usable])
+		 AC_MSG_RESULT([yes])
+		],[AC_MSG_RESULT([no])])
+    AC_MSG_CHECKING([for __progname])
+    AC_TRY_LINK([
+		#include <stdio.h>
+		extern char *__progname;
+		],[
+		return printf("%s\n", __progname);
+		],
+		[AC_DEFINE([HAVE___PROGNAME], [1], [Define to '1' if __progname is present and usable])
+		 AC_MSG_RESULT([yes])
+		],[AC_MSG_RESULT([no])])
+
     case ${target} in
       *-*-mingw*|*-*-cygwin*)
         hwloc_pid_t=HANDLE
@@ -689,19 +729,24 @@ EOF])
       LIBS="$tmp_save_LIBS"
     fi
 
+    # Linux libudev support
+    AC_CHECK_HEADERS([libudev.h], [
+	AC_CHECK_LIB([udev], [udev_device_new_from_subsystem_sysname], [HWLOC_LIBS="$HWLOC_LIBS -ludev"])
+    ])
+
     # PCI support via libpciaccess.  NOTE: we do not support
     # libpci/pciutils because that library is GPL and is incompatible
     # with our BSD license.
     hwloc_pci_happy=no
     if test "x$enable_pci" != xno; then
       hwloc_pci_happy=yes
-      HWLOC_PKG_CHECK_MODULES([PCIACCESS], [pciaccess], [pci_slot_match_iterator_create], [:], [hwloc_pci_happy=no])
+      HWLOC_PKG_CHECK_MODULES([PCIACCESS], [pciaccess], [pci_slot_match_iterator_create], [pciaccess.h], [:], [hwloc_pci_happy=no])
 
       # Just for giggles, if we didn't find a pciaccess pkg-config,
       # just try looking for its header file and library.
       AS_IF([test "$hwloc_pci_happy" != "yes"],
          [AC_CHECK_HEADER([pciaccess.h],
-              [AC_CHECK_LIB([pciaccess], [pci_system_init],
+              [AC_CHECK_LIB([pciaccess], [pci_slot_match_iterator_create],
                    [hwloc_pci_happy=yes
                     HWLOC_PCIACCESS_LIBS="-lpciaccess"])
               ])
@@ -897,7 +942,7 @@ EOF])
     # libxml2 support
     hwloc_libxml2_happy=
     if test "x$enable_libxml2" != "xno"; then
-        HWLOC_PKG_CHECK_MODULES([LIBXML2], [libxml-2.0], [xmlNewDoc],
+        HWLOC_PKG_CHECK_MODULES([LIBXML2], [libxml-2.0], [xmlNewDoc], [libxml/parser.h],
                                 [hwloc_libxml2_happy=yes],
                                 [hwloc_libxml2_happy=no])
     fi

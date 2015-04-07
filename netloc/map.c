@@ -1,6 +1,6 @@
 //
 // Copyright © 2013-2014 Cisco Systems, Inc.  All rights reserved.
-// Copyright © 2013 Inria.  All rights reserved.
+// Copyright © 2013-2015 Inria.  All rights reserved.
 // Copyright © 2013-2014 University of Wisconsin-La Crosse.
 //
 // See COPYING in top-level directory.
@@ -506,14 +506,15 @@ netloc_map__init_servers(struct netloc_map *map)
                     hwloc_topology_diff_destroy(validtopo, diff);
                     continue;
                 }
-                free(refname);
 
                 /* make sure the ref isn't compressed */
                 if (netloc_map__prepare_hwloc_topology(map, refserver) < 0) {
                     fprintf(stderr, "Failed to uncompress reference server %s topology\n", refname);
+                    free(refname);
                     hwloc_topology_diff_destroy(validtopo, diff);
                     continue;
                 }
+                free(refname);
 
                 err = hwloc_topology_dup(&topo, refserver->topology);
                 if (err < 0) {
@@ -1201,9 +1202,6 @@ netloc_map__paths_build_hwloc_edge_to_port(hwloc_topology_t topology,
         portparent = portparent->parent;
         pcilength++;
     }
-    /* ignore things like misc objects */
-    while (portparent->depth == (unsigned) HWLOC_TYPE_DEPTH_UNKNOWN)
-        portparent = portparent->parent;
 
     if (portparent->depth > src->depth) {
         /*  src ------ srccousin
@@ -1224,9 +1222,6 @@ netloc_map__paths_build_hwloc_edge_to_port(hwloc_topology_t topology,
             edges[i].hwloc.dest_obj = srccousin;
             /* find the weight through common ancestor */
             ancestor = hwloc_get_common_ancestor_obj(topology, src, srccousin);
-            /* ignore things like misc objects */
-            while (ancestor->depth == (unsigned) HWLOC_TYPE_DEPTH_UNKNOWN)
-                ancestor = ancestor->parent;
             edges[i].hwloc.weight = (src->depth - ancestor->depth) * 2 - 1;
             i++;
         }
@@ -1264,9 +1259,6 @@ netloc_map__paths_build_hwloc_edge_to_port(hwloc_topology_t topology,
             edges[i].hwloc.dest_obj = portparent;
             /* find the weight through common ancestor */
             ancestor = hwloc_get_common_ancestor_obj(topology, portparent, srcparent);
-            /* ignore things like misc objects */
-            while (ancestor->depth == (unsigned) HWLOC_TYPE_DEPTH_UNKNOWN)
-                ancestor = ancestor->parent;
             edges[i].hwloc.weight = (portparent->depth - ancestor->depth) * 2 - 1;
             i++;
         }
@@ -1315,9 +1307,6 @@ netloc_map__paths_build_hwloc_edge_from_port(hwloc_topology_t topology,
         portparent = portparent->parent;
         pcilength++;
     }
-    /* ignore things like misc objects */
-    while (portparent->depth == (unsigned) HWLOC_TYPE_DEPTH_UNKNOWN)
-        portparent = portparent->parent;
 
     if (flags & NETLOC_MAP_PATHS_FLAG_IO) {
         /* go up from portparent to port */
@@ -1355,9 +1344,6 @@ netloc_map__paths_build_hwloc_edge_from_port(hwloc_topology_t topology,
             edges[i].hwloc.dest_obj = dst;
             /* find the weight through common ancestor */
             ancestor = hwloc_get_common_ancestor_obj(topology, dstcousin, dst);
-            /* ignore things like misc objects */
-            while (ancestor->depth == (unsigned) HWLOC_TYPE_DEPTH_UNKNOWN)
-                ancestor = ancestor->parent;
             edges[i].hwloc.weight = (dst->depth - ancestor->depth) * 2 - 1;
             i++;
         }
@@ -1379,9 +1365,6 @@ netloc_map__paths_build_hwloc_edge_from_port(hwloc_topology_t topology,
             edges[i].hwloc.dest_obj = dstparent;
             /* find the weight through common ancestor */
             ancestor = hwloc_get_common_ancestor_obj(topology, portparent, dstparent);
-            /* ignore things like misc objects */
-            while (ancestor->depth == (unsigned) HWLOC_TYPE_DEPTH_UNKNOWN)
-                ancestor = ancestor->parent;
             edges[i].hwloc.weight = (portparent->depth - ancestor->depth) * 2 - 1;
             i++;
         }

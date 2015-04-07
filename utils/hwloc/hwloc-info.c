@@ -1,6 +1,6 @@
 /*
  * Copyright © 2009 CNRS
- * Copyright © 2009-2013 Inria.  All rights reserved.
+ * Copyright © 2009-2015 Inria.  All rights reserved.
  * Copyright © 2009-2012 Université Bordeaux
  * Copyright © 2009-2011 Cisco Systems, Inc.  All rights reserved.
  * See COPYING in top-level directory.
@@ -74,6 +74,8 @@ hwloc_info_show_obj(hwloc_obj_t obj, const char *type, const char *prefix, int v
     printf("%s depth = %u\n", prefix, obj->depth);
   printf("%s sibling rank = %u\n", prefix, obj->sibling_rank);
   printf("%s children = %u\n", prefix, obj->arity);
+  printf("%s i/o children = %u\n", prefix, obj->io_arity);
+  printf("%s misc children = %u\n", prefix, obj->misc_arity);
   if (obj->memory.local_memory)
     printf("%s local memory = %llu\n", prefix, (unsigned long long) obj->memory.local_memory);
   if (obj->memory.total_memory)
@@ -86,10 +88,6 @@ hwloc_info_show_obj(hwloc_obj_t obj, const char *type, const char *prefix, int v
   if (obj->complete_cpuset) {
     hwloc_bitmap_snprintf(s, sizeof(s), obj->complete_cpuset);
     printf("%s complete cpuset = %s\n", prefix, s);
-  }
-  if (obj->online_cpuset) {
-    hwloc_bitmap_snprintf(s, sizeof(s), obj->online_cpuset);
-    printf("%s online cpuset = %s\n", prefix, s);
   }
   if (obj->allowed_cpuset) {
     hwloc_bitmap_snprintf(s, sizeof(s), obj->allowed_cpuset);
@@ -350,7 +348,7 @@ main (int argc, char *argv[])
       else if (!strcmp(argv[0], "-p") || !strcmp(argv[0], "--physical"))
 	logical = 0;
       else if (!strcmp (argv[0], "--version")) {
-        printf("%s %s\n", callname, VERSION);
+        printf("%s %s\n", callname, HWLOC_VERSION);
         exit(EXIT_SUCCESS);
       }
       else {
@@ -418,7 +416,7 @@ main (int argc, char *argv[])
       } else {
 	/* try to match a type/depth followed by a special character */
 	typelen = strspn(argv[0], "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789");
-	if (typelen && (argv[0][typelen] == ':' || argv[0][typelen] == '=')) {
+	if (typelen && (argv[0][typelen] == ':' || argv[0][typelen] == '=' || argv[0][typelen] == '[')) {
 	  err = hwloc_calc_process_type_arg(topology, topodepth, argv[0], typelen, logical,
 					    hwloc_calc_process_arg_info_cb, NULL,
 					    verbose_mode);

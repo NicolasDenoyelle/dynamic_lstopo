@@ -1,7 +1,7 @@
 # -*- shell-script -*-
 #
 # Copyright © 2009      CNRS
-# Copyright © 2009-2014 Inria.  All rights reserved.
+# Copyright © 2009-2015 Inria.  All rights reserved.
 # Copyright © 2009, 2011-2012      Université Bordeaux
 # Copyright © 2009-2014 Cisco Systems, Inc.  All rights reserved.
 #
@@ -42,39 +42,6 @@ m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 AC_LANG([C])
 AC_USE_SYSTEM_EXTENSIONS
-
-####################################################################
-# Version information
-####################################################################
-
-# Make configure depend on the VERSION file, since it's used in AC_INIT
-AC_SUBST([CONFIGURE_DEPENDENCIES], ['$(top_srcdir)/VERSION'])
-
-# Get the version of hwloc that we are installing
-AC_MSG_CHECKING([for hwloc version])
-HWLOC_VERSION="`$srcdir/config/hwloc_get_version.sh $srcdir/VERSION`"
-if test "$?" != "0"; then
-    AC_MSG_ERROR([Cannot continue])
-fi
-HWLOC_RELEASE_DATE="`$srcdir/config/hwloc_get_version.sh $srcdir/VERSION --release-date`"
-AC_SUBST(HWLOC_VERSION)
-AC_SUBST(HWLOC_RELEASE_DATE)
-AC_MSG_RESULT([$HWLOC_VERSION])
-
-# Override/fixup the version numbers set by AC_INIT, since on
-# developer builds, there's no good way to know what the version is
-# before running configure :(.  We only use the base version number
-# for the version set in AC_INIT.  This will always match reality
-# because we add the VERSION file (the only way to change the
-# major.minor.release{greek}) into the configure dependencies.
-
-PACKAGE_VERSION="$HWLOC_VERSION"
-PACKAGE_STRING="${PACKAGE_NAME} ${PACKAGE_VERSION}"
-VERSION="${PACKAGE_VERSION}"
-
-# For standalone configurations, we also include a .so version number.
-
-. $srcdir/VERSION
 
 ####################################################################
 # Setup the configure-results header file
@@ -188,6 +155,29 @@ AS_IF([test "$enable_netloc" != "no"],
       ])
 
 ####################################################################
+# Version information
+####################################################################
+
+# HWLOC_VERSION was setup by HWLOC_SETUP_CORE above.
+
+# Make configure depend on the VERSION file, since it's used in AC_INIT
+AC_SUBST([CONFIGURE_DEPENDENCIES], ['$(top_srcdir)/VERSION'])
+
+# Override/fixup the version numbers set by AC_INIT, since on
+# developer builds, there's no good way to know what the version is
+# before running configure :(.  We only use the base version number
+# for the version set in AC_INIT.  This will always match reality
+# because we add the VERSION file (the only way to change the
+# major.minor.release{greek}) into the configure dependencies.
+PACKAGE_VERSION="$HWLOC_VERSION"
+PACKAGE_STRING="${PACKAGE_NAME} ${PACKAGE_VERSION}"
+VERSION="${PACKAGE_VERSION}"
+
+# For standalone configurations, we also include a .so version number.
+
+. $srcdir/VERSION
+
+####################################################################
 # Setup the rest of the infrastructure
 ####################################################################
 
@@ -196,25 +186,6 @@ AS_IF([test "$hwloc_mode" = "standalone"],
       [HWLOC_SETUP_DOCS
        HWLOC_SETUP_UTILS
        HWLOC_SETUP_TESTS])
-
-#
-# SED_I
-# Linux and OS X take different sed arguments.
-#
-AC_PROG_SED
-AC_MSG_CHECKING([if the sed -i option requires an argument])
-    rm -f conftest
-    cat > conftest <<EOF
-hello
-EOF
-$SED -i -e s/hello/goodbye/ conftest 2> /dev/null
-AS_IF([test -f conftest-e],
-      [SED_I="$SED -i ''"
-       AC_MSG_RESULT([yes])],
-      [SED_I="$SED -i"
-       AC_MSG_RESULT([no])])
-rm -f conftest conftest-e
-AC_SUBST([SED_I])
 
 cat <<EOF
 
@@ -238,6 +209,17 @@ LIBS="$HWLOC_EMBEDDED_LIBS $LIBS"
 
 # Party on
 AC_OUTPUT
+
+# Warn if we didn't have pkg-config
+if test "x$PKG_CONFIG" = x; then
+  cat << EOF
+
+************************************************************************
+Could not detect/enable some features such as libxml2 and Cairo support
+because pkg-config isn't available.
+************************************************************************
+EOF
+fi
 
 # Show which optional support we'll be building
 hwloc_xml_status=basic

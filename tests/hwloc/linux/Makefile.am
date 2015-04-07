@@ -1,4 +1,4 @@
-# Copyright © 2009-2014 Inria.  All rights reserved.
+# Copyright © 2009-2015 Inria.  All rights reserved.
 # Copyright © 2009-2011 Université Bordeaux
 # Copyright © 2009-2010 Cisco Systems, Inc.  All rights reserved.
 # See COPYING in top-level directory.
@@ -42,7 +42,6 @@ sysfs_outputs = \
 		16em64t-4s2c2t.output \
 		16em64t-4s2c2t-offlines.output \
 		16em64t-4s2c2t-offlines.xml.output \
-		16em64t-4s2c2t-offlines_noadmin.output \
 		16em64t-4s2c2t_ncaches.output \
 		16em64t-4s2c2t_merge.output \
 		16em64t-4s2c2t.xml.output \
@@ -101,7 +100,6 @@ sysfs_tarballs = \
 		16em64t-4s2c2t.tar.bz2 \
 		16em64t-4s2c2t-offlines.tar.bz2 \
 		16em64t-4s2c2t-offlines.xml.source \
-		16em64t-4s2c2t-offlines_noadmin.source \
 		16em64t-4s2c2t_merge.source \
 		16em64t-4s2c2t_ncaches.source \
 		16em64t-4s2c2t.xml.source \
@@ -139,7 +137,6 @@ sysfs_options = \
 		16amd64-8n2c-cpusets_noadmin.options \
 		16em64t-4s2ca2c-cpusetreorder-merge.options \
 		16em64t-4s2c2t-offlines.xml.options \
-		16em64t-4s2c2t-offlines_noadmin.options \
 		16em64t-4s2c2t_ncaches.options \
 		16em64t-4s2c2t_merge.options \
 		16em64t-4s2c2t.xml.options \
@@ -152,6 +149,7 @@ sysfs_options = \
 # modifying the environment of lstopo
 sysfs_envs = \
 		2i386-2t-hugepagesizecount.xml.env \
+		16amd64-8n2c-cpusets.xml.env \
 		32amd64-4s2n4c-cgroup.env \
 		32amd64-4s2n4c-cgroup.xml.env \
 		40intel64-2g2n4c+pci.env \
@@ -167,12 +165,5 @@ endif HWLOC_HAVE_OPENAT
 EXTRA_DIST = $(sysfs_outputs) $(sysfs_tarballs) $(sysfs_excludes) $(sysfs_options) $(sysfs_envs)
 
 LOG_COMPILER = $(builddir)/test-topology.sh
-
-
-bin_SCRIPTS = hwloc-gather-topology
-
-install-exec-hook:
-	$(SED) -e 's/HWLOC_top_builddir\/utils/bindir/' -e '/HWLOC_top_builddir/d' $(DESTDIR)$(bindir)/hwloc-gather-topology > $(DESTDIR)$(bindir)/hwloc-gather-topology.tmp && mv -f $(DESTDIR)$(bindir)/hwloc-gather-topology.tmp $(DESTDIR)$(bindir)/hwloc-gather-topology
-	chmod +x $(DESTDIR)$(bindir)/hwloc-gather-topology
 
 SUBDIRS = gather

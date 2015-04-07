@@ -1,7 +1,7 @@
 /*
  * Copyright © 2009 CNRS
- * Copyright © 2009-2014 Inria.  All rights reserved.
- * Copyright © 2009-2010, 2012 Université Bordeaux
+ * Copyright © 2009-2015 Inria.  All rights reserved.
+ * Copyright © 2009-2010, 2012, 2015 Université Bordeaux
  * Copyright © 2011 Cisco Systems, Inc.  All rights reserved.
  * See COPYING in top-level directory.
  */
@@ -48,6 +48,7 @@ extern enum lstopo_orient_e force_orient[];
 extern void *output_draw_start(struct draw_methods *draw_methods, int logical, int legend, struct hwloc_topology *topology, void *output);
 
 extern void output_draw(struct draw_methods *draw_methods, int logical, int legend, struct hwloc_topology *topology, void *output);
+extern void output_draw_clear(struct hwloc_topology *topology);
 
 #ifdef HWLOC_HAVE_MONITOR
 #include "monitor.h"
@@ -70,10 +71,6 @@ extern void perf_box_draw(hwloc_topology_t topology, struct draw_methods *method
 int rgb_to_color(int r, int g, int b) __hwloc_attribute_const;
 int declare_color(int r, int g, int b);
 
-static __hwloc_inline int lstopo_pu_offline(hwloc_obj_t l)
-{
-  return !hwloc_bitmap_isset(l->online_cpuset, l->os_index);
-}
 
 static __hwloc_inline int lstopo_pu_forbidden(hwloc_obj_t l)
 {

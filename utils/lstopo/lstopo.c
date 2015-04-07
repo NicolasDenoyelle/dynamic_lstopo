@@ -1,7 +1,7 @@
 /*
  * Copyright © 2009 CNRS
- * Copyright © 2009-2014 Inria.  All rights reserved.
- * Copyright © 2009-2012 Université Bordeaux
+ * Copyright © 2009-2015 Inria.  All rights reserved.
+ * Copyright © 2009-2012, 2015 Université Bordeaux
  * Copyright © 2009-2011 Cisco Systems, Inc.  All rights reserved.
  * See COPYING in top-level directory.
  */
@@ -94,27 +94,29 @@ FILE *open_output(const char *filename, int overwrite)
 
 static hwloc_obj_t insert_task(hwloc_topology_t topology, hwloc_cpuset_t cpuset, const char * name)
 {
-  hwloc_obj_t obj;
+  hwloc_obj_t group, obj;
 
   hwloc_bitmap_and(cpuset, cpuset, hwloc_topology_get_topology_cpuset(topology));
   if (hwloc_bitmap_iszero(cpuset))
     return NULL;
 
-  /* try to insert at exact position */
-  obj = hwloc_topology_insert_misc_object_by_cpuset(topology, cpuset, name);
-  if (!obj) {
+  /* try to insert a group at exact position */
+  group = hwloc_topology_alloc_group_object(topology);
+  if (!group)
+    return NULL;
+  group->cpuset = hwloc_bitmap_dup(cpuset);
+  group = hwloc_topology_insert_group_object(topology, group);
+  if (!group) {
     /* try to insert in a larger parent */
     char *s;
     hwloc_bitmap_asprintf(&s, cpuset);
-    obj = hwloc_get_obj_covering_cpuset(topology, cpuset);
-    if (obj) {
-      obj = hwloc_topology_insert_misc_object_by_parent(topology, obj, name);
-      fprintf(stderr, "Inserted process `%s' below parent larger than cpuset %s\n", name, s);
-    } else {
-      fprintf(stderr, "Failed to insert process `%s' with cpuset %s\n", name, s);
-    }
+    group = hwloc_get_obj_covering_cpuset(topology, cpuset);
+    fprintf(stderr, "Inserting process `%s' below parent larger than cpuset %s\n", name, s);
     free(s);
   }
+  obj = hwloc_topology_insert_misc_object(topology, group, name);
+  if (!obj)
+    fprintf(stderr, "Failed to insert process `%s'\n", name);
 
   return obj;
 }
@@ -925,7 +927,7 @@ main (int argc, char *argv[])
       }
 #endif
       else if (!strcmp (argv[0], "--version")) {
-	printf("%s %s\n", callname, VERSION);
+	printf("%s %s\n", callname, HWLOC_VERSION);
 	exit(EXIT_SUCCESS);
       } else if (!strcmp (argv[0], "--output-format") || !strcmp (argv[0], "--of")) {
 	if (argc < 2) {
@@ -1036,6 +1038,7 @@ main (int argc, char *argv[])
   if(perf==2){
     replay_t replay = new_replay(perf_input,topology,replay_phase,replay_speed);
     output_perf_replay(topology, filename, verbose_mode, callname, output_format, replay);
+    output_draw_clear(topology);
     delete_replay(replay);
   }
   else if(perf){
@@ -1069,6 +1072,7 @@ main (int argc, char *argv[])
       }
       else{
 	output_perf(topology, filename, verbose_mode, callname, output_format, m, refresh_usec, argv[0], argv);
+	output_draw_clear(topology);
       }
       delete_Monitors(m);
     }
@@ -1076,6 +1080,7 @@ main (int argc, char *argv[])
   else
 #endif
   output(topology, filename, verbose_mode, callname, output_format);
+  output_draw_clear(topology);
   hwloc_topology_destroy (topology);
 
   for(i=0; i<lstopo_append_legends_nr; i++)

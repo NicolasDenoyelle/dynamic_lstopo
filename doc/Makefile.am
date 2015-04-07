@@ -1,4 +1,4 @@
-# Copyright © 2009-2014 Inria.  All rights reserved.
+# Copyright © 2009-2015 Inria.  All rights reserved.
 # Copyright © 2009-2013 Université Bordeaux
 # Copyright © 2009-2014 Cisco Systems, Inc.  All rights reserved.
 # See COPYING in top-level directory.
@@ -73,6 +73,7 @@ dox_inputs = $(DOX_CONFIG) \
        $(hwloc_include_dir)/hwloc.h \
        $(hwloc_include_dir)/hwloc/helper.h \
        $(hwloc_include_dir)/hwloc/bitmap.h \
+       $(hwloc_include_dir)/hwloc/export.h \
        $(hwloc_include_dir)/hwloc/diff.h \
        $(hwloc_include_dir)/hwloc/plugins.h \
        $(hwloc_include_dir)/hwloc/glibc-sched.h \
@@ -315,36 +316,8 @@ man3_creation_DATA = \
         $(DOX_MAN_DIR)/man3/hwloc_topology_init.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_load.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_destroy.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_dup.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_check.3
-
-man3_configurationdir = $(man3dir)
-man3_configuration_DATA = \
-        $(DOX_MAN_DIR)/man3/hwlocality_configuration.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_ignore_type.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_ignore_type_keep_structure.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_ignore_all_keep_structure.3 \
-        $(DOX_MAN_DIR)/man3/HWLOC_TOPOLOGY_FLAG_IO_BRIDGES.3 \
-        $(DOX_MAN_DIR)/man3/HWLOC_TOPOLOGY_FLAG_IO_DEVICES.3 \
-        $(DOX_MAN_DIR)/man3/HWLOC_TOPOLOGY_FLAG_IS_THISSYSTEM.3 \
-        $(DOX_MAN_DIR)/man3/HWLOC_TOPOLOGY_FLAG_WHOLE_IO.3 \
-        $(DOX_MAN_DIR)/man3/HWLOC_TOPOLOGY_FLAG_WHOLE_SYSTEM.3 \
-        $(DOX_MAN_DIR)/man3/HWLOC_TOPOLOGY_FLAG_ICACHES.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_flags_e.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_get_flags.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_set_flags.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_set_pid.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_set_fsroot.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_set_synthetic.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_set_xml.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_set_xmlbuffer.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_set_distance_matrix.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_is_thissystem.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_discovery_support.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_cpubind_support.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_membind_support.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_support.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_set_userdata.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_get_userdata.3
 
 man3_levelsdir = $(man3dir)
 man3_levels_DATA = \
@@ -432,17 +405,50 @@ man3_membinding_DATA = \
         $(DOX_MAN_DIR)/man3/hwloc_alloc_membind_policy_nodeset.3 \
         $(DOX_MAN_DIR)/man3/hwloc_free.3
 
+man3_setsourcedir = $(man3dir)
+man3_setsource_DATA = \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_set_pid.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_set_fsroot.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_set_synthetic.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_set_xml.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_set_xmlbuffer.3
+
+man3_configurationdir = $(man3dir)
+man3_configuration_DATA = \
+        $(DOX_MAN_DIR)/man3/hwlocality_configuration.3 \
+        $(DOX_MAN_DIR)/man3/HWLOC_TOPOLOGY_FLAG_IO_BRIDGES.3 \
+        $(DOX_MAN_DIR)/man3/HWLOC_TOPOLOGY_FLAG_IO_DEVICES.3 \
+        $(DOX_MAN_DIR)/man3/HWLOC_TOPOLOGY_FLAG_IS_THISSYSTEM.3 \
+        $(DOX_MAN_DIR)/man3/HWLOC_TOPOLOGY_FLAG_WHOLE_IO.3 \
+        $(DOX_MAN_DIR)/man3/HWLOC_TOPOLOGY_FLAG_WHOLE_SYSTEM.3 \
+        $(DOX_MAN_DIR)/man3/HWLOC_TOPOLOGY_FLAG_ICACHES.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_flags_e.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_get_flags.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_set_flags.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_is_thissystem.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_discovery_support.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_cpubind_support.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_membind_support.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_support.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_ignore_type.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_ignore_type_keep_structure.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_ignore_all_keep_structure.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_set_distance_matrix.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_set_userdata.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_get_userdata.3
+
 man3_tinkerdir = $(man3dir)
 man3_tinker_DATA = \
         $(DOX_MAN_DIR)/man3/hwlocality_tinker.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_insert_misc_object_by_cpuset.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_insert_misc_object_by_parent.3 \
         $(DOX_MAN_DIR)/man3/HWLOC_RESTRICT_FLAG_ADAPT_DISTANCES.3 \
         $(DOX_MAN_DIR)/man3/HWLOC_RESTRICT_FLAG_ADAPT_IO.3 \
         $(DOX_MAN_DIR)/man3/HWLOC_RESTRICT_FLAG_ADAPT_MISC.3 \
         $(DOX_MAN_DIR)/man3/hwloc_restrict_flags_e.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_restrict.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_dup.3
+        $(DOX_MAN_DIR)/man3/hwloc_topology_insert_misc_object.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_alloc_group_object.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_insert_group_object.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_obj_add_other_obj_sets.3
 
 man3_xmlexportdir = $(man3dir)
 man3_xmlexport_DATA = \
@@ -568,7 +574,6 @@ man3_helper_topology_sets_DATA = \
         $(DOX_MAN_DIR)/man3/hwlocality_helper_topology_sets.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_get_allowed_cpuset.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_get_complete_nodeset.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_get_online_cpuset.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_get_topology_cpuset.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_get_allowed_nodeset.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_get_complete_cpuset.3 \
@@ -721,6 +726,7 @@ $(man3_object_strings_DATA): $(DOX_TAG)
 $(man3_cpubinding_DATA): $(DOX_TAG)
 $(man3_membinding_DATA): $(DOX_TAG)
 $(man3_tinker_DATA): $(DOX_TAG)
+$(man3_setsource_DATA): $(DOX_TAG)
 $(man3_xmlexport_DATA): $(DOX_TAG)
 $(man3_syntheticexport_DATA): $(DOX_TAG)
 $(man3_bitmap_DATA): $(DOX_TAG)
