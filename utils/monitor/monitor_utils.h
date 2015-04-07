@@ -4,11 +4,9 @@
 #include "monitor.h"
 #include "pwatch.h"
 
-#define PARSED_CODE_SRC "/tmp/custom_monitors.c"
-#define PARSED_CODE_LIB "/tmp/custom_monitors.so"
-
 /* utils from parser.y */
 struct parsed_names{
+  char * libso_path;
   unsigned int n_events;
   char ** event_names;
   unsigned int n_monitors;
