@@ -502,8 +502,8 @@ void * monitors_thread(void* monitors){
   return NULL;
 }
 
-int
-chk_monitors_lib(const char * perf_group_filename)
+static int
+chk_monitors_lib(const char * libso_path, const char * perf_group_filename)
 {
   struct stat stat_group, stat_lib;
 
@@ -516,12 +516,12 @@ chk_monitors_lib(const char * perf_group_filename)
   }
   
   /* no perf group library */
-  if(access(PARSED_CODE_LIB, R_OK ) == -1){
+  if(access(libso_path, R_OK ) == -1){
     return 0;
   }
   
   /* perf group is more recent than library */
-  if(stat(perf_group_filename,&stat_group) == -1 || stat(PARSED_CODE_LIB,&stat_lib)==-1)
+  if(stat(perf_group_filename,&stat_group) == -1 || stat(libso_path, &stat_lib)==-1)
     return 0;
   if(difftime(stat_group.st_mtime,stat_lib.st_mtime)>0)
     return 0;
