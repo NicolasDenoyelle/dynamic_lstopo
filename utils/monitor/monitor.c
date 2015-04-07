@@ -609,7 +609,7 @@ load_Monitors_from_config(hwloc_topology_t topology, const char * perf_group_fil
 
   /* load shared libraries */
   dlerror();
-  dlhandle = dlopen(PARSED_CODE_LIB,RTLD_NOW);
+  dlhandle = dlopen(pn->libso_path,RTLD_NOW);
   if(dlhandle==NULL){
     fprintf(stderr,"loading error:%s\n",dlerror());
     return NULL;
@@ -637,6 +637,7 @@ load_Monitors_from_config(hwloc_topology_t topology, const char * perf_group_fil
   free(pn->monitor_names);
   free(pn->event_names);
   free(pn->monitor_obj);
+  free(pn->libso_path);
   free(pn);
   return m;
 }
