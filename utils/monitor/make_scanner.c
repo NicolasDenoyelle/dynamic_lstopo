@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "parser.h"
+#include "monitor_utils.h"
 
 void usage(char** argv){
   fprintf(stdout,"%s <path_to_scanner> \n",argv[0]);
