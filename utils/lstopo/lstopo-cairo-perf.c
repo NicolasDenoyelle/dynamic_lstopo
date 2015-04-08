@@ -27,12 +27,14 @@ void topo_cairo_perf_boxes(hwloc_topology_t topology,
       else{
 	proc_watch_get_watched_in_cpuset(monitors->pw,obj->cpuset,active);
 	if(!hwloc_bitmap_iszero(active)){
-	  box->userdata=(void*)1;
+	  box->userdata=(void*)0;
 	  perf_box_draw(topology, methods, obj, c, obj->depth, val, variation, monitors->max[i], monitors->min[i]);
+	  if(obj->type == HWLOC_OBJ_CORE || obj->type == HWLOC_OBJ_PACKAGE)
+	    obj_draw_again(topology, obj->first_child, methods, 0, c);
 	}
-	else if(box->userdata){
-	  box->userdata = (void*)0;
-	  obj_draw_again(topology, obj, methods, 1, c);
+	else if(!box->userdata){
+	  box->userdata = (void*)1;
+	  obj_draw_again(topology, obj, methods, 0, c);
 	}
       }
     }
