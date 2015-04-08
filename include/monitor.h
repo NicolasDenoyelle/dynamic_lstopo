@@ -41,6 +41,7 @@ struct monitor_node{
    * Node identifiers in topology.
    **/
   unsigned depth,sibling,id;
+  void * userdata;
 };
 /*************************************************************/
 
