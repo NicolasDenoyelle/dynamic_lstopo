@@ -8,7 +8,7 @@
 #include "pwatch.h"
 
 void topo_cairo_perf_boxes(hwloc_topology_t topology, 
-monitors_t monitors, hwloc_bitmap_t active, cairo_t *c, struct draw_methods * methods)
+			     monitors_t monitors, hwloc_bitmap_t active, cairo_t *c, struct draw_methods * methods)
 {
   unsigned int i, nobj;
   hwloc_obj_t obj;
@@ -24,10 +24,14 @@ monitors_t monitors, hwloc_bitmap_t active, cairo_t *c, struct draw_methods * me
       variation = val - box->val1;
       proc_watch_get_watched_in_cpuset(monitors->pw,obj->cpuset,active);
       if(!monitors->pw || !hwloc_bitmap_iszero(active)){
+	box->userdata=(void*)1;
 	perf_box_draw(topology, methods, obj, c, obj->depth, val, variation, monitors->max[i], monitors->min[i]);
       }
       else if(hwloc_bitmap_iszero(active)){
-	obj_draw_again(topology, obj, methods, 1, c);
+	if(box->userdata){
+	  box->userdata = (void*)0;
+	  obj_draw_again(topology, obj, methods, 1, c);
+	}
       }
     }
   }

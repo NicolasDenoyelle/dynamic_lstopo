@@ -1437,6 +1437,16 @@ perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj
 
 #endif /* HWLOC_HAVE_MONITOR */
 
+void
+obj_draw_again(hwloc_topology_t topology, hwloc_obj_t obj, struct draw_methods * methods, int logical, void * output)
+{
+  struct dyna_save * ds = (struct dyna_save *)obj->userdata;
+  unsigned int width = ds->width;
+  unsigned int height = ds->height;
+  if(ds)
+    get_type_fun(obj->type)(topology, methods, logical, obj, output, obj->depth, ds->x, &width, ds->y, &height);
+}
+
 static void
 draw_clear(hwloc_topology_t topology, hwloc_obj_t level)
 {

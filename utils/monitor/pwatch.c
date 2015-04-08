@@ -19,8 +19,8 @@ struct proc_watch{
   char             * p_dir_path;
   DIR              * p_dir;
 
-  hwloc_bitmap_t     state;       /* physical */ /* 0 = must stop, 1 = must start */
-  hwloc_bitmap_t     old_state;   /* physical */ /* 0 = stopped,   1 = started */
+  hwloc_bitmap_t     query_state;       /* physical */ /* 0 = must stop, 1 = must start */
+  hwloc_bitmap_t     state;    /* physical */ /* 0 = stopped,   1 = started */
   hwloc_bitmap_t     tmp_state;
   pthread_mutex_t    mtx;
   struct task_stat * t_stat;
@@ -60,9 +60,9 @@ logical_to_physical(hwloc_topology_t topology, int logical_idx){
 int
 proc_watch_check_start_pu(struct proc_watch * pw,unsigned int physical_PU)
 {
-  if(!hwloc_bitmap_isset(pw->old_state,physical_PU) && hwloc_bitmap_isset(pw->state,physical_PU)){
+  if(!hwloc_bitmap_isset(pw->state,physical_PU) && hwloc_bitmap_isset(pw->query_state,physical_PU)){
     pthread_mutex_lock(&pw->mtx);
-    hwloc_bitmap_set(pw->old_state,physical_PU);
+    hwloc_bitmap_set(pw->state,physical_PU);
     pthread_mutex_unlock(&pw->mtx);
     return 1;
   }
@@ -76,9 +76,9 @@ inline unsigned int proc_watch_get_pid(struct proc_watch * pw){
 int
 proc_watch_check_stop_pu(struct proc_watch * pw, unsigned int physical_PU)
 {
-  if(hwloc_bitmap_isset(pw->old_state,physical_PU) && !hwloc_bitmap_isset(pw->state,physical_PU)){
+  if(hwloc_bitmap_isset(pw->state,physical_PU) && !hwloc_bitmap_isset(pw->query_state,physical_PU)){
     pthread_mutex_lock(&pw->mtx);
-    hwloc_bitmap_clr(pw->old_state,physical_PU);
+    hwloc_bitmap_clr(pw->state,physical_PU);
     pthread_mutex_unlock(&pw->mtx);
     return 1;
   }
@@ -88,14 +88,14 @@ proc_watch_check_stop_pu(struct proc_watch * pw, unsigned int physical_PU)
 inline int 
 proc_watch_get_pu_state(struct proc_watch * pw, unsigned int physical_PU)
 {
-  return hwloc_bitmap_isset(pw->state,physical_PU);
+  return hwloc_bitmap_isset(pw->query_state,physical_PU);
 }
 
 inline void
 proc_watch_get_watched_in_cpuset(struct proc_watch * pw, hwloc_cpuset_t cpuset, hwloc_cpuset_t out)
 {
   if(pw!=NULL)
-    hwloc_bitmap_and(out,cpuset,pw->state);
+    hwloc_bitmap_and(out,cpuset,pw->query_state);
 }
 
 void 
@@ -106,7 +106,7 @@ proc_watch_update(struct proc_watch * pw)
 
   /* If the process is not running, stop monitoring */
   if(kill(pw->pid,0)!=0){
-    hwloc_bitmap_zero(pw->state);
+    hwloc_bitmap_zero(pw->query_state);
     return;
   }
 
@@ -129,7 +129,7 @@ proc_watch_update(struct proc_watch * pw)
       hwloc_bitmap_set(pw->tmp_state,pw->t_stat->pu_num);
   }
   pthread_mutex_lock(&pw->mtx);
-  hwloc_bitmap_copy(pw->state, pw->tmp_state);
+  hwloc_bitmap_copy(pw->query_state, pw->tmp_state);
   pthread_mutex_unlock(&pw->mtx);
   rewinddir(pw->p_dir);
 }
@@ -157,11 +157,11 @@ new_proc_watch(unsigned int pid)
     exit(EXIT_FAILURE);
   }
 
-  if((pw->state = hwloc_bitmap_alloc())==NULL){
+  if((pw->query_state = hwloc_bitmap_alloc())==NULL){
     perror("hwloc_bitmap_alloc()");
     exit(EXIT_FAILURE);
   }
-  if((pw->old_state = hwloc_bitmap_alloc())==NULL){
+  if((pw->state = hwloc_bitmap_alloc())==NULL){
     perror("hwloc_bitmap_alloc()");
     exit(EXIT_FAILURE);
   }
@@ -171,8 +171,8 @@ new_proc_watch(unsigned int pid)
     exit(EXIT_FAILURE);
   }
 
+  hwloc_bitmap_zero(pw->query_state);
   hwloc_bitmap_zero(pw->state);
-  hwloc_bitmap_zero(pw->old_state);
   pthread_mutex_init(&pw->mtx,NULL);
   proc_watch_update(pw);
   return pw;
@@ -180,8 +180,8 @@ new_proc_watch(unsigned int pid)
 
 void
 delete_proc_watch(struct proc_watch * pw){
+  hwloc_bitmap_free(pw->query_state);
   hwloc_bitmap_free(pw->state);
-  hwloc_bitmap_free(pw->old_state);
   hwloc_bitmap_free(pw->tmp_state);
   free(pw->p_dir_path);
   free(pw->t_stat);

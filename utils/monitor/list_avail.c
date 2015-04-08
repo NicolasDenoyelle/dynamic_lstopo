@@ -76,6 +76,7 @@ start_executable(char * executable, char * exe_args[])
       exit(0);
     }
     else if(!pid2){
+      printf("starting %s\n",executable);
       ret = execvp(executable, exe_args);
       if (ret) {
 	fprintf(stderr, "Failed to launch executable \"%s\"\n",

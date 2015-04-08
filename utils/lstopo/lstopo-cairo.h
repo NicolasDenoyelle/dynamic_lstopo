@@ -116,6 +116,6 @@ void * svg_start(void *output, int width, int height);
 struct draw_methods svg_draw_methods;
 #endif /* CAIRO_HAS_SVG_SURFACE */
 
-
+void obj_draw_again(hwloc_topology_t topology, hwloc_obj_t obj, struct draw_methods * methods, int logical, void * output);
 
 
