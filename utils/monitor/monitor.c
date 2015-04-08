@@ -59,6 +59,7 @@ new_monitor_node(unsigned int n_events, unsigned depth, unsigned sibling, unsign
   out->depth = depth;
   out->sibling = sibling;
   out->id = id;
+  out->userdata=NULL;
   return out;
 }
 
