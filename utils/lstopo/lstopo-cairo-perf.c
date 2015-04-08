@@ -22,13 +22,15 @@ void topo_cairo_perf_boxes(hwloc_topology_t topology,
       box = ((struct monitor_node*)(hwloc_get_obj_by_depth(monitors->topology,monitors->depths[i],nobj)->userdata));
       val = box->val;
       variation = val - box->val1;
-      proc_watch_get_watched_in_cpuset(monitors->pw,obj->cpuset,active);
-      if(!monitors->pw || !hwloc_bitmap_iszero(active)){
-	box->userdata=(void*)1;
+      if(!monitors->pw)
 	perf_box_draw(topology, methods, obj, c, obj->depth, val, variation, monitors->max[i], monitors->min[i]);
-      }
-      else if(hwloc_bitmap_iszero(active)){
-	if(box->userdata){
+      else{
+	proc_watch_get_watched_in_cpuset(monitors->pw,obj->cpuset,active);
+	if(!hwloc_bitmap_iszero(active)){
+	  box->userdata=(void*)1;
+	  perf_box_draw(topology, methods, obj, c, obj->depth, val, variation, monitors->max[i], monitors->min[i]);
+	}
+	else if(box->userdata){
 	  box->userdata = (void*)0;
 	  obj_draw_again(topology, obj, methods, 1, c);
 	}
