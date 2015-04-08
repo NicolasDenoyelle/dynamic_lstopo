@@ -1,6 +1,7 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <signal.h>
 #include "lstopo-cairo.h"
 #include "monitor.h"
 #include "monitor_replay.h"
@@ -13,6 +14,7 @@ monitors_t monitors, hwloc_bitmap_t active, cairo_t *c, struct draw_methods * me
   hwloc_obj_t obj;
   double val, variation;
   struct monitor_node * box;
+  struct dyna_save * ds;
   for(i=0;i<monitors->count;i++){
     nobj = hwloc_get_nbobjs_by_depth(monitors->topology,monitors->depths[i]);
     while(nobj--){
@@ -23,6 +25,9 @@ monitors_t monitors, hwloc_bitmap_t active, cairo_t *c, struct draw_methods * me
       proc_watch_get_watched_in_cpuset(monitors->pw,obj->cpuset,active);
       if(!monitors->pw || !hwloc_bitmap_iszero(active)){
 	perf_box_draw(topology, methods, obj, c, obj->depth, val, variation, monitors->max[i], monitors->min[i]);
+      }
+      else if(hwloc_bitmap_iszero(active)){
+	obj_draw_again(topology, obj, methods, 1, c);
       }
     }
   }
@@ -90,15 +95,16 @@ void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_att
   Monitors_start(monitors);
 
   /* start executable to watch */
+  int pid=0;
   if(executable){
-    int pid = start_executable(executable,exe_args);
+    pid = start_executable(executable,exe_args);
     Monitors_watch_pid(monitors,pid);
     printf("monitoring pid %d\n",pid);
   }
 
   /* start timer */
   timerfd_settime(itimer_fd,0,&itimer,NULL);
-  while(1){
+  while(pid ? kill(pid,0)==0 : 1){
     in_fds = in_fds_original;
     timeout.tv_sec=10;
     timeout.tv_usec=0;
