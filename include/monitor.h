@@ -59,7 +59,10 @@ struct monitors{
    * A structure which holds a PU bitmap with bit set to 1 when <pid>'s children task's state is running on this PU.
    */
   struct proc_watch *pw;
-
+  /**
+   * 0 if we do not accumulate values.
+   **/
+  int accum;
   /**
    * The dynamic library handle to dynamically load compute functions parsed and compiled from an input file.
    **/
@@ -148,7 +151,7 @@ typedef struct monitors * monitors_t;
  *        The filename where to write the trace.
  * @return New monitors
  */
-monitors_t   new_default_Monitors             (hwloc_topology_t topology, const char * output);
+monitors_t   new_default_Monitors             (hwloc_topology_t topology, const char * output, int accum);
 /*************************************************************/
 
 
@@ -163,7 +166,7 @@ monitors_t   new_default_Monitors             (hwloc_topology_t topology, const 
  *        The filename where to write the trace.
  * @return New monitors
  */
-monitors_t   load_Monitors_from_config        (hwloc_topology_t topology, const char * perf_group_file, const char * output);
+monitors_t   load_Monitors_from_config        (hwloc_topology_t topology, const char * perf_group_file, const char * output, int accum);
 /*************************************************************/
 
 
