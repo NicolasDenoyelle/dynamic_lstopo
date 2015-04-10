@@ -101,6 +101,8 @@ proc_watch_get_watched_in_cpuset(struct proc_watch * pw, hwloc_cpuset_t cpuset, 
 void 
 proc_watch_update(struct proc_watch * pw)
 {
+  if(!pw)
+    return;
   struct dirent * task_dir;
   char task_path[128];
 
