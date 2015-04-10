@@ -176,7 +176,7 @@ init_eventset(int * eventset,unsigned int n_events,  char** event_names, unsigne
 monitors_t new_Monitors(hwloc_topology_t topology,
 			unsigned int n_events, 
 			char ** event_names, 
-			const char * output){
+			const char * output, int accum){
 
   unsigned int i, depth; 
   monitors_t m;
@@ -191,6 +191,7 @@ monitors_t new_Monitors(hwloc_topology_t topology,
     perror("malloc failed\n");
     return NULL;
   }
+  m->accum=accum;
   m->n_events=0;
   m->event_names=NULL;
   m->n_PU=0;
@@ -460,9 +461,11 @@ void * monitors_thread(void* monitors){
       pthread_mutex_lock(&(out->read_lock));
       /* i am the first to acquire the lock, i reset values */
       if(out->uptodate==0){
-	zerod(out->counters_val,m->n_events);
 	out->old_usec = out->real_usec;
 	out->real_usec = 0;
+	if(!m->accum){
+	  zerod(out->counters_val,m->n_events);
+	}
       }
       /* accumulate values */
       for(j=0;j<m->n_events;j++){
@@ -541,7 +544,7 @@ void unload_monitors_lib(monitors_t m){
 /*                                                   PUBLIC                                                    */
 /***************************************************************************************************************/
 monitors_t
-new_default_Monitors(hwloc_topology_t topology, const char * output)
+new_default_Monitors(hwloc_topology_t topology, const char * output, int accum)
 {
   unsigned i,depth = hwloc_topology_get_depth(topology)-1;
   int eventset = PAPI_NULL;
@@ -571,7 +574,7 @@ new_default_Monitors(hwloc_topology_t topology, const char * output)
   PAPI_destroy_eventset(&eventset);
 
   monitors_t m;
-  m = new_Monitors(topology, count, event_names, output);
+  m = new_Monitors(topology, count, event_names, output, accum);
   if(m==NULL){
     fprintf(stderr,"default monitors_t creation failed\n");
     for(i=0;i<count;i++){
@@ -594,7 +597,7 @@ new_default_Monitors(hwloc_topology_t topology, const char * output)
 
 
 monitors_t
-load_Monitors_from_config(hwloc_topology_t topology, const char * perf_group_file, const char * output)
+load_Monitors_from_config(hwloc_topology_t topology, const char * perf_group_file, const char * output, int accum)
 {
   struct parsed_names * pn;
   monitors_t m;
@@ -616,7 +619,7 @@ load_Monitors_from_config(hwloc_topology_t topology, const char * perf_group_fil
   }  
   dlerror();
 
-  m = new_Monitors(topology, pn->n_events,pn->event_names,output);
+  m = new_Monitors(topology, pn->n_events,pn->event_names,output, accum);
   m->dlhandle=dlhandle;
 
   for(i=0;i<pn->n_events;i++)

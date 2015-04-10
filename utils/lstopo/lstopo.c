@@ -72,6 +72,7 @@ static unsigned int top  = 0;
   } while(0)								\
     
 static int perf_opt = 0;
+static int perf_accumulate = 0;
 static int perf_no_display_opt = 0;
 static int perf_replay_opt = 0;
 static int replay_phase = 0;
@@ -327,6 +328,7 @@ void usage(const char *name, FILE *where)
   fprintf (where, "  --whole-io            Show all I/O devices and bridges\n");
 #ifdef HWLOC_HAVE_MONITOR
   fprintf (where, "  --perf                Display live performance counters on topology\n");
+  fprintf (where, "  --perf-accumulate     Specify if samples should be accumulated\n");
   fprintf (where, "  --perf-output         Choose a file to keep monitors_t trace\n");
   fprintf (where, "  --perf-no-display     Record counters without direct printing for later display.\n");
   fprintf (where, "                        This option is usefull to reduce recording overhead.\n");
@@ -843,6 +845,10 @@ main (int argc, char *argv[])
       else if (!strcmp (argv[0], "--perf")){
 	perf_opt = 1;
       }
+      else if (!strcmp (argv[0], "--perf-accumulate")){
+	perf_opt = 1;
+	perf_accumulate = 1;
+      }
       else if (!strcmp (argv[0], "--perf-output")){
 	if (argc < 2) {
 	  usage (callname, stderr);
@@ -1028,9 +1034,9 @@ main (int argc, char *argv[])
     delete_replay(replay);
   }
   else if(perf_opt){
-    monitors_t m=load_Monitors_from_config(topology,perf_input,perf_output);
+    monitors_t m=load_Monitors_from_config(topology,perf_input,perf_output, perf_accumulate);
     if(m==NULL)
-      m=new_default_Monitors(topology,perf_output);
+      m=new_default_Monitors(topology,perf_output,perf_accumulate);
     if(m==NULL){
       fprintf(stderr, "failed to create monitors\n");
       exit(EXIT_FAILURE);
