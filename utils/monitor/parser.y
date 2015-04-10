@@ -199,9 +199,9 @@ struct parsed_names * parser(const char * file_name) {
   }
 
   /* prepare file for functions copy */
-  char tmp_name[strlen("tmp.XXXXXX.c")];
-  memset(tmp_name,0,sizeof(tmp_name));
-  strcat(tmp_name,"tmp.XXXXXX.c");
+  char * tmp_name = malloc(strlen("tmp.XXXXXX.c")+1);
+  memset(tmp_name,0,strlen("tmp.XXXXXX.c")+1);
+  sprintf(tmp_name,"tmp.XXXXXX.c");
   if(mkstemps(tmp_name,2)==-1){
     perror("mkstemps");
     exit(EXIT_FAILURE);
@@ -262,6 +262,7 @@ struct parsed_names * parser(const char * file_name) {
   char command[1024]; command[0]='\0'; 
   sprintf(command,"gcc -shared -fpic -rdynamic %s -o %s",tmp_name, pn->libso_path);
   system(command);
+  free(tmp_name);
   return pn;
 }
 
