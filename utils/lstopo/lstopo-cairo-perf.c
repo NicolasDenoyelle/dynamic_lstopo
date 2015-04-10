@@ -268,9 +268,11 @@ output_pdf_perf(hwloc_topology_t topology, const char *filename __hwloc_attribut
     Monitors_watch_pid(monitors,pid);
     printf("monitoring pid %d\n",pid);
     Monitors_update_counters(monitors);
-    proc_watch_update(monitors->pw);
-    waitpid(pid,NULL,0);
-    Monitors_update_counters(monitors);
+    while(kill(pid,0)==0){
+      Monitors_update_counters(monitors);
+      proc_watch_update(monitors->pw);
+      usleep(refresh_usec);
+    }
   }
   else{
     unsigned i;
