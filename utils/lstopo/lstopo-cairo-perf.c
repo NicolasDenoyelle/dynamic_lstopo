@@ -1,5 +1,6 @@
 #include <sys/mman.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <signal.h>
 #include "lstopo-cairo.h"
@@ -125,6 +126,7 @@ void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_att
 	if(read(itimer_fd,&buf,sizeof(uint64_t))==-1){
 	  perror("read");
 	}
+	proc_watch_update(monitors->pw);
 	Monitors_update_counters(monitors);
 	topo_cairo_perf_boxes(topology, monitors, active, c, &x11_draw_methods);
 	XFlush(disp->dpy);
@@ -216,9 +218,20 @@ output_png_perf(hwloc_topology_t topology, const char *filename, int overwrite, 
   cairo_t *c;
   c = cairo_create(cs);
   Monitors_start(monitors);
-  unsigned i;
-  for(i=0;i<10;i++){
+  if(executable){
+    int pid=0;
+    pid = start_executable(executable,exe_args);
+    Monitors_watch_pid(monitors,pid);
+    proc_watch_update(monitors->pw);
+    printf("monitoring pid %d\n",pid);
+    waitpid(pid,NULL,0);
     Monitors_update_counters(monitors);
+  }
+  else{
+    unsigned i;
+    for(i=0;i<10;i++){
+      Monitors_update_counters(monitors);
+    }
   }
   topo_cairo_perf_boxes(topology, monitors, active, c, &png_draw_methods);
   cairo_destroy(c);
@@ -249,9 +262,21 @@ output_pdf_perf(hwloc_topology_t topology, const char *filename __hwloc_attribut
   cairo_t *c;
   c = cairo_create(cs);
   Monitors_start(monitors);
-  unsigned i;
-  for(i=0;i<10;i++){
+  if(executable){
+    int pid=0;
+    pid = start_executable(executable,exe_args);
+    Monitors_watch_pid(monitors,pid);
+    printf("monitoring pid %d\n",pid);
     Monitors_update_counters(monitors);
+    proc_watch_update(monitors->pw);
+    waitpid(pid,NULL,0);
+    Monitors_update_counters(monitors);
+  }
+  else{
+    unsigned i;
+    for(i=0;i<10;i++){
+      Monitors_update_counters(monitors);
+    }
   }
   output_draw( &pdf_draw_methods, logical, legend, topology, c);
   topo_cairo_perf_boxes(topology, monitors, active, c, &pdf_draw_methods);
@@ -283,9 +308,20 @@ output_ps_perf(hwloc_topology_t topology, const char *filename, int overwrite, i
   cairo_t *c;
   c = cairo_create(cs);
   Monitors_start(monitors);
-  unsigned i;
-  for(i=0;i<100;i++){
+  if(executable){
+    int pid=0;
+    pid = start_executable(executable,exe_args);
+    Monitors_watch_pid(monitors,pid);
+    printf("monitoring pid %d\n",pid);
+    waitpid(pid,NULL,0);
     Monitors_update_counters(monitors);
+    proc_watch_update(monitors->pw);
+  }
+  else{
+    unsigned i;
+    for(i=0;i<10;i++){
+      Monitors_update_counters(monitors);
+    }
   }
   output_draw( &ps_draw_methods, logical, legend, topology, c);
   topo_cairo_perf_boxes(topology, monitors, active, c, &png_draw_methods);
@@ -319,9 +355,20 @@ output_svg_perf(hwloc_topology_t topology, const char *filename, int overwrite, 
   cairo_t *c;
   c = cairo_create(cs);
   Monitors_start(monitors);
-  unsigned i;
-  for(i=0;i<100;i++){
+  if(executable){
+    int pid=0;
+    pid = start_executable(executable,exe_args);
+    Monitors_watch_pid(monitors,pid);
+    printf("monitoring pid %d\n",pid);
+    waitpid(pid,NULL,0);
     Monitors_update_counters(monitors);
+    proc_watch_update(monitors->pw);
+  }
+  else{
+    unsigned i;
+    for(i=0;i<10;i++){
+      Monitors_update_counters(monitors);
+    }
   }
   output_draw( &svg_draw_methods, logical, legend, topology, c);
   topo_cairo_perf_boxes(topology, monitors, active, c, &png_draw_methods);
