@@ -415,7 +415,6 @@ void * monitors_thread(void* monitors){
     /* signal we are ready for new update*/
   next_loop:;
     pthread_barrier_wait(&(m->barrier));
-    pthread_barrier_wait(&(m->barrier));
 
     /* update time stamp*/
     PU_vals->old_usec=PU_vals->real_usec;
@@ -691,9 +690,6 @@ Monitors_start(monitors_t m)
 
 void
 Monitors_update_counters(monitors_t m){
-  pthread_barrier_wait(&(m->barrier));
-  if(m->pw!=NULL)
-    proc_watch_update(m->pw);
   pthread_barrier_wait(&(m->barrier));
 }
 
