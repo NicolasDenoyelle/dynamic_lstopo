@@ -360,7 +360,7 @@ void usage(const char *name, FILE *where)
   fprintf (where, "  --perf-replay         Choose a file output by --perf-output to replay an execution from trace.\n");
   fprintf (where, "  --perf-replay-phase   Choose a phase defined in the trace file to replay.\n");
   fprintf (where, "  --perf-replay-speed   Choose the speed, the replay has to be run. Ex: 0.5 will multiply per 2 the "); 
-  fprintf (where, "execution time.\n");
+  fprintf (where, "execution time. (\".\" is language sensitive, it might be \",\" instead\n");
 #endif
   fprintf (where, "  --version             Report version and exit\n");
 }
