@@ -67,6 +67,7 @@ struct monitors{
    * The dynamic library handle to dynamically load compute functions parsed and compiled from an input file.
    **/
   void *            dlhandle;
+  const char * libsopath;
   /**
    * The file descriptor to the output file where to write the trace.
    **/
