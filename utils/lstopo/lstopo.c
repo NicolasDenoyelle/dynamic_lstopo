@@ -73,6 +73,7 @@ static unsigned int top  = 0;
     
 static int perf_opt = 0;
 static int perf_accumulate = 0;
+static int perf_whole_machine = 0;
 static int perf_no_display_opt = 0;
 static int perf_replay_opt = 0;
 static int replay_phase = 0;
@@ -80,6 +81,7 @@ static float replay_speed=1;
 static char * perf_output = NULL;
 static char * perf_input = NULL;
 static unsigned long refresh_usec=100000;
+static monitors_t m;
 #endif
 
 FILE *open_output(const char *filename, int overwrite)
@@ -331,6 +333,7 @@ void usage(const char *name, FILE *where)
   fprintf (where, "  --perf-accumulate     Specify if samples should be accumulated\n");
   fprintf (where, "  --perf-output         Choose a file to keep monitors_t trace\n");
   fprintf (where, "  --perf-no-display     Record counters without direct printing for later display.\n");
+  fprintf (where, "  --perf-whole-machine  Record every PU counter even when monitoring an application.\n");
   fprintf (where, "                        This option is usefull to reduce recording overhead.\n");
   fprintf (where, "  -r --refresh <r_usec> Refresh display each r_usec when --perf option is used\n");
 #endif
@@ -481,7 +484,7 @@ output(hwloc_topology_t topology, const char * filename, int verbose_mode, char*
 
 #ifdef HWLOC_HAVE_MONITOR
 void 
-output_perf(hwloc_topology_t topology, const char * filename, int verbose_mode, char* callname, int output_format, monitors_t monitors, unsigned long r_usec, char * executable, char * exe_args[])
+output_perf(hwloc_topology_t topology, const char * filename, int verbose_mode, char* callname, int output_format, char * executable, char * exe_args[])
 {
   switch (output_format) {
   case LSTOPO_OUTPUT_DEFAULT:
@@ -490,7 +493,8 @@ output_perf(hwloc_topology_t topology, const char * filename, int verbose_mode, 
     if (getenv("DISPLAY")) {
       if (logical == -1)
 	logical = 0;
-      output_x11_perf(topology, NULL, overwrite, logical, legend, verbose_mode,monitors, r_usec, executable, exe_args);
+      output_x11_perf(topology, NULL, overwrite, logical, legend, verbose_mode, 
+		      m, refresh_usec, perf_whole_machine, executable, exe_args);
     } else
 #endif /* CAIRO_HAS_XLIB_SURFACE */
 #ifdef HWLOC_WIN_SYS
@@ -527,22 +531,26 @@ output_perf(hwloc_topology_t topology, const char * filename, int verbose_mode, 
 #ifdef LSTOPO_HAVE_GRAPHICS
 # if CAIRO_HAS_PNG_FUNCTIONS
   case LSTOPO_OUTPUT_PNG:
-    output_png_perf(topology, filename, overwrite, logical, legend, verbose_mode, monitors, r_usec, executable, exe_args);
+    output_png_perf(topology, filename, overwrite, logical, legend, verbose_mode, 
+		    m, refresh_usec, perf_whole_machine, executable, exe_args);
     break;
 # endif /* CAIRO_HAS_PNG_FUNCTIONS */
 # if CAIRO_HAS_PDF_SURFACE
   case LSTOPO_OUTPUT_PDF:
-    output_pdf_perf(topology, filename, overwrite, logical, legend, verbose_mode, monitors, r_usec, executable, exe_args);
+    output_pdf_perf(topology, filename, overwrite, logical, legend, verbose_mode, 
+		    m, refresh_usec, perf_whole_machine, executable, exe_args);
     break;
 # endif /* CAIRO_HAS_PDF_SURFACE */
 # if CAIRO_HAS_PS_SURFACE
   case LSTOPO_OUTPUT_PS:
-    output_ps_perf(topology, filename, overwrite, logical, legend, verbose_mode, monitors, r_usec, executable, exe_args);
+    output_ps_perf(topology, filename, overwrite, logical, legend, verbose_mode, 
+		   m, refresh_usec, perf_whole_machine, executable, exe_args);
     break;
 #endif /* CAIRO_HAS_PS_SURFACE */
 #if CAIRO_HAS_SVG_SURFACE
   case LSTOPO_OUTPUT_SVG:
-    output_svg_perf(topology, filename, overwrite, logical, legend, verbose_mode, monitors, r_usec, executable, exe_args);
+    output_svg_perf(topology, filename, overwrite, logical, legend, verbose_mode, 
+		    m, refresh_usec, perf_whole_machine, executable, exe_args);
     break;
 #endif /* CAIRO_HAS_SVG_SURFACE */
 #endif /* LSTOPO_HAVE_GRAPHICS */
@@ -849,6 +857,9 @@ main (int argc, char *argv[])
 	perf_opt = 1;
 	perf_accumulate = 1;
       }
+      else if (!strcmp (argv[0], "--perf-whole-machine")){
+	perf_whole_machine = 1;
+      }
       else if (!strcmp (argv[0], "--perf-output")){
 	if (argc < 2) {
 	  usage (callname, stderr);
@@ -1034,9 +1045,9 @@ main (int argc, char *argv[])
     delete_replay(replay);
   }
   else if(perf_opt){
-    monitors_t m=load_Monitors_from_config(topology,perf_input,perf_output, perf_accumulate);
+    m = load_Monitors_from_config(topology,perf_input,perf_output, perf_accumulate);
     if(m==NULL)
-      m=new_default_Monitors(topology,perf_output,perf_accumulate);
+      m = new_default_Monitors(topology,perf_output,perf_accumulate);
     if(m==NULL){
       fprintf(stderr, "failed to create monitors\n");
       exit(EXIT_FAILURE);
@@ -1047,8 +1058,10 @@ main (int argc, char *argv[])
     if(perf_no_display_opt){
       if(argv[0]){
 	lstopo_pid = start_executable(argv[0],argv);
-	printf("monitoring pid %d\n",lstopo_pid);
-	Monitors_watch_pid(m,lstopo_pid);
+	if(!perf_whole_machine){
+	  printf("monitoring pid %d\n",lstopo_pid);
+	  Monitors_watch_pid(m,lstopo_pid);
+	}
       }
       Monitors_start(m);
       if(lstopo_pid){
@@ -1065,7 +1078,7 @@ main (int argc, char *argv[])
       }
     }
     else{
-      output_perf(topology, filename, verbose_mode, callname, output_format, m, refresh_usec, argv[0], argv);
+      output_perf(topology, filename, verbose_mode, callname, output_format, argv[0], argv);
       output_draw_clear(topology);
     }
     delete_Monitors(m);
