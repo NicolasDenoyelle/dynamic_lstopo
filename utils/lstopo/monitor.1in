@@ -30,9 +30,19 @@ my_monitor0{L2, PAPI_L2_TCM/PAPI_TOT_CYC}
 
 #The parser skips new lines and spaces.
 .TP
-\fB\-\-perf\-no\-display\fR \fIfile\fR
+\fB\-\-perf\-no\-display\fR
 
-If you to avoid display overhead while recording counters you can use this option jointly with
+If you want to avoid display overhead while recording counters you can use this option jointly with
+\fB\-\-perf\-output\fR to keep an execution trace to display later.
+.TP
+\fB\-\-perf\-whole\-machine\fR
+
+This option allows to record counters from each machine's processing unit, even if we should monitor a specific application or pid.
+.TP
+\fB\-\-perf\-accumulate\fR
+
+This option will make counters accumulate along time instead of displaying difference between two contiguous time steps.
+.TP
 \fB\-\-perf\-output\fR to keep an execution trace to display later.
 .TP
 \fB\-\-refresh\fR \fIusec\fR
