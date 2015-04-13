@@ -56,7 +56,7 @@ extern void output_draw_clear(struct hwloc_topology *topology);
 
 /* monitor draw */
 extern void output_draw_perf(struct draw_methods *draw_methods, int logical, int legend, struct hwloc_topology *topology, void *output, monitors_t monitors);
-typedef void output_perf_method(struct hwloc_topology *topology, const char *output, int overwrite, int logical, int legend, int verbose_mode, monitors_t monitors, unsigned long refresh_usec, char * executable, char * exe_args[]);
+typedef void output_perf_method(struct hwloc_topology *topology, const char *output, int overwrite, int logical, int legend, int verbose_mode, monitors_t monitors, unsigned long refresh_usec, int perf_whole_machine, char * executable, char * exe_args[]);
 extern output_perf_method output_x11_perf, output_pdf_perf, output_png_perf, output_ps_perf, output_svg_perf;
 
 /* perf draw */
