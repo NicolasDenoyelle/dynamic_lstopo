@@ -61,7 +61,7 @@ replay_t replay, cairo_t *c, struct draw_methods * methods)
 }
 
 #if CAIRO_HAS_XLIB_SURFACE
-void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_attribute_unused, int overwrite __hwloc_attribute_unused, int logical, int legend, int verbose_mode __hwloc_attribute_unused, monitors_t monitors, unsigned long refresh_usec, char * executable, char * exe_args[])
+void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_attribute_unused, int overwrite __hwloc_attribute_unused, int logical, int legend, int verbose_mode __hwloc_attribute_unused, monitors_t monitors, unsigned long refresh_usec, int perf_whole_machine, char * executable, char * exe_args[])
 {
   struct timeval timeout;
   char buf[sizeof(uint64_t)];
@@ -107,8 +107,10 @@ void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_att
   int pid=0;
   if(executable){
     pid = start_executable(executable,exe_args);
-    Monitors_watch_pid(monitors,pid);
-    printf("monitoring pid %d\n",pid);
+    if(!perf_whole_machine){
+      Monitors_watch_pid(monitors,pid);
+      printf("monitoring pid %d\n",pid);
+    }
   }
 
   /* start timer */
@@ -198,47 +200,56 @@ void output_x11_perf_replay(hwloc_topology_t topology, const char *filename __hw
 
 #endif /* CAIRO_HAS_XLIB_SURFACE */
 
-#if CAIRO_HAS_PNG_FUNCTIONS
-/* PNG back-end */
-void
-output_png_perf(hwloc_topology_t topology, const char *filename, int overwrite, int logical, int legend, int verbose_mode __hwloc_attribute_unused, monitors_t monitors, unsigned long refresh_usec, char * executable, char * exe_args[])
+
+static cairo_surface_t *
+static_app_monitor(monitors_t m, int perf_whole_machine, char * executable, char * exe_args[],
+		   struct draw_methods * methods, FILE * output, int logical, int legend, 
+		   hwloc_topology_t topology)
 {
-  FILE *output = open_output(filename, overwrite);
-  cairo_surface_t *cs;
-
-  if (!output) {
-    fprintf(stderr, "Failed to open %s for writing (%s)\n", filename, strerror(errno));
-    return;
-  }
-
-  cs = output_draw_start(&png_draw_methods, logical, legend, topology, output);
-  topo_cairo_paint(&png_draw_methods, logical, legend, topology, cs);
-
-  hwloc_bitmap_t active = hwloc_bitmap_dup(hwloc_topology_get_topology_cpuset(topology));
+  cairo_surface_t *cs = output_draw_start(methods, logical, legend, topology, output);
+  topo_cairo_paint(methods, logical, legend, topology, cs);
   cairo_t *c;
   c = cairo_create(cs);
-  Monitors_start(monitors);
+
+  Monitors_start(m);
   if(executable){
     int pid=0;
     pid = start_executable(executable,exe_args);
-    Monitors_watch_pid(monitors,pid);
-    proc_watch_update(monitors->pw);
-    printf("monitoring pid %d\n",pid);
+    if(!perf_whole_machine){
+      Monitors_watch_pid(m,pid);
+      printf("monitoring pid %d\n",pid);
+    }
     waitpid(pid,NULL,0);
-    Monitors_update_counters(monitors);
+    Monitors_update_counters(m);
   }
   else{
     unsigned i;
     for(i=0;i<10;i++){
-      Monitors_update_counters(monitors);
+      Monitors_update_counters(m);
     }
   }
-  topo_cairo_perf_boxes(topology, monitors, active, c, &png_draw_methods);
-  cairo_destroy(c);
 
-  cairo_surface_write_to_png_stream(cs, topo_cairo_write, output);
-  cairo_surface_destroy(cs);
+  hwloc_bitmap_t active = hwloc_bitmap_dup(hwloc_topology_get_topology_cpuset(topology));
+  topo_cairo_perf_boxes(topology, m, active, c, &png_draw_methods);
   hwloc_bitmap_free(active);
+  cairo_destroy(c);
+  return cs;
+}
+
+#if CAIRO_HAS_PNG_FUNCTIONS
+/* PNG back-end */
+void
+output_png_perf(hwloc_topology_t topology, const char *filename, int overwrite, int logical, int legend, int verbose_mode __hwloc_attribute_unused, monitors_t monitors, unsigned long refresh_usec, int perf_whole_machine, char * executable, char * exe_args[])
+{
+  FILE *output = open_output(filename, overwrite);
+  if (!output) {
+    fprintf(stderr, "Failed to open %s for writing (%s)\n", filename, strerror(errno));
+    return;
+  }
+  cairo_surface_t * cs = static_app_monitor(monitors, perf_whole_machine, executable, exe_args, &png_draw_methods, output, logical, legend, topology);
+  cairo_surface_write_to_png_stream(cs, topo_cairo_write, output);
+  cairo_surface_flush(cs);
+  cairo_surface_destroy(cs);
   if (output != stdout)
     fclose(output);
 }
@@ -247,44 +258,14 @@ output_png_perf(hwloc_topology_t topology, const char *filename, int overwrite, 
 #if CAIRO_HAS_PDF_SURFACE
 /* PDF back-end */
 void
-output_pdf_perf(hwloc_topology_t topology, const char *filename __hwloc_attribute_unused, int overwrite __hwloc_attribute_unused, int logical, int legend, int verbose_mode __hwloc_attribute_unused, monitors_t monitors, unsigned long refresh_usec, char * executable, char * exe_args[])
+output_pdf_perf(hwloc_topology_t topology, const char *filename __hwloc_attribute_unused, int overwrite __hwloc_attribute_unused, int logical, int legend, int verbose_mode __hwloc_attribute_unused, monitors_t monitors, unsigned long refresh_usec, int perf_whole_machine, char * executable, char * exe_args[])
 {
-  hwloc_bitmap_t active = hwloc_bitmap_dup(hwloc_topology_get_topology_cpuset(topology));
   FILE *output = open_output(filename, overwrite);
-  cairo_surface_t *cs;
-
   if (!output) {
     fprintf(stderr, "Failed to open %s for writing (%s)\n", filename, strerror(errno));
     return;
   }
-
-  cs = output_draw_start(&pdf_draw_methods, logical, legend, topology, output);
-  cairo_t *c;
-  c = cairo_create(cs);
-  Monitors_start(monitors);
-  if(executable){
-    int pid=0;
-    pid = start_executable(executable,exe_args);
-    Monitors_watch_pid(monitors,pid);
-    printf("monitoring pid %d\n",pid);
-    Monitors_update_counters(monitors);
-    while(kill(pid,0)==0){
-      Monitors_update_counters(monitors);
-      proc_watch_update(monitors->pw);
-      usleep(refresh_usec);
-    }
-  }
-  else{
-    unsigned i;
-    for(i=0;i<10;i++){
-      Monitors_update_counters(monitors);
-    }
-  }
-  output_draw( &pdf_draw_methods, logical, legend, topology, c);
-  topo_cairo_perf_boxes(topology, monitors, active, c, &pdf_draw_methods);
-  hwloc_bitmap_free(active);
-
-  cairo_destroy(c);
+  cairo_surface_t * cs = static_app_monitor(monitors, perf_whole_machine, executable, exe_args, &pdf_draw_methods, output, logical, legend, topology);
   cairo_surface_flush(cs);
   cairo_surface_destroy(cs);
   if (output != stdout)
@@ -295,40 +276,15 @@ output_pdf_perf(hwloc_topology_t topology, const char *filename __hwloc_attribut
 #if CAIRO_HAS_PS_SURFACE
 /* PS back-end */
 void
-output_ps_perf(hwloc_topology_t topology, const char *filename, int overwrite, int logical, int legend, int verbose_mode __hwloc_attribute_unused, monitors_t monitors, unsigned long refresh_usec, char * executable, char * exe_args[])
+output_ps_perf(hwloc_topology_t topology, const char *filename, int overwrite, int logical, int legend, int verbose_mode __hwloc_attribute_unused, monitors_t monitors, unsigned long refresh_usec, int perf_whole_machine, char * executable, char * exe_args[])
 {
   FILE *output = open_output(filename, overwrite);
-  cairo_surface_t *cs;
-
   if (!output) {
     fprintf(stderr, "Failed to open %s for writing (%s)\n", filename, strerror(errno));
     return;
   }
 
-  cs = output_draw_start(&ps_draw_methods, logical, legend, topology, output);
-  hwloc_bitmap_t active = hwloc_bitmap_dup(hwloc_topology_get_topology_cpuset(topology));
-  cairo_t *c;
-  c = cairo_create(cs);
-  Monitors_start(monitors);
-  if(executable){
-    int pid=0;
-    pid = start_executable(executable,exe_args);
-    Monitors_watch_pid(monitors,pid);
-    printf("monitoring pid %d\n",pid);
-    waitpid(pid,NULL,0);
-    Monitors_update_counters(monitors);
-    proc_watch_update(monitors->pw);
-  }
-  else{
-    unsigned i;
-    for(i=0;i<10;i++){
-      Monitors_update_counters(monitors);
-    }
-  }
-  output_draw( &ps_draw_methods, logical, legend, topology, c);
-  topo_cairo_perf_boxes(topology, monitors, active, c, &png_draw_methods);
-  hwloc_bitmap_free(active);
-  cairo_destroy(c);
+  cairo_surface_t * cs = static_app_monitor(monitors, perf_whole_machine, executable, exe_args, &ps_draw_methods, output, logical, legend, topology);
   cairo_surface_flush(cs);
   cairo_surface_destroy(cs);
   if (output != stdout)
@@ -341,41 +297,16 @@ output_ps_perf(hwloc_topology_t topology, const char *filename, int overwrite, i
 /* SVG back-end */
 
 void
-output_svg_perf(hwloc_topology_t topology, const char *filename, int overwrite, int logical, int legend, int verbose_mode __hwloc_attribute_unused, monitors_t monitors, unsigned long refresh_usec, char * executable, char * exe_args[])
+output_svg_perf(hwloc_topology_t topology, const char *filename, int overwrite, int logical, int legend, int verbose_mode __hwloc_attribute_unused, monitors_t monitors, unsigned long refresh_usec, int perf_whole_machine, char * executable, char * exe_args[])
 {
   FILE *output;
-  cairo_surface_t *cs;
-
   output = open_output(filename, overwrite);
   if (!output) {
     fprintf(stderr, "Failed to open %s for writing (%s)\n", filename, strerror(errno));
     return;
   }
 
-  cs = output_draw_start(&svg_draw_methods, logical, legend, topology, output);
-  hwloc_bitmap_t active = hwloc_bitmap_dup(hwloc_topology_get_topology_cpuset(topology));
-  cairo_t *c;
-  c = cairo_create(cs);
-  Monitors_start(monitors);
-  if(executable){
-    int pid=0;
-    pid = start_executable(executable,exe_args);
-    Monitors_watch_pid(monitors,pid);
-    printf("monitoring pid %d\n",pid);
-    waitpid(pid,NULL,0);
-    Monitors_update_counters(monitors);
-    proc_watch_update(monitors->pw);
-  }
-  else{
-    unsigned i;
-    for(i=0;i<10;i++){
-      Monitors_update_counters(monitors);
-    }
-  }
-  output_draw( &svg_draw_methods, logical, legend, topology, c);
-  topo_cairo_perf_boxes(topology, monitors, active, c, &png_draw_methods);
-  cairo_destroy(c);
-
+  cairo_surface_t * cs = static_app_monitor(monitors, perf_whole_machine, executable, exe_args, &svg_draw_methods, output, logical, legend, topology);
   cairo_surface_flush(cs);
   cairo_surface_destroy(cs);
 
