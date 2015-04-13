@@ -202,7 +202,7 @@ void output_x11_perf_replay(hwloc_topology_t topology, const char *filename __hw
 
 
 static void
-static_app_monitor(monitors_t m, int perf_whole_machine,int r, char * executable, char * exe_args[],
+static_app_monitor(monitors_t m,int r, char * executable, char * exe_args[],
 		   struct draw_methods * methods, FILE * output, int logical, int legend, 
 		   hwloc_topology_t topology, cairo_surface_t * cs)
 {
@@ -211,16 +211,14 @@ static_app_monitor(monitors_t m, int perf_whole_machine,int r, char * executable
 
   Monitors_start(m);
   if(executable){
+    m->accum=1;
     int pid=0;
     pid = start_executable(executable,exe_args);
-    if(!perf_whole_machine){
-      Monitors_watch_pid(m,pid);
-      printf("monitoring pid %d\n",pid);
+    while(kill(pid,0)==0){
+      proc_watch_update(m->pw);
+      Monitors_update_counters(m);
+      usleep(r);    
     }
-    while(kill(pid,0)==0)
-      usleep(r);
-    
-    Monitors_update_counters(m);
   }
   else{
     unsigned i;
@@ -229,10 +227,11 @@ static_app_monitor(monitors_t m, int perf_whole_machine,int r, char * executable
     }
   }
 
-  hwloc_bitmap_t active = hwloc_bitmap_dup(hwloc_topology_get_topology_cpuset(topology));
+  hwloc_bitmap_t active = hwloc_bitmap_alloc();
   output_draw(methods, logical, legend, topology, c);
   topo_cairo_perf_boxes(topology, m, active, c, methods);
   hwloc_bitmap_free(active);
+  cairo_show_page(c);
   cairo_destroy(c);
   return;
 }
@@ -240,7 +239,7 @@ static_app_monitor(monitors_t m, int perf_whole_machine,int r, char * executable
 #if CAIRO_HAS_PNG_FUNCTIONS
 /* PNG back-end */
 void
-output_png_perf(hwloc_topology_t topology, const char *filename, int overwrite, int logical, int legend, int verbose_mode __hwloc_attribute_unused, monitors_t monitors, unsigned long refresh_usec, int perf_whole_machine, char * executable, char * exe_args[])
+output_png_perf(hwloc_topology_t topology, const char *filename, int overwrite, int logical, int legend, int verbose_mode __hwloc_attribute_unused, monitors_t monitors, unsigned long refresh_usec, int perf_whole_machine __hwloc_attribute_unused, char * executable, char * exe_args[])
 {
   FILE *output = open_output(filename, overwrite);
   if (!output) {
@@ -250,7 +249,7 @@ output_png_perf(hwloc_topology_t topology, const char *filename, int overwrite, 
   cairo_surface_t * cs = output_draw_start(&png_draw_methods, logical, legend, topology, output);
   topo_cairo_paint(&png_draw_methods, logical, legend, topology, cs);
 
-  static_app_monitor(monitors, perf_whole_machine, refresh_usec, executable, exe_args, &png_draw_methods, output, logical, legend, topology, cs);
+  static_app_monitor(monitors, refresh_usec, executable, exe_args, &png_draw_methods, output, logical, legend, topology, cs);
 
   cairo_surface_write_to_png_stream(cs, topo_cairo_write, output);
 }
@@ -259,7 +258,7 @@ output_png_perf(hwloc_topology_t topology, const char *filename, int overwrite, 
 #if CAIRO_HAS_PDF_SURFACE
 /* PDF back-end */
 void
-output_pdf_perf(hwloc_topology_t topology, const char *filename __hwloc_attribute_unused, int overwrite __hwloc_attribute_unused, int logical, int legend, int verbose_mode __hwloc_attribute_unused, monitors_t monitors, unsigned long refresh_usec, int perf_whole_machine, char * executable, char * exe_args[])
+output_pdf_perf(hwloc_topology_t topology, const char *filename __hwloc_attribute_unused, int overwrite __hwloc_attribute_unused, int logical, int legend, int verbose_mode __hwloc_attribute_unused, monitors_t monitors, unsigned long refresh_usec, int perf_whole_machine __hwloc_attribute_unused, char * executable, char * exe_args[])
 {
   FILE *output = open_output(filename, overwrite);
   if (!output) {
@@ -267,7 +266,7 @@ output_pdf_perf(hwloc_topology_t topology, const char *filename __hwloc_attribut
     return;
   }
   cairo_surface_t * cs = output_draw_start(&pdf_draw_methods, logical, legend, topology, output);
-  static_app_monitor(monitors, perf_whole_machine, refresh_usec, executable, exe_args, &pdf_draw_methods, output, logical, legend, topology, cs);
+  static_app_monitor(monitors, refresh_usec, executable, exe_args, &pdf_draw_methods, output, logical, legend, topology, cs);
   cairo_surface_flush(cs);
   cairo_surface_destroy(cs);
   if (output != stdout)
@@ -278,7 +277,7 @@ output_pdf_perf(hwloc_topology_t topology, const char *filename __hwloc_attribut
 #if CAIRO_HAS_PS_SURFACE
 /* PS back-end */
 void
-output_ps_perf(hwloc_topology_t topology, const char *filename, int overwrite, int logical, int legend, int verbose_mode __hwloc_attribute_unused, monitors_t monitors, unsigned long refresh_usec, int perf_whole_machine, char * executable, char * exe_args[])
+output_ps_perf(hwloc_topology_t topology, const char *filename, int overwrite, int logical, int legend, int verbose_mode __hwloc_attribute_unused, monitors_t monitors, unsigned long refresh_usec, int perf_whole_machine __hwloc_attribute_unused, char * executable, char * exe_args[])
 {
   FILE *output = open_output(filename, overwrite);
   if (!output) {
@@ -287,7 +286,7 @@ output_ps_perf(hwloc_topology_t topology, const char *filename, int overwrite, i
   }
 
   cairo_surface_t * cs = output_draw_start(&ps_draw_methods, logical, legend, topology, output);
-  static_app_monitor(monitors, perf_whole_machine, refresh_usec, executable, exe_args, &ps_draw_methods, output, logical, legend, topology, cs);
+  static_app_monitor(monitors, refresh_usec, executable, exe_args, &ps_draw_methods, output, logical, legend, topology, cs);
   cairo_surface_flush(cs);
   cairo_surface_destroy(cs);
   if (output != stdout)
@@ -300,7 +299,7 @@ output_ps_perf(hwloc_topology_t topology, const char *filename, int overwrite, i
 /* SVG back-end */
 
 void
-output_svg_perf(hwloc_topology_t topology, const char *filename, int overwrite, int logical, int legend, int verbose_mode __hwloc_attribute_unused, monitors_t monitors, unsigned long refresh_usec, int perf_whole_machine, char * executable, char * exe_args[])
+output_svg_perf(hwloc_topology_t topology, const char *filename, int overwrite, int logical, int legend, int verbose_mode __hwloc_attribute_unused, monitors_t monitors, unsigned long refresh_usec, int perf_whole_machine __hwloc_attribute_unused, char * executable, char * exe_args[])
 {
   FILE *output;
   output = open_output(filename, overwrite);
@@ -310,7 +309,7 @@ output_svg_perf(hwloc_topology_t topology, const char *filename, int overwrite, 
   }
 
   cairo_surface_t * cs = output_draw_start(&ps_draw_methods, logical, legend, topology, output);
-  static_app_monitor(monitors, perf_whole_machine, refresh_usec, executable, exe_args, &svg_draw_methods, output, logical, legend, topology, cs);
+  static_app_monitor(monitors, refresh_usec, executable, exe_args, &svg_draw_methods, output, logical, legend, topology, cs);
   cairo_surface_flush(cs);
   cairo_surface_destroy(cs);
 
