@@ -201,13 +201,11 @@ void output_x11_perf_replay(hwloc_topology_t topology, const char *filename __hw
 #endif /* CAIRO_HAS_XLIB_SURFACE */
 
 
-static cairo_surface_t *
-static_app_monitor(monitors_t m, int perf_whole_machine, char * executable, char * exe_args[],
+static void
+static_app_monitor(monitors_t m, int perf_whole_machine,int r, char * executable, char * exe_args[],
 		   struct draw_methods * methods, FILE * output, int logical, int legend, 
-		   hwloc_topology_t topology)
+		   hwloc_topology_t topology, cairo_surface_t * cs)
 {
-  cairo_surface_t *cs = output_draw_start(methods, logical, legend, topology, output);
-  topo_cairo_paint(methods, logical, legend, topology, cs);
   cairo_t *c;
   c = cairo_create(cs);
 
@@ -219,7 +217,9 @@ static_app_monitor(monitors_t m, int perf_whole_machine, char * executable, char
       Monitors_watch_pid(m,pid);
       printf("monitoring pid %d\n",pid);
     }
-    waitpid(pid,NULL,0);
+    while(kill(pid,0)==0)
+      usleep(r);
+    
     Monitors_update_counters(m);
   }
   else{
@@ -230,10 +230,11 @@ static_app_monitor(monitors_t m, int perf_whole_machine, char * executable, char
   }
 
   hwloc_bitmap_t active = hwloc_bitmap_dup(hwloc_topology_get_topology_cpuset(topology));
-  topo_cairo_perf_boxes(topology, m, active, c, &png_draw_methods);
+  output_draw(methods, logical, legend, topology, c);
+  topo_cairo_perf_boxes(topology, m, active, c, methods);
   hwloc_bitmap_free(active);
   cairo_destroy(c);
-  return cs;
+  return;
 }
 
 #if CAIRO_HAS_PNG_FUNCTIONS
@@ -246,12 +247,12 @@ output_png_perf(hwloc_topology_t topology, const char *filename, int overwrite, 
     fprintf(stderr, "Failed to open %s for writing (%s)\n", filename, strerror(errno));
     return;
   }
-  cairo_surface_t * cs = static_app_monitor(monitors, perf_whole_machine, executable, exe_args, &png_draw_methods, output, logical, legend, topology);
+  cairo_surface_t * cs = output_draw_start(&png_draw_methods, logical, legend, topology, output);
+  topo_cairo_paint(&png_draw_methods, logical, legend, topology, cs);
+
+  static_app_monitor(monitors, perf_whole_machine, refresh_usec, executable, exe_args, &png_draw_methods, output, logical, legend, topology, cs);
+
   cairo_surface_write_to_png_stream(cs, topo_cairo_write, output);
-  cairo_surface_flush(cs);
-  cairo_surface_destroy(cs);
-  if (output != stdout)
-    fclose(output);
 }
 #endif /* CAIRO_HAS_PNG_FUNCTIONS */
 
@@ -265,7 +266,8 @@ output_pdf_perf(hwloc_topology_t topology, const char *filename __hwloc_attribut
     fprintf(stderr, "Failed to open %s for writing (%s)\n", filename, strerror(errno));
     return;
   }
-  cairo_surface_t * cs = static_app_monitor(monitors, perf_whole_machine, executable, exe_args, &pdf_draw_methods, output, logical, legend, topology);
+  cairo_surface_t * cs = output_draw_start(&pdf_draw_methods, logical, legend, topology, output);
+  static_app_monitor(monitors, perf_whole_machine, refresh_usec, executable, exe_args, &pdf_draw_methods, output, logical, legend, topology, cs);
   cairo_surface_flush(cs);
   cairo_surface_destroy(cs);
   if (output != stdout)
@@ -284,7 +286,8 @@ output_ps_perf(hwloc_topology_t topology, const char *filename, int overwrite, i
     return;
   }
 
-  cairo_surface_t * cs = static_app_monitor(monitors, perf_whole_machine, executable, exe_args, &ps_draw_methods, output, logical, legend, topology);
+  cairo_surface_t * cs = output_draw_start(&ps_draw_methods, logical, legend, topology, output);
+  static_app_monitor(monitors, perf_whole_machine, refresh_usec, executable, exe_args, &ps_draw_methods, output, logical, legend, topology, cs);
   cairo_surface_flush(cs);
   cairo_surface_destroy(cs);
   if (output != stdout)
@@ -306,7 +309,8 @@ output_svg_perf(hwloc_topology_t topology, const char *filename, int overwrite, 
     return;
   }
 
-  cairo_surface_t * cs = static_app_monitor(monitors, perf_whole_machine, executable, exe_args, &svg_draw_methods, output, logical, legend, topology);
+  cairo_surface_t * cs = output_draw_start(&ps_draw_methods, logical, legend, topology, output);
+  static_app_monitor(monitors, perf_whole_machine, refresh_usec, executable, exe_args, &svg_draw_methods, output, logical, legend, topology, cs);
   cairo_surface_flush(cs);
   cairo_surface_destroy(cs);
 
