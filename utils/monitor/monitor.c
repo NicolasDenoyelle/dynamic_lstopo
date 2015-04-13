@@ -327,8 +327,7 @@ int add_Monitor(monitors_t m, const char * name, char * hwloc_obj_name, double (
     node=hwloc_get_obj_by_depth(m->topology,depth,n_obj);
     node->userdata = new_monitor_node(m->n_events,depth,n_obj,m->n_nodes);
     m->n_nodes++;
-  }
-  
+  }  
   return 0;
 }
 
@@ -620,6 +619,7 @@ load_Monitors_from_config(hwloc_topology_t topology, const char * perf_group_fil
   dlerror();
 
   m = new_Monitors(topology, pn->n_events,pn->event_names,output, accum);
+  m->libsopath = pn->libso_path;
   m->dlhandle=dlhandle;
 
   for(i=0;i<pn->n_events;i++)
@@ -787,6 +787,7 @@ delete_Monitors(monitors_t m)
   if(m->pw!=NULL)
     delete_proc_watch(m->pw);
   unload_monitors_lib(m);
+  remove(m->libsopath);
   free(m);
   // hwloc_topology_destroy(m->topology);
   PAPI_shutdown();
