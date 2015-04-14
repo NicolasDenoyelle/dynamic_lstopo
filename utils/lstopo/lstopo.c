@@ -499,33 +499,33 @@ output_perf(hwloc_topology_t topology, const char * filename, int verbose_mode, 
 #endif /* CAIRO_HAS_XLIB_SURFACE */
 #ifdef HWLOC_WIN_SYS
       {
-	fprintf(stdout,"output format not supported with --perf\n");
+	fprintf(stdout,"output format not supported on windows with --perf\n");
 	exit(EXIT_FAILURE);
       }
 #endif
 #endif /* !LSTOPO_HAVE_GRAPHICS */
 #if !defined HWLOC_WIN_SYS || !defined LSTOPO_HAVE_GRAPHICS
     {
-      fprintf(stdout,"output format not supported with --perf\n");
+      fprintf(stdout,"output format not supported on windows with --perf\n");
       exit(EXIT_FAILURE);
     }
 #endif
     break;
       
   case LSTOPO_OUTPUT_CONSOLE:
-    fprintf(stdout,"output format not supported with --perf\n");
+    fprintf(stdout,"output format LSTOPO_OUTPUT_CONSOLE not supported with --perf\n");
     exit(EXIT_FAILURE);
     break;
   case LSTOPO_OUTPUT_SYNTHETIC:
-    fprintf(stdout,"output format not supported with --perf\n");
+    fprintf(stdout,"output format LSTOPO_OUTPUT_SYNTHETIC not supported with --perf\n");
     exit(EXIT_FAILURE);
     break;
   case LSTOPO_OUTPUT_TEXT:
-    fprintf(stdout,"output format not supported with --perf\n");
+    fprintf(stdout,"output format LSTOPO_OUTPUT_TEXT not supported with --perf\n");
     exit(EXIT_FAILURE);
     break;
   case LSTOPO_OUTPUT_FIG:
-    fprintf(stdout,"output format not supported with --perf\n");
+    fprintf(stdout,"output format LSTOPO_OUTPUT_FIG not supported with --perf\n");
     exit(EXIT_FAILURE);
     break;
 #ifdef LSTOPO_HAVE_GRAPHICS
@@ -555,7 +555,7 @@ output_perf(hwloc_topology_t topology, const char * filename, int verbose_mode, 
 #endif /* CAIRO_HAS_SVG_SURFACE */
 #endif /* LSTOPO_HAVE_GRAPHICS */
   case LSTOPO_OUTPUT_XML:
-    fprintf(stdout,"output format not supported with --perf\n");
+    fprintf(stdout,"output format LSTOPO_OUTPUT_XML not supported with --perf\n");
     exit(EXIT_FAILURE);    break;
   default:
     fprintf(stderr, "file format not supported\n");
