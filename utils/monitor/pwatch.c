@@ -1,5 +1,7 @@
 #include "pwatch.h"
 #include <pthread.h>
+#include <sys/wait.h>
+#include <sys/mman.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
