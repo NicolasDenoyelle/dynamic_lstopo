@@ -60,3 +60,46 @@ Running the "lstopo" tool is a good way to check as a graphical output whether
 hwloc properly detected the architecture of your node. Netloc command-line
 tools can be used to display the network topology interconnecting your nodes.
 
+
+Using PAPI to Monitor an application or a machine in lstopo (X) view:
+
+Requirements:
+	X output must be enabled.
+	You must ave permission to read every performance counters, it can be 
+	achieved by running the command 
+	"echo "-1" > /proc/sys/kernel/perf_event_paranoid" as root.
+	PAPI, bison and lex must be installed.
+	If you use a custom installation of these, you have to make configure 
+	know where to find headers and libraries:
+	export LD_LIBRARY_PATH=<papi_lib_dir>:$LD_LIBRARY_PATH
+	export LIBRARY_PATH=<papi_lib_dir>:$LIBRARY_PATH
+	export C_INCLUDE_PATH=<papi_include_dir>:$C_INCLUDE_PATH
+Installation:
+	Simply install hwloc
+	Use configure option --enable-monitor to force monitor compilation.
+	The configure summary shows if monitors is enabled.
+Usage:
+	Use lstopo the same way as usual + add perf options:
+	"lstopo --perf" will display random availables counters on random 
+	topology nodes.
+	"lstopo --help" contains other options you can use to custom behaviour. 
+	You can describe which counter(s) to display on a specific topology 
+	node with --perf-input option, which takes in argument a file written 
+	as follow:
+	#commentary: The first one is the pattern and while trigger an error
+	counter_name0{hwloc_obj_name0,PAPI_COUNTER0}
+	my_counter{L1i,PAPI_FP_OPS*PAPI_L1_ICM/1000}
+	...
+	If an object or a counter isn't available on your system, a list of 
+	availables items will be dumped.
+Monitoring an application:
+	As a backend:
+	   lstopo <perf options> <your_application> <your application args>
+	Instrumenting your code:
+	   Use monitor.h header in <hwloc_install_include_dir> and link your
+	   application  with -lmonitor in <hwloc_install_lib_dir>
+	   Instanciating monitors require an <output_file> to write a trace.
+	   Once you ran your application, you can display the trace with 
+	   lstopo --perf-replay <output_file> .
+
+
