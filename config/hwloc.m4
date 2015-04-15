@@ -190,7 +190,7 @@ EOF])
 
     if test "x$enable_mbench" != "xno"; then
     hwloc_mbench_happy=yes     
-    AC_CHECK_LIB([mbench],[mbench_rdtsc],[mbench_lib_happy=yes],[hwloc_mbench_happy=no])
+    AC_CHECK_LIB([mbench],[mbench_stream_new],[mbench_lib_happy=yes],[hwloc_mbench_happy=no])
     AC_CHECK_HEADER([libmbench.h],[mbench_header_happy=yes],[hwloc_mbench_happy=no])
     fi
 
@@ -887,9 +887,9 @@ EOF])
     # X11 support
     AC_PATH_XTRA
 
+    lstopo_X11_happy=no
     CPPFLAGS_save=$CPPFLAGS
     LIBS_save=$LIBS
-
     CPPFLAGS="$CPPFLAGS $X_CFLAGS"
     LIBS="$LIBS $X_PRE_LIBS $X_LIBS $X_EXTRA_LIBS"
     AC_CHECK_HEADERS([X11/Xlib.h],
@@ -900,7 +900,8 @@ EOF])
              # lstopo needs more
              AC_CHECK_HEADERS([X11/Xutil.h],
                 [AC_CHECK_HEADERS([X11/keysym.h],
-                    [AC_DEFINE([HWLOC_HAVE_X11_KEYSYM], [1], [Define to 1 if X11 headers including Xutil.h and keysym.h are available.])])
+                    [AC_DEFINE([HWLOC_HAVE_X11_KEYSYM], [1], [Define to 1 if X11 headers including Xutil.h and keysym.h are available.])
+		     lstopo_X11_happy=yes])
                      AC_SUBST([HWLOC_X11_LIBS], ["-lX11"])
                 ], [], [#include <X11/Xlib.h>])
             ])

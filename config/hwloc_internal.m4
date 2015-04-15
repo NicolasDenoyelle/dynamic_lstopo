@@ -282,6 +282,8 @@ EOF
 
     AS_IF([test "x$hwloc_cairo_happy" = "xno"],
     	  [hwloc_monitor_happy=no])
+    AS_IF([test "x$lstopo_X11_happy" = "xno"],
+    	  [hwloc_monitor_happy=no])
 
     AC_CHECK_LIB([papi],[PAPI_library_init],[papi_lib_happy=yes],[hwloc_monitor_happy=no])
     AC_CHECK_HEADER([papi.h],[papi_header_happy=yes],[hwloc_monitor_happy=no])
@@ -306,6 +308,7 @@ EOF
     [AS_IF([test "$papi_lib_happy" = "no"],  [AC_MSG_WARN([--enable-monitor requested, but papi lib was not found, LDFLAGS=$LDFLAGS])])
     AS_IF([test "$papi_header_happy" = "no"],[AC_MSG_WARN([--enable-monitor requested, but papi header was not found])])
     AS_IF([test "x$hwloc_cairo_happy" = "xno"],[AC_MSG_WARN([--enable-monitor requested, but CAIRO dependency is not satisfied])])
+    AS_IF([test "x$lstopo_X11_happy" = "xno"],[AC_MSG_WARN([--enable-monitor requested, but X11 was not found])])
     AS_IF([test "$lex_happy" = "no"],[AC_MSG_WARN([--enable-monitor requested, but program lex $LEX was not found])])
     AS_IF([test "$yacc_happy" = "no"],[AC_MSG_WARN([--enable-monitor requested, but program yacc $YACC was not found])])
     AC_MSG_ERROR([Cannot continue])])
