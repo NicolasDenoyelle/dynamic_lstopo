@@ -50,6 +50,16 @@ AC_DEFUN([HWLOC_DEFINE_ARGS],[
                   AC_HELP_STRING([--disable-picky],
                                  [When in developer checkouts of hwloc and compiling with gcc, the default is to enable maximum compiler pickyness.  Using --disable-picky or --enable-picky overrides any default setting]))
 
+    #monitor ?			 
+    AC_ARG_ENABLE([monitor],
+       		  AS_HELP_STRING([--disable-monitor],
+				 [Disable PAPI monitoring with lstopo command]))
+
+    #monitor ?			 
+    AC_ARG_ENABLE([mbench],
+       		  AS_HELP_STRING([--disable-mbench],
+				 [Disable benchmark driven hardware discovery]))
+
     # Cairo?
     AC_ARG_ENABLE([cairo],
                   AS_HELP_STRING([--disable-cairo],
@@ -240,7 +250,45 @@ AC_DEFUN([HWLOC_SETUP_UTILS],[
 ###
 EOF
 
+# Monitor support
+hwloc_monitor_happy=no
+papi_lib_happy=no
+papi_header_happy=no
+lex_happy=no
+yacc_happy=no
+no_happy=no
+
+if test "x$enable_monitor" != "xno"; then
+hwloc_monitor_happy=yes     
+AC_CHECK_LIB([papi],[PAPI_library_init],[papi_lib_happy=yes],[hwloc_monitor_happy=no])
+AC_CHECK_HEADER([papi.h],[papi_header_happy=yes],[hwloc_monitor_happy=no])
+AC_PROG_YACC
+if test x"${YACC}" != x":" ; then
+yacc_happy=yes
+else	
+hwloc_monitor_happy=no
+fi
+AC_PROG_LEX
+if test x"${LEX}" != x":" ; then
+lex_happy=yes
+else	
+hwloc_monitor_happy=no
+fi
+fi
+
+if test "$hwloc_monitor_happy" = "yes"; then
+AC_DEFINE([HWLOC_HAVE_MONITOR], [1], [Define to 1 if you are able to compile the 'monitor'.])
+else
+AS_IF([test "$enable_monitor" = "yes"],
+[AS_IF([test "$papi_lib_happy" = "no"],  [AC_MSG_WARN([--enable-monitor requested, but papi lib was not found, LDFLAGS=$LDFLAGS])])
+AS_IF([test "$papi_header_happy" = "no"],[AC_MSG_WARN([--enable-monitor requested, but papi header was not found])])
+AS_IF([test "$lex_happy" = "no"],[AC_MSG_WARN([--enable-monitor requested, but program lex $LEX was not found])])
+AS_IF([test "$yacc_happy" = "no"],[AC_MSG_WARN([--enable-monitor requested, but program yacc $YACC was not found])])
+AC_MSG_ERROR([Cannot continue])])
+fi
+
     AC_REQUIRE([AC_PROG_SED])
+
 
     # Cairo support
     hwloc_cairo_happy=no
@@ -310,6 +358,7 @@ EOF
         hwloc_config_prefix[utils/Makefile]
         hwloc_config_prefix[utils/hwloc/Makefile]
         hwloc_config_prefix[utils/lstopo/Makefile]
+        hwloc_config_prefix[utils/monitor/Makefile]
         hwloc_config_prefix[hwloc.pc]
 
         hwloc_config_prefix[utils/lsmap/Makefile]

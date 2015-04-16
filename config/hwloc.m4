@@ -182,6 +182,29 @@ EOF])
     hwloc_components="noos xml synthetic xml_nolibxml"
 
     #
+    # Check benchmark support
+    # 
+    hwloc_mbench_happy=no
+    mbench_lib_happy=no
+    mbench_header_happy=no
+
+    if test "x$enable_mbench" != "xno"; then
+    hwloc_mbench_happy=yes     
+    AC_CHECK_LIB([mbench],[mbench_rdtsc],[mbench_lib_happy=yes],[hwloc_mbench_happy=no])
+    AC_CHECK_HEADER([libmbench.h],[mbench_header_happy=yes],[hwloc_mbench_happy=no])
+    fi
+
+    if test "x$hwloc_mbench_happy" = "xyes"; then
+    AC_DEFINE([HWLOC_HAVE_MBENCH], [1], [Define to 1 if you are able to compile the 'benchmark discovery plugin'.])
+    hwloc_components="$hwloc_components bench"
+    else
+    AS_IF([test "$enable_mbench" = "yes"],
+    [AS_IF([test "$mbench_lib_happy" = "no"],  [AC_MSG_WARN([--enable-mbench requested, but mbench lib was not found, LDFLAGS=$LDFLAGS])])
+    AS_IF([test "$mbench_header_happy" = "no"],[AC_MSG_WARN([--enable-mbench requested, but libmbench.h header was not found])])
+    AC_MSG_ERROR([Cannot continue])])
+    fi
+
+    #
     # Check OS support
     #
     AC_MSG_CHECKING([which OS support to include])
@@ -1176,6 +1199,8 @@ AC_DEFUN([HWLOC_DO_AM_CONDITIONALS],[
 		       [test "x$hwloc_have_cudart" = "xyes"])
         AM_CONDITIONAL([HWLOC_HAVE_LIBXML2], [test "$hwloc_libxml2_happy" = "yes"])
         AM_CONDITIONAL([HWLOC_HAVE_CAIRO], [test "$hwloc_cairo_happy" = "yes"])
+        AM_CONDITIONAL([HWLOC_HAVE_MONITOR], [test "$hwloc_monitor_happy" = "yes"])
+        AM_CONDITIONAL([HWLOC_HAVE_MBENCH], [test "$hwloc_mbench_happy" = "yes"])
         AM_CONDITIONAL([HWLOC_HAVE_PCI], [test "$hwloc_pci_happy" = "yes"])
         AM_CONDITIONAL([HWLOC_HAVE_OPENCL], [test "$hwloc_opencl_happy" = "yes"])
         AM_CONDITIONAL([HWLOC_HAVE_NVML], [test "$hwloc_nvml_happy" = "yes"])
