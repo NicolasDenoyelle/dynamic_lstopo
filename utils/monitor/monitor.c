@@ -619,7 +619,7 @@ load_Monitors_from_config(hwloc_topology_t topology, const char * perf_group_fil
   dlerror();
 
   m = new_Monitors(topology, pn->n_events,pn->event_names,output, accum);
-  m->libsopath = pn->libso_path;
+  m->libsopath = strdup(pn->libso_path);
   m->dlhandle=dlhandle;
 
   for(i=0;i<pn->n_events;i++)
@@ -642,6 +642,7 @@ load_Monitors_from_config(hwloc_topology_t topology, const char * perf_group_fil
   free(pn->monitor_obj);
   free(pn->libso_path);
   free(pn);
+  print_monitors(m);
   return m;
 }
 
@@ -791,5 +792,24 @@ delete_Monitors(monitors_t m)
   free(m);
   // hwloc_topology_destroy(m->topology);
   PAPI_shutdown();
+}
+
+void print_monitors(monitors_t m)
+{
+  if(!m)
+    return;
+  hwloc_bitmap_t watched_cpu = hwloc_bitmap_dup(hwloc_topology_get_complete_cpuset(m->topology));
+  proc_watch_get_watched_in_cpuset(m->pw,watched_cpu,watched_cpu);
+  if(m->libsopath)
+    printf("Functions from: %s\n",m->libsopath);
+  else
+    printf("Default monitors\n");
+  unsigned i;
+  printf("%u Events watched:\n",m->n_events);
+  for(i=0;i<m->n_events;i++)
+    printf("\t%s\n",m->event_names[i]);
+  printf("%u Monitors:\n",m->count);
+  for(i=0;i<m->count;i++)
+    printf("%10s:%s\n",m->depth_names[i],m->names[i]);
 }
 
