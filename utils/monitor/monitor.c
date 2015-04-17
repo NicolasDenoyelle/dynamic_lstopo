@@ -642,7 +642,7 @@ load_Monitors_from_config(hwloc_topology_t topology, const char * perf_group_fil
   free(pn->monitor_obj);
   free(pn->libso_path);
   free(pn);
-  print_monitors(m);
+  //print_monitors(m);
   return m;
 }
 
