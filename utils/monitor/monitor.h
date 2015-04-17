@@ -183,6 +183,16 @@ void         delete_Monitors                  (monitors_t m);
 
 /*************************************************************/
 /**
+ * @brief Print infos contained in a monitors_t
+ * @param m
+ *        The monitors to print.
+ */
+void         print_monitors                    (monitors_t m);
+/*************************************************************/
+
+
+/*************************************************************/
+/**
  * @brief Record exection only for a chosen processus. Each call to Monitors_update_counters will induce a look in /proc/<pid>/task to list pid 
  * subtasks.
  * Each subtask state and location is saved to bitmap arrays and then used by update threads to know if they have to start or stop reading 
