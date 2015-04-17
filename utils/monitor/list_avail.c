@@ -3,6 +3,7 @@
 #include <string.h>
 #include <papi.h>
 #include "hwloc.h"
+#include "monitor_utils.h"
 
 int topology_init(hwloc_topology_t * topology){
   hwloc_topology_init(topology); 
@@ -112,7 +113,7 @@ char ** get_native_avail_papi_counters(unsigned * ncount){
 	memset(&info, 0, sizeof(info));
 	retval = PAPI_get_event_info(event_code, &info);
 	if (retval != PAPI_OK) continue;
-	printf("%s\n",info.symbol);
+	if (check_papi_counter(info.symbol) != PAPI_OK) continue;
 	avail[count]=strdup(info.symbol);
 	check_count(avail,count,max_count);
 	count++;
@@ -134,7 +135,6 @@ char ** get_preset_avail_papi_counters(unsigned * ncount){
   PAPI_enum_event( &event_code, PAPI_ENUM_FIRST );
   do {
     if ( PAPI_get_event_info( event_code, &info ) == PAPI_OK ) {
-      printf("%s\n",info.symbol);
       avail[count]=strdup(info.symbol);
       count++;
     }
@@ -144,4 +144,56 @@ char ** get_preset_avail_papi_counters(unsigned * ncount){
   return avail;
 }
 
+void dump_avail(char * (*get_avail(unsigned *)))
+{
+  unsigned n_avail;
+  char ** avail = get_avail(&n_avail);
+  unsigned i;
+  for(i=0;i<n_avail;i++){
+    printf("\t%s\n",avail[i]);
+    free(avail[i]);
+  }
+  free(avail);
+}
+
+
+int
+check_papi_counter(char * counter_name)
+{
+  PAPI_event_info_t * info;
+  int EventSet = PAPI_NULL;
+  unsigned int event_code = 0x0;
+  int err;
+
+  if ((err=PAPI_create_eventset (&EventSet)) != PAPI_OK){
+    fprintf(stderr,"Failed to create a PAPI eventset\n");
+    exit(1);
+  }
+  if((err = PAPI_event_name_to_code(counter_name,&event_code)) != PAPI_OK){
+    return err;
+  }
+  if((err = PAPI_add_event (EventSet, event_code)) != PAPI_OK) {
+    return err;
+  }
+
+  PAPI_remove_named_event (EventSet, counter_name);
+  if ( PAPI_destroy_eventset( &EventSet ) != PAPI_OK ){
+    printf("**********  Call to destroy eventset failed when trying to validate event '%s'  **********\n", counter_name);
+  }
+  return err;
+}
+
+void
+check_hwloc_obj_name(char * obj_name)
+{
+  hwloc_obj_type_t typep;
+  int depthattrp;
+  char typeattrp[sizeof(hwloc_obj_cache_type_t)];
+  if(hwloc_obj_type_sscanf(obj_name, &typep, &depthattrp, typeattrp, sizeof(hwloc_obj_cache_type_t))==-1){
+    fprintf(stderr,"Wrong hwloc_obj name: %s\n",obj_name);
+    fprintf(stderr,"Available objs are:\n");
+    dump_avail(get_avail_hwloc_objs_names);
+    exit(1);
+  }
+}
 
