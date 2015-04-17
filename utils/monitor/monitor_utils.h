@@ -41,7 +41,8 @@ int                   topology_init(hwloc_topology_t * topology);
 int                   chk_input_file(const char * filename);
 pid_t                 start_executable(char * executable, char * exe_args[]);
 int                   hwloc_get_obj_depth_by_name(hwloc_topology_t topology, char * obj_name);
-char **               get_avail_papi_counters(unsigned * ncount);
+char **               get_preset_avail_papi_counters(unsigned * ncount);
+char **               get_native_avail_papi_counters(unsigned * ncount);
 char **               get_avail_hwloc_objs_names(unsigned * nobjs);
 
 
