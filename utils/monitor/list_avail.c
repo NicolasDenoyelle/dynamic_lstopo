@@ -85,20 +85,61 @@ char ** get_avail_hwloc_objs_names(unsigned * nobjs){
 }
 
 
-char ** get_avail_papi_counters(unsigned * ncount){
+#define check_count(avail, count, max_count) do{	\
+  if(count == max_count-1){				\
+  max_count*=2;						\
+  avail = realloc(avail,sizeof(*avail)*max_count);	\
+  }							\
+  } while(0)						\
+    
+char ** get_native_avail_papi_counters(unsigned * ncount){
+  unsigned count=0, max_count = PAPI_MAX_HWCTRS + PAPI_MAX_PRESET_EVENTS;
+  char ** avail = malloc(sizeof(char*)*max_count);
+  int event_code = 0 | PAPI_NATIVE_MASK;
+  PAPI_event_info_t info;
+  int numcmp, cid;	
+  int retval;
+
+  /* native events */
+  numcmp = PAPI_num_components();
+  for(cid = 0; cid < numcmp; cid++){
+    const PAPI_component_info_t *component;
+    component=PAPI_get_component_info(cid);
+    if (component->disabled) continue;
+    retval = PAPI_enum_cmp_event(&event_code, PAPI_ENUM_FIRST, cid);
+    if(retval==PAPI_OK){
+      do{
+	memset(&info, 0, sizeof(info));
+	retval = PAPI_get_event_info(event_code, &info);
+	if (retval != PAPI_OK) continue;
+	printf("%s\n",info.symbol);
+	avail[count]=strdup(info.symbol);
+	check_count(avail,count,max_count);
+	count++;
+      } while(PAPI_enum_cmp_event(&event_code, PAPI_ENUM_EVENTS, cid) == PAPI_OK);
+    }
+  }
+  *ncount=count;
+  return avail;
+}
+
+char ** get_preset_avail_papi_counters(unsigned * ncount){
   PAPI_library_init( PAPI_VER_CURRENT);
   unsigned count=0, max_count = PAPI_MAX_HWCTRS + PAPI_MAX_PRESET_EVENTS;
   char ** avail = malloc(sizeof(char*)*max_count);
   int event_code = 0 | PAPI_PRESET_MASK;
   PAPI_event_info_t info;
 
+  /* preset events */
   PAPI_enum_event( &event_code, PAPI_ENUM_FIRST );
   do {
     if ( PAPI_get_event_info( event_code, &info ) == PAPI_OK ) {
+      printf("%s\n",info.symbol);
       avail[count]=strdup(info.symbol);
       count++;
     }
   } while (PAPI_enum_event( &event_code, PAPI_PRESET_ENUM_AVAIL ) == PAPI_OK);
+
   *ncount=count;
   return avail;
 }
