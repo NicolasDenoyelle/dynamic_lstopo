@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "monitor_utils.h"
 
 void usage(char** argv){
   fprintf(stdout,"%s <path_to_scanner> \n",argv[0]);
@@ -28,45 +27,24 @@ int main(int argc, char** argv){
   fprintf(scanner,"void count();\n");
   fprintf(scanner,"%%}\n");
   fprintf(scanner,"%%option yylineno\n\n");
-  fprintf(scanner,"integer    [0-9]+\n");
-  fprintf(scanner,"real       {integer}*\\.({integer}+)\n");
-
-  fprintf(scanner,"hwloc_obj  ");
-  int nobjs;
-  char** objs = get_avail_hwloc_objs_names(&nobjs);
-  while((nobjs--) >1){
-    fprintf(scanner,("%s|"),objs[nobjs]);
-    free(objs[nobjs]);
-  }
-  fprintf(scanner,("%s\n"),objs[0]);
-  free(objs[0]); free(objs);
-
-  fprintf(scanner,"counter    ");
-  int ncount;
-  char** counters = get_avail_papi_counters(&ncount);
-  while((ncount--) >1){
-    fprintf(scanner,("%s|"),counters[ncount]);
-    free(counters[ncount]);
-  }
-  fprintf(scanner,("%s\n"),counters[0]);
-  free(counters[0]); free(counters);  
-
-  fprintf(scanner,"name           [a-zA-Z0-9_]+\n\n");
+  fprintf(scanner,"integer      [0-9]+\n");
+  fprintf(scanner,"real         {integer}*\\.({integer}+)\n");
+  fprintf(scanner,"name         [a-zA-Z0-9_\\-]*\n");
+  
   fprintf(scanner,"%%%%\n");
-  fprintf(scanner,"\"-\"         { count(); return('-'); };\n");
-  fprintf(scanner,"\"+\"         { count(); return('+'); };\n");
-  fprintf(scanner,"\"*\"         { count(); return('*'); };\n");
-  fprintf(scanner,"\"/\"         { count(); return('/'); };\n");
-  fprintf(scanner,"\"(\"         { count(); return('('); };\n");
-  fprintf(scanner,"\")\"         { count(); return(')'); };\n");
-  fprintf(scanner,"\"{\"         { count(); return('{'); };\n");
-  fprintf(scanner,"\"}\"         { count(); return('}'); };\n");
-  fprintf(scanner,"\",\"         { count(); return(','); };\n");
-  fprintf(scanner,"{integer}   { count(); yylval.str = strdup(yytext); return(INTEGER); };\n");
-  fprintf(scanner,"{real}      { count(); yylval.str = strdup(yytext); return(REAL);    };\n");
-  fprintf(scanner,"{counter}   { count(); yylval.str = strdup(yytext); return(COUNTER); };\n");
-  fprintf(scanner,"{hwloc_obj} { count(); yylval.str = strdup(yytext); return(OBJ);     };\n");
-  fprintf(scanner,"{name}      { count(); yylval.str = strdup(yytext); return(NAME);    };\n");
+  fprintf(scanner,"\"-\"          { count(); return('-'); };\n");
+  fprintf(scanner,"\"+\"          { count(); return('+'); };\n");
+  fprintf(scanner,"\"*\"          { count(); return('*'); };\n");
+  fprintf(scanner,"\"/\"          { count(); return('/'); };\n");
+  fprintf(scanner,"\"(\"          { count(); return('('); };\n");
+  fprintf(scanner,"\")\"          { count(); return(')'); };\n");
+  fprintf(scanner,"\"}\"          { count(); return('}'); };\n");
+  fprintf(scanner,"\"{\"          { count(); return('{'); };\n");
+  fprintf(scanner,"\",\"          { count(); return(','); };\n");
+  fprintf(scanner,"\":\"          { count(); return(':'); };\n");
+  fprintf(scanner,"{integer}      { count(); yylval.str = strdup(yytext); return(INTEGER); };\n");
+  fprintf(scanner,"{real}         { count(); yylval.str = strdup(yytext); return(REAL);    };\n");
+  fprintf(scanner,"{name}         { count(); yylval.str = strdup(yytext); return(NAME);    };\n");
   fprintf(scanner,"\\n          { count();}\n");
   fprintf(scanner,"#.*         { count();}\n");
   fprintf(scanner,".           { count();}\n");
