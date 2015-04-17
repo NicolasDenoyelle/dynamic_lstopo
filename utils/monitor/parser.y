@@ -8,8 +8,8 @@
 #include "monitor_utils.h"
 
   hwloc_topology_t topology;
-  int yyerror(char * s);
-  char * concat_expr(char* expr1, char sign, char* expr2);
+  int yyerror(const char * s);
+  char * concat_expr(char* expr1, char * expr2, char* expr3);
   char * parenthesis(char* expr);
   int strsearch(char * key, char** array, unsigned int array_len);
   void print_func(char * name,char* code);
@@ -21,8 +21,8 @@
 %}
 
 %error-verbose
-%token <str> NAME COUNTER REAL INTEGER OBJ
-%type  <str> primary_expr add_expr mul_expr 
+%token <str> NAME REAL INTEGER
+%type  <str> hwloc_obj counter primary_expr add_expr mul_expr 
 
 
 %union{
@@ -38,40 +38,34 @@ monitor_list
 ;
 
 monitor
-: NAME '{' hwloc_obj ',' add_expr '}' {
-  /* {{{ */
+: NAME '{' hwloc_obj add_expr '}' {
   if(nb_monitors==0 || 
      strsearch($1, monitor_names,nb_monitors)==-1){
-    print_func($1,$5);
+    print_func($1,$4);
     monitor_names[nb_monitors]=$1;
     nb_monitors++;
   }
   else{
     fprintf(stderr,"monitor \"%s\" ignored because its name is already used by another one\n",$1);
   }
-  free($5);
-  /* }}} */
+  free($4);
  }
 ;
 
 add_expr
 : mul_expr              {$$ = $1;}
-| add_expr '+' mul_expr {$$=concat_expr($1,'+',$3); free($1); free($3);}
-| add_expr '-' mul_expr {$$=concat_expr($1,'-',$3); free($1); free($3);}
+| add_expr '+' mul_expr {$$=concat_expr($1,"+",$3); free($1); free($3);}
+| add_expr '-' mul_expr {$$=concat_expr($1,"-",$3); free($1); free($3);}
 ;
    
  mul_expr
-: primary_expr              {$$ = $1;}
-| mul_expr '*' primary_expr {$$=concat_expr($1,'*',$3); free($1); free($3);}
-| mul_expr '/' primary_expr {$$=concat_expr($1,'/',$3); free($1); free($3);}
-;
-
-hwloc_obj
-: OBJ {monitor_obj[nb_monitors]=$1;}
+: primary_expr {$$ = $1;}
+| mul_expr '*' primary_expr {$$=concat_expr($1,"*",$3); free($1); free($3);}
+| mul_expr '/' primary_expr {$$=concat_expr($1,"/",$3); free($1); free($3);}
 ;
 
 primary_expr 
-: COUNTER {
+: counter {
    int counter_idx=-1;
    if(nb_counters==0){
      event_names[0] = $1;
@@ -104,6 +98,15 @@ primary_expr
 | INTEGER {$$ = $1;}
 ;
 
+hwloc_obj
+: NAME ',' {$$=$1; monitor_obj[nb_monitors]=$1;}
+;
+
+counter
+: NAME               {$$=$1;}
+| NAME ':' ':' NAME  {$$=concat_expr($1,"::",$4); free($1); free($4);}
+;
+
 %%
 
 extern char yytext[];
@@ -112,16 +115,12 @@ extern int column;
 extern int yylineno;
 
 void print_func(char * name,char* code){
-  /* {{{ */
   fprintf(tmp,"double %s(long long * in){\n\treturn (double) %s;\n}\n\n",name,code);
-  /* }}} */
 }
 
 
-int yyerror (char *s) {
-  /* {{{ */
+int yyerror(const char *s) {
   fflush (stdout);
-  
   fprintf(stderr, "%d:%d: %s while scanning input file\n", yylineno, column, s);
   fprintf(stderr, "available hwloc_objs: \n");
   unsigned nobjs;
@@ -130,34 +129,27 @@ int yyerror (char *s) {
     fprintf(stderr,("\t%s\n"),objs[nobjs]);
     free(objs[nobjs]);
   }
-
   fprintf(stderr, "available counters: \n");
   unsigned ncount;
-  char** counters = get_avail_papi_counters(&ncount);
+  char** counters = get_preset_avail_papi_counters(&ncount);
   while((ncount--) >0){
     fprintf(stderr,("\t%s\n"),counters[ncount]);
     free(counters[ncount]);
   }
   
   exit(EXIT_FAILURE);
-
-  /* }}} */
 }
 
-char * concat_expr(char* expr1, char sign, char* expr2){
-  /* {{{ */
-
-  char* str =  malloc(strlen(expr1)+strlen(expr2)+2);
+char * concat_expr(char* expr1, char * expr2, char* expr3){
+  char* str =  malloc(strlen(expr1)+strlen(expr2)+strlen(expr3));
   if(str==NULL)
     {
       perror("malloc failed");
       exit(EXIT_FAILURE);
     }
-  memset(str,0,strlen(expr1)+strlen(expr2)+2);
-  sprintf(str,"%s%c%s",expr1,sign,expr2);
+  memset(str,0,strlen(expr1)+strlen(expr2)+strlen(expr3));
+  sprintf(str,"%s%s%s",expr1,expr2,expr3);
   return str;
-
-  /* }}} */
 }
 
 char * parenthesis(char* expr){
