@@ -11,6 +11,7 @@
   int yyerror(const char * s);
   char * concat_expr(char* expr1, char * expr2, char* expr3);
   char * parenthesis(char* expr);
+  void check_counter(char * counter_name);
   int strsearch(char * key, char** array, unsigned int array_len);
   void print_func(char * name,char* code);
   unsigned int nb_counters, nb_monitors, topodepth, i;
@@ -99,12 +100,12 @@ primary_expr
 ;
 
 hwloc_obj
-: NAME ',' {$$=$1; monitor_obj[nb_monitors]=$1;}
+: NAME ',' {$$=$1; monitor_obj[nb_monitors]=$1; check_hwloc_obj_name($1);}
 ;
 
 counter
-: NAME               {$$=$1;}
-| NAME ':' ':' NAME  {$$=concat_expr($1,"::",$4); free($1); free($4);}
+: NAME               {$$=$1; check_counter($1);}
+| NAME ':' ':' NAME  {$$=concat_expr($1,"::",$4); check_counter($$); free($1); free($4); }
 ;
 
 %%
@@ -114,6 +115,28 @@ extern FILE *yyin;
 extern int column;
 extern int yylineno;
 
+static void
+exit_wrong_counter(char * name)
+{
+    fprintf(stdout,"Wrong Event name: %s\n", name);
+    fprintf(stdout,"Available native events:\n");
+    dump_avail(get_native_avail_papi_counters);
+    fprintf(stdout,"Available preset events:\n");
+    dump_avail(get_preset_avail_papi_counters);
+    exit(1);
+}
+
+void check_counter(char * counter_name)
+{
+  int err = check_papi_counter(counter_name);
+  if(err != PAPI_OK){
+    handle_error(err);
+    exit_wrong_counter(counter_name);
+  }
+}
+
+
+
 void print_func(char * name,char* code){
   fprintf(tmp,"double %s(long long * in){\n\treturn (double) %s;\n}\n\n",name,code);
 }
@@ -122,21 +145,6 @@ void print_func(char * name,char* code){
 int yyerror(const char *s) {
   fflush (stdout);
   fprintf(stderr, "%d:%d: %s while scanning input file\n", yylineno, column, s);
-  fprintf(stderr, "available hwloc_objs: \n");
-  unsigned nobjs;
-  char** objs = get_avail_hwloc_objs_names(&nobjs);
-  while((nobjs--) >0){
-    fprintf(stderr,("\t%s\n"),objs[nobjs]);
-    free(objs[nobjs]);
-  }
-  fprintf(stderr, "available counters: \n");
-  unsigned ncount;
-  char** counters = get_preset_avail_papi_counters(&ncount);
-  while((ncount--) >0){
-    fprintf(stderr,("\t%s\n"),counters[ncount]);
-    free(counters[ncount]);
-  }
-  
   exit(EXIT_FAILURE);
 }
 
@@ -182,6 +190,8 @@ struct parsed_names * parser(const char * file_name) {
   /* Allocate and initialize topology object. */
   topology_init(&topology);
   topodepth = hwloc_topology_get_depth(topology);
+  PAPI_library_init( PAPI_VER_CURRENT);
+
 
   monitor_names = malloc(sizeof(char*)*topodepth);
   monitor_obj  = malloc(sizeof(char*)*topodepth);
