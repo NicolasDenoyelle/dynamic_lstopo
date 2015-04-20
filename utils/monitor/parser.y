@@ -22,8 +22,8 @@
 %}
 
 %error-verbose
-%token <str> NAME REAL INTEGER
-%type  <str> hwloc_obj counter primary_expr add_expr mul_expr 
+%token <str> NAME MASK MASK_SEPARATOR REAL INTEGER
+%type  <str> hwloc_obj masked_counter primary_expr add_expr mul_expr 
 
 
 %union{
@@ -66,7 +66,8 @@ add_expr
 ;
 
 primary_expr 
-: counter {
+: masked_counter {
+  check_counter($1);
    int counter_idx=-1;
    if(nb_counters==0){
      event_names[0] = $1;
@@ -103,9 +104,10 @@ hwloc_obj
 : NAME ',' {$$=$1; monitor_obj[nb_monitors]=$1; check_hwloc_obj_name($1);}
 ;
 
-counter
-: NAME               {$$=$1; check_counter($1);}
-| NAME ':' ':' NAME  {$$=concat_expr($1,"::",$4); check_counter($$); free($1); free($4); }
+masked_counter
+: NAME                               {$$=$1;}
+| masked_counter MASK_SEPARATOR NAME {$$=concat_expr($1,$2,$3); free($1); free($2); free($3); }
+| masked_counter MASK_SEPARATOR MASK {$$=concat_expr($1,$2,$3); free($1); free($2); free($3); }
 ;
 
 %%

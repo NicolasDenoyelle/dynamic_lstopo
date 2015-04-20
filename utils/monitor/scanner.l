@@ -8,6 +8,9 @@ void count();
 integer      [0-9]+
 real         {integer}*\.({integer}+)
 name         [a-zA-Z0-9_\-]*
+mask         {name}={integer}
+COLON        ":"
+mask_sep     {COLON}*
 %%
 "-"          { count(); return('-'); };
 "+"          { count(); return('+'); };
@@ -18,13 +21,14 @@ name         [a-zA-Z0-9_\-]*
 "}"          { count(); return('}'); };
 "{"          { count(); return('{'); };
 ","          { count(); return(','); };
-":"          { count(); return(':'); };
-{integer}      { count(); yylval.str = strdup(yytext); return(INTEGER); };
-{real}         { count(); yylval.str = strdup(yytext); return(REAL);    };
-{name}         { count(); yylval.str = strdup(yytext); return(NAME);    };
-\n          { count();}
-#.*         { count();}
-.           { count();}
+{integer}    { count(); yylval.str = strdup(yytext); return(INTEGER); };
+{real}       { count(); yylval.str = strdup(yytext); return(REAL);    };
+{name}       { count(); yylval.str = strdup(yytext); return(NAME);    };
+{mask}       { count(); yylval.str = strdup(yytext); return(MASK);    }
+{mask_sep}   { count(); yylval.str = strdup(yytext); return(MASK_SEPARATOR);};
+\n           { count();}
+#.*          { count();}
+.            { count();}
 
 %%
 
