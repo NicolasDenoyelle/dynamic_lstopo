@@ -92,6 +92,42 @@ char ** get_avail_hwloc_objs_names(unsigned * nobjs){
   avail = realloc(avail,sizeof(*avail)*max_count);	\
   }							\
   } while(0)						\
+
+
+static int
+parse_unit_masks( PAPI_event_info_t * info )
+{
+	char *pmask,*ptr;
+
+	/* handle the PAPI component-style events which have a component:::event type */
+	if ((ptr=strstr(info->symbol, ":::"))) {
+		ptr+=3;
+		/* handle libpfm4-style events which have a pmu::event type event name */
+	} else if ((ptr=strstr(info->symbol, "::"))) {
+		ptr+=2;
+	}
+	else {
+		ptr=info->symbol;
+	}
+
+	if ( ( pmask = strchr( ptr, ':' ) ) == NULL ) {
+		return ( 0 );
+	}
+	memmove( info->symbol, pmask, ( strlen(pmask) + 1 ) * sizeof(char) );
+
+	//  The description field contains the event description followed by a tag 'masks:'
+	//  and then the mask description (if there was a mask with this event).  The following
+	//  code isolates the mask description part of this information.
+
+	pmask = strstr( info->long_descr, "masks:" );
+	if ( pmask == NULL ) {
+		info->long_descr[0] = 0;
+	} else {
+		pmask += 6;        // bump pointer past 'masks:' identifier in description
+		memmove( info->long_descr, pmask, (strlen(pmask) + 1) * sizeof(char) );
+	}
+	return ( 1 );
+}
     
 char ** get_native_avail_papi_counters(unsigned * ncount){
   unsigned count=0, max_count = PAPI_MAX_HWCTRS + PAPI_MAX_PRESET_EVENTS;
@@ -117,7 +153,7 @@ char ** get_native_avail_papi_counters(unsigned * ncount){
 	avail[count]=strdup(info.symbol);
 	check_count(avail,count,max_count);
 	count++;
-      } while(PAPI_enum_cmp_event(&event_code, PAPI_ENUM_EVENTS, cid) == PAPI_OK);
+      } while(PAPI_enum_cmp_event(&event_code, PAPI_ENUM_ALL, cid) == PAPI_OK);
     }
   }
   *ncount=count;
@@ -146,11 +182,29 @@ char ** get_preset_avail_papi_counters(unsigned * ncount){
 
 void dump_avail(char * (*get_avail(unsigned *)))
 {
-  unsigned n_avail;
-  char ** avail = get_avail(&n_avail);
-  unsigned i;
+  unsigned n_avail, i;
+  char *ptr, ** avail = get_avail(&n_avail);
+  int eventcode = PAPI_NULL, retval;
+  PAPI_event_info_t info;
+
   for(i=0;i<n_avail;i++){
-    printf("\t%s\n",avail[i]);
+    PAPI_event_name_to_code(avail[i],&eventcode);
+    PAPI_get_event_info(eventcode, &info);
+    printf("\t%s%*s, %s\n",info.symbol, 40-strlen(info.symbol)," ", info.long_descr);
+    if(get_avail == get_native_avail_papi_counters){
+      if(PAPI_enum_event(&eventcode, PAPI_NTV_ENUM_UMASKS) == PAPI_OK){
+	printf("\t\t%s%*s, %s\n","Masks", 20-strlen("Masks")," ", "Mask description");
+	do{
+	  retval = PAPI_get_event_info(eventcode, &info);
+	  if (retval == PAPI_OK){
+	    if(parse_unit_masks(&info)){
+	      printf("\t\t%s%*s, %s\n",info.symbol, 20-strlen(info.symbol)," ",info.long_descr);
+	    }
+	  }
+	} while ( PAPI_enum_event( &eventcode, PAPI_NTV_ENUM_UMASKS) == PAPI_OK );
+      }
+    }
+
     free(avail[i]);
   }
   free(avail);
@@ -196,4 +250,42 @@ check_hwloc_obj_name(char * obj_name)
     exit(1);
   }
 }
+
+void 
+check_map_event_obj(hwloc_topology_t topology, char * obj_name, char * event_name)
+{
+  PAPI_event_info_t info;
+  int err, eventcode;
+  hwloc_obj_t obj;
+  unsigned depth = hwloc_get_obj_depth_by_name(topology,obj_name);
+  if((err = PAPI_event_name_to_code(event_name,&eventcode))!=PAPI_OK){
+    handle_error(err);
+    fprintf(stderr,"could not get \"%s\" event infos\n",event_name);
+  }
+  
+  PAPI_get_event_info(eventcode,&info);
+  switch(info.location){
+  case PAPI_LOCATION_UNCORE:
+      if(depth >= hwloc_get_type_depth(topology, HWLOC_OBJ_CORE)){
+	fprintf(stderr,"event %s is an UNCORE event and is actually mapped on %s which is under HWLOC_OBJ_CORE\n",
+		event_name, obj_name);
+      }
+      break;      
+    case PAPI_LOCATION_CPU:
+      if(depth > hwloc_get_type_depth(topology, HWLOC_OBJ_MACHINE)){
+	fprintf(stderr,"event %s is a CPU event and is actually mapped on %s which is strictly under HWLOC_OBJ_MACHINE\n",
+		event_name, obj_name);
+      }
+      break;
+    case PAPI_LOCATION_PACKAGE:
+      if(depth > hwloc_get_type_depth(topology, HWLOC_OBJ_SOCKET)){
+	fprintf(stderr,"event %s is a PACKAGE event and is actually mapped on %s which is strictly under HWLOC_OBJ_SOCKET\n",
+		event_name, obj_name);
+      }
+      break;
+    default:
+      break;
+    }
+}
+
 
