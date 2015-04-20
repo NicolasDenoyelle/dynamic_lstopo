@@ -40,13 +40,17 @@ void                  output_line_content_paje(int output_fd, struct value_line 
 int                   topology_init(hwloc_topology_t * topology);
 int                   chk_input_file(const char * filename);
 pid_t                 start_executable(char * executable, char * exe_args[]);
-int                   hwloc_get_obj_depth_by_name(hwloc_topology_t topology, char * obj_name);
+int                   hwloc_get_obj_depth_by_name(hwloc_topology_t topology, 
+						  char * obj_name);
 void                  handle_error(int PAPI_err);
 char **               get_preset_avail_papi_counters(unsigned * ncount);
 char **               get_native_avail_papi_counters(unsigned * ncount);
 char **               get_avail_hwloc_objs_names(unsigned * nobjs);
 int                   check_papi_counter(char * counter_name);
 void                  check_hwloc_obj_name(char * obj_name);
+void                  check_map_event_obj(hwloc_topology_t topology, 
+					  char * obj_name, char * event_name);
+
 void                  dump_avail(char * (*get_avail(unsigned *)));
 
 #endif
