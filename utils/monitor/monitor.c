@@ -35,7 +35,7 @@ static inline void zerod(long long * array, unsigned int size){
   for(i=0;i<size;i++) array[i]=0;
 }
 
-struct monitor_node *
+static struct monitor_node *
 new_monitor_node(unsigned int n_events, unsigned depth, unsigned sibling, unsigned id)
 {
   struct monitor_node * out = malloc(sizeof(*out));
@@ -43,11 +43,8 @@ new_monitor_node(unsigned int n_events, unsigned depth, unsigned sibling, unsign
     perror("malloc failed\n");
     exit(EXIT_FAILURE);
   }
-  out->counters_val = calloc(n_events,sizeof(long long));
-  if(out->counters_val==NULL){
-    perror("calloc failed\n");
-    exit(EXIT_FAILURE);
-  }
+
+  M_alloc(out->counters_val,n_events,sizeof(long long));
   zerod(out->counters_val,n_events);
 
   pthread_mutex_init(&(out->read_lock), NULL);
@@ -63,7 +60,7 @@ new_monitor_node(unsigned int n_events, unsigned depth, unsigned sibling, unsign
   return out;
 }
 
-void
+static void
 delete_monitor_node(struct monitor_node * out)
 {
   if(out==NULL)
@@ -126,26 +123,30 @@ handle_error(int err)
   }
 }
 
-int 
-init_eventset(int * eventset,unsigned int n_events,  char** event_names, unsigned cpu_num)
+static int 
+init_eventset(monitors_t m, int * eventset, unsigned cpu_num, int print_err)
 {
   int err; unsigned int i;
-  
+  PAPI_event_info_t info;
+
   /* initialize eventset */
   *(eventset)=PAPI_NULL;
   if((err=PAPI_create_eventset(eventset))!=PAPI_OK){
-    fprintf(stderr,"eventset init: create failed\n");
-    handle_error(err);
+    if(print_err){
+      fprintf(stderr,"eventset init: create failed\n");
+      handle_error(err);
+    }
     return 1;
   }
 
   if((err = PAPI_assign_eventset_component(*eventset, 0)) != PAPI_OK){
-    handle_error(err);
-    PAPI_event_info_t info;
+    if(print_err)
+      handle_error(err);
     int code;
-    PAPI_event_name_to_code(event_names[0],&code);
+    PAPI_event_name_to_code(m->event_names[0],&code);
     PAPI_get_event_info(code,&info);
-    fprintf(stderr,"%s component = %d\n",event_names[0],info.component_index);
+    if(print_err)
+      fprintf(stderr,"%s component = %d\n",m->event_names[0],info.component_index);
   }
 
 
@@ -153,18 +154,18 @@ init_eventset(int * eventset,unsigned int n_events,  char** event_names, unsigne
   cpu_option.cpu.eventset=*eventset;
   cpu_option.cpu.cpu_num = cpu_num;
 
-  err = PAPI_set_debug(PAPI_VERB_ESTOP);
-  if ( err != PAPI_OK ) handle_error(err);
-  if((err = PAPI_set_opt(PAPI_CPU_ATTACH,&cpu_option))!=PAPI_OK){
+  if((err = PAPI_set_opt(PAPI_CPU_ATTACH,&cpu_option))!=PAPI_OK  && print_err){
     fprintf(stderr, "Could not set PAPI option PAPI_CPU_ATTACH to %u\n",cpu_num);
     handle_error(err);
   }
 
-  for(i=0;i<n_events;i++){
-    err =  PAPI_add_named_event(*(eventset),event_names[i]);
+  for(i=0;i<m->n_events;i++){
+    err =  PAPI_add_named_event(*(eventset),m->event_names[i]);
     if(err!=PAPI_OK){
-      fprintf(stderr,"event set init: could not add \"%s\" to eventset.\n",event_names[i]);
-      handle_error(err);
+      if(print_err){
+	fprintf(stderr,"event set init: could not add \"%s\" to eventset.\n",m->event_names[i]);
+	handle_error(err);
+      }
       return 1;
     }
   }
@@ -172,12 +173,10 @@ init_eventset(int * eventset,unsigned int n_events,  char** event_names, unsigne
   return 0;
 }
 
-/*@null@*/
-monitors_t new_Monitors(hwloc_topology_t topology,
-			unsigned int n_events, 
-			char ** event_names, 
-			const char * output, int accum){
-
+static monitors_t 
+new_Monitors(hwloc_topology_t topology, unsigned int n_events, char ** event_names, 
+	     const char * output, int accum)
+{
   unsigned int i, depth; 
   monitors_t m;
 
@@ -264,7 +263,10 @@ monitors_t new_Monitors(hwloc_topology_t topology,
   return m;
 }
 
-int add_Monitor(monitors_t m, const char * name, char * hwloc_obj_name, double (*fun)(long long *)){
+static int 
+add_Monitor(monitors_t m, const char * name, char * hwloc_obj_name, 
+	    double (*fun)(long long *))
+{
   unsigned int i,j, n_obj;
   hwloc_obj_t node;
   if(m==NULL)
@@ -353,7 +355,6 @@ void * monitors_thread(void* monitors){
   pthread_t tid;
   unsigned int i,j,weight, nobj;
   int tidx, p_tidx, eventset, depth;
-  long long * values, * old_values, * tmp;
   hwloc_obj_t obj,cpu;
   struct monitor_node * out, * PU_vals;
   struct value_line output;
@@ -382,20 +383,31 @@ void * monitors_thread(void* monitors){
   hwloc_set_thread_cpubind(m->topology,tid, active_pu, HWLOC_CPUBIND_THREAD | HWLOC_CPUBIND_STRICT);
   p_tidx = hwloc_bitmap_first(active_pu);
   
-  if(init_eventset(&eventset,m->n_events,m->event_names,p_tidx)!=0){
+  /* Initialize my eventset */
+  if(init_eventset(m,&eventset,p_tidx,!tidx)!=0){
     fprintf(stderr,"%d failed to init its eventset\n",tidx);
     exit(EXIT_FAILURE);
   }
 
   /* initialize counters value container */
-  values = malloc(sizeof(long long)*m->n_events);
-  old_values = malloc(sizeof(long long)*m->n_events);
-  if(values==NULL || old_values==NULL){
-    perror("malloc");
-    exit(EXIT_FAILURE);
-  }
-  zerod(values,m->n_events);
-  zerod(old_values,m->n_events);
+  long long * values, *old_values , *tmp;
+  M_alloc(values,    m->n_events,sizeof(long long));
+  M_alloc(old_values,m->n_events,sizeof(long long));
+  /* values to check fast event locations */
+  int events_location[m->n_events];
+  
+  PAPI_event_info_t info;
+  int eventcode;
+  for(i=0;i<m->n_events;i++){
+    values[i]=0; 
+    old_values[i]=0;
+    PAPI_event_name_to_code(m->event_names[i],&eventcode);
+    PAPI_get_event_info(eventcode,&info);
+    events_location[i]=info.location;    
+  } 
+  int core_depth    = hwloc_get_type_depth(m->topology, HWLOC_OBJ_CORE);
+  int machine_depth = hwloc_get_type_depth(m->topology, HWLOC_OBJ_MACHINE);
+  int package_depth = hwloc_get_type_depth(m->topology, HWLOC_OBJ_SOCKET);
 
   /* fill the structure of objects to free at cleanup */
   struct thread_junk tj;
@@ -466,9 +478,32 @@ void * monitors_thread(void* monitors){
 	  zerod(out->counters_val,m->n_events);
 	}
       }
-      /* accumulate values */
+
+      /* accumulate values if necessary */
       for(j=0;j<m->n_events;j++){
-	out->counters_val[j]+=PU_vals->counters_val[j];
+	switch(events_location[j]){
+	case PAPI_LOCATION_UNCORE:
+	  if(obj->depth < core_depth)
+	    out->counters_val[j] = PU_vals->counters_val[j];
+	  else
+	    out->counters_val[j] += PU_vals->counters_val[j];
+	  break;      
+	case PAPI_LOCATION_CPU:
+	  if(obj->depth >= machine_depth)
+	    out->counters_val[j] = PU_vals->counters_val[j];
+	  else
+	    out->counters_val[j] += PU_vals->counters_val[j];
+	  break;
+	case PAPI_LOCATION_PACKAGE:
+	  if(obj->depth >= package_depth)
+	    out->counters_val[j] = PU_vals->counters_val[j];
+	  else
+	    out->counters_val[j] += PU_vals->counters_val[j];
+	  break;
+	default:
+	  out->counters_val[j]+=PU_vals->counters_val[j];
+	  break;
+	}
       }
 
       out->real_usec += PU_vals->real_usec;
