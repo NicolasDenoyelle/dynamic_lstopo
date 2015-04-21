@@ -188,11 +188,13 @@ void dump_avail(char * (*get_avail(unsigned *)))
   PAPI_event_info_t info;
 
   for(i=0;i<n_avail;i++){
-    PAPI_event_name_to_code(avail[i],&eventcode);
-    PAPI_get_event_info(eventcode, &info);
-    printf("\t%s%*s, %s\n",info.symbol, 40-strlen(info.symbol)," ", info.long_descr);
-    if(get_avail == get_native_avail_papi_counters){
-      if(PAPI_enum_event(&eventcode, PAPI_NTV_ENUM_UMASKS) == PAPI_OK){
+    if(get_avail == get_native_avail_papi_counters || get_avail == get_preset_avail_papi_counters){
+      PAPI_event_name_to_code(avail[i],&eventcode);
+      PAPI_get_event_info(eventcode, &info);
+      printf("\t%s%*s, %s\n",info.symbol, 40-strlen(info.symbol)," ", info.long_descr);
+      
+      if(get_avail == get_native_avail_papi_counters &&
+	 PAPI_enum_event(&eventcode, PAPI_NTV_ENUM_UMASKS) == PAPI_OK){
 	printf("\t\t%s%*s, %s\n","Masks", 20-strlen("Masks")," ", "Mask description");
 	do{
 	  retval = PAPI_get_event_info(eventcode, &info);
@@ -204,6 +206,8 @@ void dump_avail(char * (*get_avail(unsigned *)))
 	} while ( PAPI_enum_event( &eventcode, PAPI_NTV_ENUM_UMASKS) == PAPI_OK );
       }
     }
+    else
+      printf("%s\n",avail[i]);
 
     free(avail[i]);
   }
