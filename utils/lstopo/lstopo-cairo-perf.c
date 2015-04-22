@@ -41,16 +41,14 @@ void topo_cairo_perf_boxes(hwloc_topology_t topology,
     }
   }
 
-  do{
-    obj = hwloc_get_obj_by_depth(topology,obj->depth+1,0);
-    if(obj==NULL)
-      break;
+  obj = hwloc_get_obj_by_depth(topology,obj->depth+1,0);
+  if(obj!=NULL){
     nobj = hwloc_get_nbobjs_by_depth(monitors->topology,obj->depth);
     while(nobj--){
       obj = hwloc_get_obj_by_depth(topology,obj->depth,nobj);
       obj_draw_again(topology, obj, methods, 0, c);
     }
-  } while(obj!=NULL);
+  }
   cairo_show_page(c);
 }
 
