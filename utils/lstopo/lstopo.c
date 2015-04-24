@@ -38,6 +38,7 @@
 
 #ifdef HWLOC_HAVE_MONITOR
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <signal.h>
 #include "monitor.h"
 #include "monitor_replay.h"
@@ -1065,10 +1066,11 @@ main (int argc, char *argv[])
       }
       Monitors_start(m);
       if(lstopo_pid){
-	while(kill(lstopo_pid,0)==0){
+	while(waitpid(lstopo_pid, NULL, WNOHANG)==0){
 	  Monitors_update_counters(m);
 	  usleep(refresh_usec);
 	}
+	waitpid(lstopo_pid,NULL,0);
       }
       else if(!lstopo_pid){
 	while(1){
