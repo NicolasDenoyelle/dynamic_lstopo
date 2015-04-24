@@ -103,7 +103,7 @@ void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_att
   int itimer_fd = timerfd_create(CLOCK_REALTIME,0);
   if(itimer_fd==-1){
     perror("itimer");
-    goto exit;
+    exit(1);
   }
   FD_SET(x11_fd, &in_fds_original);
   FD_SET(itimer_fd, &in_fds_original);
@@ -124,7 +124,7 @@ void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_att
 
   /* start timer */
   timerfd_settime(itimer_fd,0,&itimer,NULL);
-  while(pid ? kill(pid,0)==0 : 1){
+  while(pid ? waitpid(pid, NULL, WNOHANG)==0 : 1){
     in_fds = in_fds_original;
     timeout.tv_sec=10;
     timeout.tv_usec=0;
@@ -144,8 +144,8 @@ void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_att
       }
     }
   }
+  waitpid(pid,NULL,0);
     
- exit:;
   hwloc_bitmap_free(active); 
   cairo_destroy(c);
   x11_destroy(disp);
@@ -225,11 +225,12 @@ static_app_monitor(monitors_t m,int r, int whole_machine, char * executable, cha
     pid = start_executable(executable,exe_args);
     if(!whole_machine)
       Monitors_watch_pid(m,pid);
-    while(kill(pid,0)==0){
+    while(waitpid(pid, NULL, WNOHANG)==0){
       proc_watch_update(m->pw);
       Monitors_update_counters(m);
       usleep(r);    
     }
+    waitpid(pid,NULL,0);
   }
   else{
     unsigned i;
