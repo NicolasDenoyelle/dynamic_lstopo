@@ -194,44 +194,66 @@ delete_proc_watch(struct proc_watch * pw){
   free(pw);
 }
 
-
-pid_t 
+pid_t
 start_executable(char * executable, char * exe_args[])
 {
   printf("starting %s\n",executable);
-  pid_t ret=0;
-  pid_t *child = mmap(NULL, sizeof *child, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-  *child=0;
-  pid_t pid2, pid1 = fork();
-  if(pid1<0){
+  pid_t pid = fork();
+  if(pid<0){
     perror("fork");
     exit(EXIT_FAILURE);
   }
-  if(pid1>0){
-    wait(NULL);
+  if(pid>0){
+    return pid;
   }
-  else if(pid1==0){
-    pid2=fork();
-    if(pid2){
-      *child = pid2;
-      msync(child, sizeof(*child), MS_SYNC);
-      exit(0);
+  else if(pid==0){
+    if(execvp(executable, exe_args)){
+      fprintf(stderr, "Failed to launch executable \"%s\"\n", executable);
+      perror("execvp");
+      exit(EXIT_FAILURE);
     }
-    else if(!pid2){
-      printf("starting %s\n",executable);
-      ret = execvp(executable, exe_args);
-      if (ret) {
-	fprintf(stderr, "Failed to launch executable \"%s\"\n",
-		executable);
-	perror("execvp");
-	exit(EXIT_FAILURE);
-      }
-    }
+    exit(EXIT_SUCCESS);
   }
-  msync(child, sizeof(*child), MS_SYNC);
-  ret = *child;
-  munmap(child, sizeof *child);
-  return ret; 
 }
+
+
+/* pid_t  */
+/* start_executable(char * executable, char * exe_args[]) */
+/* { */
+/*   printf("starting %s\n",executable); */
+/*   pid_t ret=0; */
+/*   pid_t *child = mmap(NULL, sizeof *child, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0); */
+/*   *child=0; */
+/*   pid_t pid2, pid1 = fork(); */
+/*   if(pid1<0){ */
+/*     perror("fork"); */
+/*     exit(EXIT_FAILURE); */
+/*   } */
+/*   if(pid1>0){ */
+/*     wait(NULL); */
+/*   } */
+/*   else if(pid1==0){ */
+/*     pid2=fork(); */
+/*     if(pid2){ */
+/*       *child = pid2; */
+/*       msync(child, sizeof(*child), MS_SYNC); */
+/*       exit(0); */
+/*     } */
+/*     else if(!pid2){ */
+/*       printf("starting %s\n",executable); */
+/*       ret = execvp(executable, exe_args); */
+/*       if (ret) { */
+/* 	fprintf(stderr, "Failed to launch executable \"%s\"\n", */
+/* 		executable); */
+/* 	perror("execvp"); */
+/* 	exit(EXIT_FAILURE); */
+/*       } */
+/*     } */
+/*   } */
+/*   msync(child, sizeof(*child), MS_SYNC); */
+/*   ret = *child; */
+/*   munmap(child, sizeof *child); */
+/*   return ret;  */
+/* } */
 
 
