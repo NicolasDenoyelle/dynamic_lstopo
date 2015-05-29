@@ -63,7 +63,7 @@ tools can be used to display the network topology interconnecting your nodes.
 
 Using PAPI to Monitor an application or a machine in lstopo (X) view:
 
-[![Current machine state](https://github.com/NicolasDenoyelle/dynamic_lstopo/blob/monitor/E5-2650.png)]
+[![Current machine state]( https://github.com/NicolasDenoyelle/dynamic_lstopo/blob/monitor/E5-2650.png )]
 
 Requirements:
 	X output must be enabled.
