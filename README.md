@@ -79,19 +79,21 @@ If monitoring is enabled during configuration, lstopo utility will use PAPI to M
 
 #### Requirements
 
-	- X output must be enabled.
-	- You must ave permission to read every performance counters. It can be achieved by running the command: 
+	X output must be enabled.
+	You must ave permission to read every performance counters. It can be achieved by running the command: 
 	"echo "-1" > /proc/sys/kernel/perf_event_paranoid" as root.
-	- PAPI, bison and lex must be installed.
-	- If you use a custom installation of these, you have to append CFLAGS for includes and LDFALGS for lib to configure command line. 
+	PAPI, bison and lex must be installed.
+	If you use a custom installation of these, you have to append CFLAGS for includes and LDFALGS for lib to configure command line. 
 
 #### Installation
-	- Simply install hwloc
-	- Use configure option --enable-monitor to force monitor compilation.
-	- The configure summary shows if monitors is enabled.
+	
+	Simply install hwloc
+	Use configure option --enable-monitor to force monitor compilation.
+	The configure summary shows if monitors is enabled.
 
 #### Usage
-        lstopo man page contains every extra perf option.
+        
+	lstopo man page contains every extra perf option.
 	`lstopo --help` to. 
 
 	Use lstopo the same way as usual + append perf options:
