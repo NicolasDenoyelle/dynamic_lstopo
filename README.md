@@ -77,7 +77,7 @@ If monitoring is enabled during configuration, lstopo utility will use PAPI to M
 
 ![Current machine state](https://github.com/NicolasDenoyelle/dynamic_lstopo/blob/monitor/E5-2650.png)
 
-#### Requirements:
+#### Requirements
 
 	- X output must be enabled.
 	- You must ave permission to read every performance counters. It can be achieved by running the command: 
@@ -85,12 +85,12 @@ If monitoring is enabled during configuration, lstopo utility will use PAPI to M
 	- PAPI, bison and lex must be installed.
 	- If you use a custom installation of these, you have to append CFLAGS for includes and LDFALGS for lib to configure command line. 
 
-#### Installation:
+#### Installation
 	- Simply install hwloc
 	- Use configure option --enable-monitor to force monitor compilation.
 	- The configure summary shows if monitors is enabled.
 
-#### Usage:
+#### Usage
         lstopo man page contains every extra perf option.
 	`lstopo --help` to. 
 
@@ -99,6 +99,7 @@ If monitoring is enabled during configuration, lstopo utility will use PAPI to M
 	You can describe which counter(s) to display on a specific topology node with `--perf-input`.
 
 	Performance input files syntax is the same as follow:
+
 	```
 	#commentary: The first one is the pattern and while trigger an error
 	#counter_name0{hwloc_obj_name0,PAPI_COUNTER0}`
@@ -108,7 +109,7 @@ If monitoring is enabled during configuration, lstopo utility will use PAPI to M
 	If an object or a counter isn't available on your system, a list of 
 	availables items will be dumped.
 
-#### Monitoring an application:
+#### Monitoring an application
 	* As a backend:
 	   ```
 	   lstopo <perf options> <your_application> <your application args>
@@ -117,6 +118,6 @@ If monitoring is enabled during configuration, lstopo utility will use PAPI to M
 	* Instrumenting your code:
 	   Use `monitor.h` header in `<hwloc_install_include_dir>` and link your
 	   application  with `-lmonitor`
-	   Once you executed your application, you can display the trace with ```lstopo --perf-replay <output_file>```.
+	   Once you executed your application, you can display the trace with `lstopo --perf-replay <output_file>`.
 
 
