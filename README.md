@@ -73,9 +73,9 @@ tools can be used to display the network topology interconnecting your nodes.
 
 ### Machine and applications monitoring
 
-If monitoring is enabled during configuration, lstopo utility will use PAPI to Monitor an application or a machine into a graphical display.
-
 ![Current machine state](https://github.com/NicolasDenoyelle/dynamic_lstopo/blob/monitor/E5-2650.png)
+
+If monitoring is enabled during configuration, lstopo utility will use PAPI to Monitor an application or a machine into a graphical display.
 
 #### Requirements
 
