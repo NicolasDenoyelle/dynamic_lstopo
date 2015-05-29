@@ -120,6 +120,121 @@ lstopo <perf options> <your_application> <your application args>
 ```
 
 * Instrumenting your code:
-Use `monitor.h` header in `<hwloc_install_include_dir>` and link your application  with `-lmonitor`
+Use `monitor.h` header in `<hwloc_install_include_dir>` and link your application  with `-lmonitor -lhwloc`
 Once you executed your application, you can display the trace with `lstopo --perf-replay <output_file>`.
+
+* Here is a minimal snippet example:
+```
+#include <monitor.h>
+#include <hwloc.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+monitors_t monitor;
+
+int main(void)
+{
+	/* Initialize monitors */
+	monitors = load_Monitors_from_config(NULL, "my_perf_file", "my_output_file", 0);
+	/* Attach to current pid */
+	Monitors_watch_pid(monitors,getpid());
+
+	/* start and collect current hardware counters' value */
+	Monitors_start(monitors);
+
+	/* Your code here */
+	/* ... */
+
+	/* update to current hardware counters' value */
+	Monitors_update_counters(monitors);
+
+	/* destroy monitors */
+	delete_Monitors(monitors);
+	return 0;
+}
+```
+
+* Here is a snippet for sampling phases:
+
+```
+#include <pthread.h>
+#include <monitor.h>
+#include <hwloc.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <signal.h>
+#include <time.h>
+
+monitors_t monitors;
+pthread_t sampling_thr;	
+pthread_mutex_t sample;
+int end_flag = 0;
+
+void take_a_sample(union sigval unused)
+{
+   pthread_mutex_unlock(&sample);
+}
+
+void * sampling_thread(void* refresh_usec)
+{
+   /* Init structure and timer for periodic samples */
+   struct sigevent sevp;
+   timer_t timerid;
+   sevp.sigev_notify=SIGEV_THREAD;
+   sevp.sigev_notify_function=take_a_sample;
+   if(timer_create(CLOCK_THREAD_CPUTIME_ID, &sevp, &timerid)==-1){
+   	perror("timer_create");
+	return NULL;
+   }		
+   struct itimerspec interval = {{0, 1000*(long)(intptr_t)(refresh_usec)}, {0, 0}} ;	
+
+   /* Init mutex for sampling loop unlock every interval */
+   pthread_mutex_init(&sample,NULL);
+   pthread_mutex_lock(&sample);	
+
+   /* trigger timer */
+   timer_settime(timerid, 0, &interval, NULL);
+   while(end_flag==0){
+	pthread_mutex_lock(&sample);
+	/* update to current hardware counters' value */
+	Monitors_update_counters(monitors);
+   }
+
+   pthread_mutex_destroy(&sample);
+   return NULL;
+}
+
+void sampling_start(long refresh_usec)
+{
+   sampling_thr = pthread_create(&sampling_thr,NULL,sampling_thread,NULL);
+}
+
+void sampling_stop(void)
+{
+   end_flag = 1;
+   pthread_join(sampling_thr,NULL);
+   end_flag = 0;
+}
+
+int main(void)
+{
+	/* Initialize monitors */
+	monitors = load_Monitors_from_config(NULL, "my_performance_file", "my_output_file", 0);
+	/* Attach to current pid */
+	Monitors_watch_pid(monitors,getpid());
+	/* start and collect current hardware counters' value */
+	Monitors_start(monitors);
+	/* Set a marker to find this phase into my_output_file */
+	Monitors_set_phase(monitors, 0);
+	/* Start sampling region every millisecond */
+	sampling_start(10);
+	/* Your code here */
+	/* ... */
+	/* Stop sampling */
+	sampling_stop();
+	/* destroy monitors */
+	delete_Monitors(monitors);
+	return 0;
+}
+``` 
 
