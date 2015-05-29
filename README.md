@@ -1,4 +1,4 @@
-# hwloc fork with hierarchical performance monitoring
+## hwloc fork with hierarchical performance monitoring
 ### Introduction
 
 The Hardware Locality (hwloc) software project aims at easing the process of
