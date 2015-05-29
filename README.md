@@ -227,7 +227,7 @@ int main(void)
 	/* Set a marker to find this phase into my_output_file */
 	Monitors_set_phase(monitors, 0);
 	/* Start sampling region every millisecond */
-	sampling_start(10);
+	sampling_start(1000);
 	/* Your code here */
 	/* ... */
 	/* Stop sampling */
