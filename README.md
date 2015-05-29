@@ -44,7 +44,8 @@ when building from a Git clone.
 
 Installation by itself is the fairly common GNU-based process:
 
-```./configure --prefix=...
+```
+./configure --prefix=...
 make
 make install
 ```
