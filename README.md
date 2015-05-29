@@ -33,18 +33,21 @@ It just happens to be hosted as part of the overall Open MPI project.
 Nightly development snapshots are available on the web site. Additionally, the
 code can be directly cloned from Git:
 
-```git clone https://github.com/open-mpi/hwloc.git```
-```cd hwloc```
-```./autogen.sh```
+```
+git clone https://github.com/open-mpi/hwloc.git
+cd hwloc
+./autogen.sh
+```
 
 Note that GNU Autoconf >=2.63, Automake >=1.11 and Libtool >=2.2.6 are required
 when building from a Git clone.
 
 Installation by itself is the fairly common GNU-based process:
 
-```./configure --prefix=...```
-```make```
-```make install```
+```./configure --prefix=...
+make
+make install
+```
 
 hwloc- and netloc-specific configure options and requirements are documented in
 sections hwloc Installation and Netloc Installation respectively.
@@ -58,7 +61,9 @@ For example, if libpciaccess was installed into /opt/pciaccess, hwloc's
 configure script may not find it be default. Try adding PKG_CONFIG_PATH to the
 ./configure command line, like this:
 
-```./configure PKG_CONFIG_PATH=/opt/pciaccess/lib/pkgconfig ...```
+```
+./configure PKG_CONFIG_PATH=/opt/pciaccess/lib/pkgconfig ...
+```
 
 Running the "lstopo" tool is a good way to check as a graphical output whether
 hwloc properly detected the architecture of your node. Netloc command-line
@@ -88,7 +93,7 @@ If monitoring is enabled during configuration, lstopo utility will use PAPI to M
 	`lstopo --help` to. 
 
 	Use lstopo the same way as usual + append perf options:
-	```lstopo --perf``` will display random availables counters on random topology nodes.
+	`lstopo --perf` will display random availables counters on random topology nodes.
 	You can describe which counter(s) to display on a specific topology node with `--perf-input`.
 
 	Performance input files syntax is the same as follow:
@@ -103,7 +108,10 @@ If monitoring is enabled during configuration, lstopo utility will use PAPI to M
 
 #### Monitoring an application:
 	* As a backend:
-	   ```lstopo <perf options> <your_application> <your application args>```
+	   ```
+	   lstopo <perf options> <your_application> <your application args>
+	   ```
+
 	* Instrumenting your code:
 	   Use `monitor.h` header in `<hwloc_install_include_dir>` and link your
 	   application  with `-lmonitor`
