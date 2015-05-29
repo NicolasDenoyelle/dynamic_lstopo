@@ -104,7 +104,7 @@ You can describe which counter(s) to display on a specific topology node with `-
 Performance input files syntax is the same as follow:
 
 ```
-#commentary: The first one is the pattern and while trigger an error
+#commentary
 #counter_name0{hwloc_obj_name0,PAPI_COUNTER0}`
 my_counter{L1i,PAPI_FP_OPS*PAPI_L1_ICM/100}`
 ```
