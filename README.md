@@ -79,49 +79,47 @@ If monitoring is enabled during configuration, lstopo utility will use PAPI to M
 
 #### Requirements
 
-	X output must be enabled.
-	You must ave permission to read every performance counters. It can be achieved by running the command: 
-	```
-	echo "-1" > /proc/sys/kernel/perf_event_paranoid" as root.
-	```
-	PAPI, bison and lex must be installed.
-	If you use a custom installation of these, you have to append CFLAGS for includes and LDFALGS for lib to configure command line. 
+X output must be enabled.
+You must ave permission to read every performance counters. It can be achieved by running the command: 
+```
+echo "-1" > /proc/sys/kernel/perf_event_paranoid" as root.
+```
+PAPI, bison and lex must be installed.
+If you use a custom installation of these, you have to append CFLAGS for includes and LDFALGS for lib to configure command line.
 
 #### Installation
 	
-	Simply install hwloc
-	Use configure option --enable-monitor to force monitor compilation.
-	The configure summary shows if monitors is enabled.
+Simply install hwloc
+Use configure option --enable-monitor to force monitor compilation.
+The configure summary shows if monitors is enabled.
 
 #### Usage
         
-	lstopo man page contains every extra perf option.
-	`lstopo --help` to. 
+lstopo man page contains every extra perf option.
+`lstopo --help` to. 
 
-	Use lstopo the same way as usual + append perf options:
-	`lstopo --perf` will display random availables counters on random topology nodes.
-	You can describe which counter(s) to display on a specific topology node with `--perf-input`.
+Use lstopo the same way as usual + append perf options:
+`lstopo --perf` will display random availables counters on random topology nodes.
+You can describe which counter(s) to display on a specific topology node with `--perf-input`.
+Performance input files syntax is the same as follow:
 
-	Performance input files syntax is the same as follow:
+```
+#commentary: The first one is the pattern and while trigger an error
+#counter_name0{hwloc_obj_name0,PAPI_COUNTER0}`
+my_counter{L1i,PAPI_FP_OPS*PAPI_L1_ICM/100}`
+```
 
-	```
-	#commentary: The first one is the pattern and while trigger an error
-	#counter_name0{hwloc_obj_name0,PAPI_COUNTER0}`
-	my_counter{L1i,PAPI_FP_OPS*PAPI_L1_ICM/100}`
-	```
-
-	If an object or a counter isn't available on your system, a list of 
-	availables items will be dumped.
+If an object or a counter isn't available on your system, a list of 
+availables items will be dumped.
 
 #### Monitoring an application
-	* As a backend:
-	   ```
-	   lstopo <perf options> <your_application> <your application args>
-	   ```
 
-	* Instrumenting your code:
-	   Use `monitor.h` header in `<hwloc_install_include_dir>` and link your
-	   application  with `-lmonitor`
-	   Once you executed your application, you can display the trace with `lstopo --perf-replay <output_file>`.
+* As a backend:
+```
+lstopo <perf options> <your_application> <your application args>
+```
 
+* Instrumenting your code:
+Use `monitor.h` header in `<hwloc_install_include_dir>` and link your application  with `-lmonitor`
+Once you executed your application, you can display the trace with `lstopo --perf-replay <output_file>`.
 
