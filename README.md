@@ -118,6 +118,8 @@ availables items will be dumped.
 ```
 lstopo <perf options> <your_application> <your application args>
 ```
+Note: setting output to a pdf, a png, or a svg file will accumulate all and output values once, instead of classic graphic output where the display is refreshed periodically.
+
 
 * Instrumenting your code:
 Use `monitor.h` header in `<hwloc_install_include_dir>` and link your application  with `-lmonitor -lhwloc`
