@@ -105,7 +105,7 @@ Performance input files syntax is the same as follow:
 
 ```
 #commentary
-#counter_name0{hwloc_obj_name0,PAPI_COUNTER0}`
+#counter_name{hwloc_obj_name,PAPI_COUNTER1*3.14159265359/PAPI_COUNTER2}`
 my_counter{L1i,PAPI_FP_OPS*PAPI_L1_ICM/100}`
 ```
 
