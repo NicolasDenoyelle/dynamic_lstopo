@@ -65,7 +65,7 @@ fig_declare_color(void *output_, int r, int g, int b)
 }
 
 static void
-fig_box(void *output_, int r, int g, int b, unsigned depth, unsigned x, unsigned width, unsigned y, unsigned height)
+fig_box(void *output_, int r, int g, int b, unsigned depth, unsigned x, unsigned width, unsigned y, unsigned height, int highlight __hwloc_attribute_unused)
 {
   FILE *output = output_;
   x *= FIG_FACTOR;
