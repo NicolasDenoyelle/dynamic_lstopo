@@ -584,7 +584,7 @@ merge(struct display *disp, int x, int y, int or, int andnot, int r, int g, int 
 
 /* Now we can implement the standard drawing helpers */
 static void
-text_box(void *output, int r, int g, int b, unsigned depth __hwloc_attribute_unused, unsigned x1, unsigned width, unsigned y1, unsigned height)
+text_box(void *output, int r, int g, int b, unsigned depth __hwloc_attribute_unused, unsigned x1, unsigned width, unsigned y1, unsigned height, int highlight __hwloc_attribute_unused)
 {
   struct display *disp = output;
   unsigned i, j;
