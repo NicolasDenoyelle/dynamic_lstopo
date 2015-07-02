@@ -117,23 +117,17 @@ extern FILE *yyin;
 extern int column;
 extern int yylineno;
 
-static void
-exit_wrong_counter(char * name)
-{
-    fprintf(stdout,"Wrong Event name: %s\n", name);
-    fprintf(stdout,"Available native events:\n");
-    dump_avail(get_native_avail_papi_counters);
-    fprintf(stdout,"Available preset events:\n");
-    dump_avail(get_preset_avail_papi_counters);
-    exit(1);
-}
-
 void check_counter(char * counter_name)
 {
   int err = check_papi_counter(counter_name);
   if(err != PAPI_OK){
+    fprintf(stdout,"Available native events:\n");
+    dump_avail(get_native_avail_papi_counters);
+    fprintf(stdout,"Available preset events:\n");
+    dump_avail(get_preset_avail_papi_counters);
+    fprintf(stdout,"\nWrong Event name: %s\n", counter_name);
     handle_error(err);
-    exit_wrong_counter(counter_name);
+    exit(1);
   }
 }
 

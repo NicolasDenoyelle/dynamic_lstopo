@@ -384,7 +384,7 @@ void * monitors_thread(void* monitors){
   p_tidx = hwloc_bitmap_first(active_pu);
   
   /* Initialize my eventset */
-  if(init_eventset(m,&eventset,p_tidx,!tidx)!=0){
+  if(init_eventset(m,&eventset,p_tidx,1)!=0){
     fprintf(stderr,"%d failed to init its eventset\n",tidx);
     exit(EXIT_FAILURE);
   }
