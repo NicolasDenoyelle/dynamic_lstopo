@@ -137,6 +137,7 @@ void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_att
     }
   }
 
+  int user_stopped=0;
   /* start timer */
   timerfd_settime(itimer_fd,0,&itimer,NULL);
   while(pid ? waitpid(pid, NULL, WNOHANG)==0 : 1){
@@ -145,8 +146,10 @@ void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_att
     timeout.tv_usec=0;
     if(select(nfds, &in_fds, NULL, NULL,&timeout)>0){
       if(FD_ISSET(x11_fd,&in_fds)){
-	if(handle_xDisplay(disp,topology,logical,legend,&lastx,&lasty))
+	if(handle_xDisplay(disp,topology,logical,legend,&lastx,&lasty)){
+	  user_stopped=1;
 	  break;
+	}
       }
       if(FD_ISSET(itimer_fd,&in_fds)){
 	if(read(itimer_fd,&buf,sizeof(uint64_t))==-1){
@@ -161,15 +164,19 @@ void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_att
   }
   waitpid(pid,NULL,0);
 
-  do{
-    if(FD_ISSET(x11_fd,&in_fds)){
-      if(handle_xDisplay(disp,topology,logical,legend,&lastx,&lasty))
-	break;
+  if(!user_stopped){
+    FD_ZERO(&in_fds_original);  
+    FD_SET(x11_fd, &in_fds_original);
+    while(select(nfds, &in_fds, NULL, NULL,&timeout)>0){
+      if(FD_ISSET(itimer_fd,&in_fds)){
+	timeout.tv_sec=10;
+	timeout.tv_usec=0;
+	if(handle_xDisplay(disp,topology,logical,legend,&lastx,&lasty))
+	  break;
     }
-    in_fds = in_fds_original;
-    timeout.tv_sec=10;
-    timeout.tv_usec=0;
-  } while(select(nfds, &in_fds, NULL, NULL,&timeout)>0);
+    }
+  }
+
 
   hwloc_bitmap_free(active); 
   cairo_destroy(c);
