@@ -8,11 +8,26 @@
 #include "monitor_replay.h"
 #include "pwatch.h"
 
+void
+topo_cairo_highlight_box(void *output, int r, int g, int b, unsigned depth __hwloc_attribute_unused, unsigned x, unsigned width, unsigned y, unsigned height)
+{
+  cairo_t *c = output;
+  cairo_rectangle(c, x, y, width, height);
+  cairo_set_source_rgb(c, (float)r / 255, (float) g / 255, (float) b / 255);
+  cairo_fill(c);
+
+  cairo_rectangle(c, x, y, width, height);
+  cairo_set_source_rgb(c, 51, 0, 255);
+  cairo_set_line_width(c, 1);
+  cairo_stroke(c);
+}
+
+
 void topo_cairo_perf_boxes(hwloc_topology_t topology, 
 			     monitors_t monitors, hwloc_bitmap_t active, cairo_t *c, struct draw_methods * methods)
 {
   unsigned int i, nobj;
-  hwloc_obj_t obj;
+  hwloc_obj_t obj,sibling;
   double val, variation;
   struct monitor_node * box;
   struct dyna_save * ds;
@@ -24,26 +39,25 @@ void topo_cairo_perf_boxes(hwloc_topology_t topology,
       val = box->val;
       variation = val - box->val1;
       if(!monitors->pw)
-	perf_box_draw(topology, methods, obj, c, obj->depth, val, variation, monitors->max[i], monitors->min[i]);
+	perf_box_draw(topology, methods, obj, c, obj->depth, val, variation, monitors->max[i], monitors->min[i], 0);
       else{
 	proc_watch_get_watched_in_cpuset(monitors->pw,obj->cpuset,active);
-	if(!hwloc_bitmap_iszero(active)){
-	  box->userdata=(void*)0;
-	  perf_box_draw(topology, methods, obj, c, obj->depth, val, variation, monitors->max[i], monitors->min[i]);
-	  if(obj->type == HWLOC_OBJ_CORE || obj->type == HWLOC_OBJ_PACKAGE)
-	    obj_draw_again(topology, obj->first_child, methods, 0, c);
+	if(hwloc_bitmap_iszero(active)){
+	  if(box->userdata == (void*)0) //not already drawn unactive
+	    perf_box_draw(topology, methods, obj, c, obj->depth, val, variation, monitors->max[i], monitors->min[i],0);
+	  box->userdata == (void*)1;
 	}
-	else if(!box->userdata){
-	  box->userdata = (void*)1;
-	  obj_draw_again(topology, obj, methods, 0, c);
+	else{
+	  box->userdata = (void*)0;
+	  perf_box_draw(topology, methods, obj, c, obj->depth, val, variation, monitors->max[i], monitors->min[i],!hwloc_bitmap_iszero(active));
 	}
       }
     }
   }
 
-  obj = hwloc_get_obj_by_depth(topology,obj->depth+1,0);
-  if(obj!=NULL){
-    nobj = hwloc_get_nbobjs_by_depth(monitors->topology,obj->depth);
+  /* re draw deeper objects overlapped by boxes */
+  while((obj=obj->first_child)!=NULL){
+    nobj = hwloc_get_nbobjs_by_depth(topology,obj->depth);
     while(nobj--){
       obj = hwloc_get_obj_by_depth(topology,obj->depth,nobj);
       obj_draw_again(topology, obj, methods, 0, c);
@@ -65,7 +79,8 @@ replay_t replay, cairo_t *c, struct draw_methods * methods)
   perf_box_draw(topology, methods, obj, c, obj->depth, 
 		vl.value, vl.value-old_val, 
 		replay->max[obj->depth], 
-		replay->min[obj->depth]);
+		replay->min[obj->depth],
+		0);
   cairo_show_page(c);
 }
 
@@ -145,7 +160,17 @@ void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_att
     }
   }
   waitpid(pid,NULL,0);
-    
+
+  do{
+    if(FD_ISSET(x11_fd,&in_fds)){
+      if(handle_xDisplay(disp,topology,logical,legend,&lastx,&lasty))
+	break;
+    }
+    in_fds = in_fds_original;
+    timeout.tv_sec=10;
+    timeout.tv_usec=0;
+  } while(select(nfds, &in_fds, NULL, NULL,&timeout)>0);
+
   hwloc_bitmap_free(active); 
   cairo_destroy(c);
   x11_destroy(disp);
@@ -217,7 +242,6 @@ static_app_monitor(monitors_t m,int r, int whole_machine, char * executable, cha
 {
   cairo_t *c;
   c = cairo_create(cs);
-
   Monitors_start(m);
   if(executable){
     m->accum=1;
@@ -228,7 +252,7 @@ static_app_monitor(monitors_t m,int r, int whole_machine, char * executable, cha
     while(waitpid(pid, NULL, WNOHANG)==0){
       proc_watch_update(m->pw);
       Monitors_update_counters(m);
-      usleep(r);    
+      usleep(r);   
     }
     waitpid(pid,NULL,0);
   }
