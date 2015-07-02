@@ -12,7 +12,7 @@
 /* Cairo methods */
 
 void
-topo_cairo_box(void *output, int r, int g, int b, unsigned depth __hwloc_attribute_unused, unsigned x, unsigned width, unsigned y, unsigned height)
+topo_cairo_box(void *output, int r, int g, int b, unsigned depth __hwloc_attribute_unused, unsigned x, unsigned width, unsigned y, unsigned height, int highlight)
 {
   cairo_t *c = output;
   cairo_rectangle(c, x, y, width, height);
@@ -20,7 +20,10 @@ topo_cairo_box(void *output, int r, int g, int b, unsigned depth __hwloc_attribu
   cairo_fill(c);
 
   cairo_rectangle(c, x, y, width, height);
-  cairo_set_source_rgb(c, 0, 0, 0);
+  if(highlight)
+    cairo_set_source_rgb(c, 0, 0, 0);
+  else
+    cairo_set_source_rgb(c, 255, 255, 255);
   cairo_set_line_width(c, 1);
   cairo_stroke(c);
 }
