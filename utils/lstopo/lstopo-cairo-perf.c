@@ -87,6 +87,7 @@ replay_t replay, cairo_t *c, struct draw_methods * methods)
 #if CAIRO_HAS_XLIB_SURFACE
 void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_attribute_unused, int overwrite __hwloc_attribute_unused, int logical, int legend, int verbose_mode __hwloc_attribute_unused, monitors_t monitors, unsigned long refresh_usec, int perf_whole_machine, char * executable, char * exe_args[])
 {
+
   struct timeval timeout;
   char buf[sizeof(uint64_t)];
 
@@ -123,11 +124,8 @@ void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_att
   FD_SET(x11_fd, &in_fds_original);
   FD_SET(itimer_fd, &in_fds_original);
   int nfds = x11_fd > itimer_fd ? x11_fd+1 : itimer_fd+1;  
-  
-  /* start monitoring activity */
-  Monitors_start(monitors);
 
-  /* start executable to watch */
+  /* start executable to watch */  
   int pid=0;
   if(executable){
     pid = start_executable(executable,exe_args);
@@ -136,6 +134,9 @@ void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_att
       printf("monitoring pid %d\n",pid);
     }
   }
+
+  /* start monitoring activity */
+  Monitors_start(monitors);
 
   int user_stopped=0;
   /* start timer */
@@ -173,7 +174,7 @@ void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_att
 	timeout.tv_usec=0;
 	if(handle_xDisplay(disp,topology,logical,legend,&lastx,&lasty))
 	  break;
-    }
+      }
     }
   }
 
@@ -249,13 +250,13 @@ static_app_monitor(monitors_t m,int r, int whole_machine, char * executable, cha
 {
   cairo_t *c;
   c = cairo_create(cs);
-  Monitors_start(m);
   if(executable){
     m->accum=1;
     int pid=0;
     pid = start_executable(executable,exe_args);
     if(!whole_machine)
       Monitors_watch_pid(m,pid);
+    Monitors_start(m);
     while(waitpid(pid, NULL, WNOHANG)==0){
       proc_watch_update(m->pw);
       Monitors_update_counters(m);
@@ -264,6 +265,7 @@ static_app_monitor(monitors_t m,int r, int whole_machine, char * executable, cha
     waitpid(pid,NULL,0);
   }
   else{
+    Monitors_start(m);
     unsigned i;
     for(i=0;i<10;i++){
       Monitors_update_counters(m);
