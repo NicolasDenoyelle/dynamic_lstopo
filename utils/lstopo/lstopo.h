@@ -30,7 +30,7 @@ extern output_method output_console, output_synthetic, output_text, output_x11, 
 struct draw_methods {
   void* (*start) (void *output, int width, int height);
   void (*declare_color) (void *output, int r, int g, int b);
-  void (*box) (void *output, int r, int g, int b, unsigned depth, unsigned x, unsigned width, unsigned y, unsigned height);
+  void (*box) (void *output, int r, int g, int b, unsigned depth, unsigned x, unsigned width, unsigned y, unsigned height, int highlight);
   void (*line) (void *output, int r, int g, int b, unsigned depth, unsigned x1, unsigned y1, unsigned x2, unsigned y2);
   void (*text) (void *output, int r, int g, int b, int size, unsigned depth, unsigned x, unsigned y, const char *text);
 };
@@ -65,7 +65,7 @@ typedef void output_perf_replay_method(struct hwloc_topology *topology, const ch
 extern output_perf_replay_method output_x11_perf_replay, output_pdf_perf_replay, output_png_perf_replay, output_ps_perf_replay, output_svg_perf_replay;
 
 /* box draw */
-extern void perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj_t level, void *output, unsigned depth, double value, double variation, double max, double min);
+extern void perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj_t level, void *output, unsigned depth, double value, double variation, double max, double min, int active);
 #endif /* HWLOC_HAVE_MONITOR */
 
 int rgb_to_color(int r, int g, int b) __hwloc_attribute_const;
