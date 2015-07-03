@@ -236,12 +236,15 @@ replay_get_value(replay_t r, struct value_line * out)
   int ret =replay_queue_pop(r->val_queue, out);
   ((double*)r->nodes[out->id]->userdata)[2] = ((double*)r->nodes[out->id]->userdata)[1];
   ((double*)r->nodes[out->id]->userdata)[1] = ((double*)r->nodes[out->id]->userdata)[0];
-  ((double*)r->nodes[out->id]->userdata)[0] = out->value;
+  if(r->accumulate)
+    ((double*)r->nodes[out->id]->userdata)[0] += out->value;
+  else
+    ((double*)r->nodes[out->id]->userdata)[0] = out->value;
   return ret;
 }
 
 replay_t
-new_replay(const char * filename, hwloc_topology_t topology, int phase, float speed)
+new_replay(const char * filename, hwloc_topology_t topology, int phase, float speed, int accumulate)
 {
   FILE * input = fopen(filename,"r");
   if(input==NULL){
@@ -259,6 +262,7 @@ new_replay(const char * filename, hwloc_topology_t topology, int phase, float sp
   rp->timestamp_queue = new_replay_queue();
   rp->phase=phase;
   rp->trace_start=-1;
+  rp->accumulate=accumulate;
   if(speed > 0)
     rp->speed = speed;
   else
