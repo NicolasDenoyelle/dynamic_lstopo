@@ -34,6 +34,7 @@ struct replay_t{
   pthread_mutex_t mtx;
 
   double    * max, * min; /* topo_depth */    
+  int accumulate;
 
   hwloc_obj_t * nodes;  /* index correspond to the value_line.id. userdata contain double[3] history of values*/
   struct replay_queue * val_queue, * timestamp_queue;
@@ -42,7 +43,7 @@ struct replay_t{
 };
 typedef struct replay_t * replay_t;
 
-replay_t new_replay        (const char * filename, hwloc_topology_t topology, int phase, float speed);
+replay_t new_replay        (const char * filename, hwloc_topology_t topology, int phase, float speed, int accumulate);
 void     delete_replay     (replay_t r);
 void     replay_start      (replay_t r);
 int      replay_is_finished(replay_t r);
