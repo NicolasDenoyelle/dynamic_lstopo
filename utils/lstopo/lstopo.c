@@ -615,25 +615,25 @@ output_perf_replay(hwloc_topology_t topology, const char * filename, int verbose
 #ifdef LSTOPO_HAVE_GRAPHICS
 # if CAIRO_HAS_PNG_FUNCTIONS
   case LSTOPO_OUTPUT_PNG:
-    fprintf(stdout,"output format not supported with --perf\n");
+    output_png_perf_replay(topology, filename, overwrite, logical, legend, verbose_mode, replay);
     exit(EXIT_FAILURE);
     break;
 # endif /* CAIRO_HAS_PNG_FUNCTIONS */
 # if CAIRO_HAS_PDF_SURFACE
   case LSTOPO_OUTPUT_PDF:
-    fprintf(stdout,"output format not supported with --perf\n");
+    output_pdf_perf_replay(topology, filename, overwrite, logical, legend, verbose_mode, replay);
     exit(EXIT_FAILURE);
     break;
 # endif /* CAIRO_HAS_PDF_SURFACE */
 # if CAIRO_HAS_PS_SURFACE
   case LSTOPO_OUTPUT_PS:
-    fprintf(stdout,"output format not supported with --perf\n");
+    output_ps_perf_replay(topology, filename, overwrite, logical, legend, verbose_mode, replay);
     exit(EXIT_FAILURE);  
     break;
 #endif /* CAIRO_HAS_PS_SURFACE */
 #if CAIRO_HAS_SVG_SURFACE
   case LSTOPO_OUTPUT_SVG:
-    fprintf(stdout,"output format not supported with --perf\n");    
+    output_svg_perf_replay(topology, filename, overwrite, logical, legend, verbose_mode, replay);
     exit(EXIT_FAILURE);  
     break;
 #endif /* CAIRO_HAS_SVG_SURFACE */
@@ -861,7 +861,6 @@ main (int argc, char *argv[])
 	perf_accumulate = 1;
       }
       else if (!strcmp (argv[0], "--perf-logscale")){
-	perf_opt = 1;
 	perf_logscale = 1;
       }
       else if (!strcmp (argv[0], "--perf-whole-machine")){
