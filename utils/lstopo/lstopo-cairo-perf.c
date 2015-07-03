@@ -80,7 +80,7 @@ replay_t replay, cairo_t *c, struct draw_methods * methods)
 		vl.value, vl.value-old_val, 
 		replay->max[obj->depth], 
 		replay->min[obj->depth],
-		0);
+		1);
   cairo_show_page(c);
 }
 
@@ -281,6 +281,83 @@ static_app_monitor(monitors_t m,int r, int whole_machine, char * executable, cha
   return;
 }
 
+static void
+static_replay(hwloc_topology_t topology, const char *filename, int overwrite, int logical, int legend, int verbose_mode, replay_t replay, struct draw_methods * methods)
+{
+  FILE *output = open_output(filename, overwrite);
+  if (!output) {
+    fprintf(stderr, "Failed to open %s for writing (%s)\n", filename, strerror(errno));
+    return;
+  }
+
+  cairo_surface_t * cs = output_draw_start(methods, logical, legend, topology, output);
+  cairo_t *c  = cairo_create(cs);
+
+  struct value_line vl;
+  char buf[sizeof(uint64_t)];
+  struct timeval timeout;
+  fd_set in_fds, in_fds_original;
+  FD_ZERO(&in_fds_original);  
+  FD_SET(replay->update_read_fd, &in_fds_original);
+  int nfds = replay->update_read_fd+1;
+  replay->accumulate=1;
+  replay_start(replay);
+  while(!replay_is_finished(replay)){
+    in_fds = in_fds_original;
+    timeout.tv_sec=1 ;
+    timeout.tv_usec=0;
+    if(select(nfds, &in_fds, NULL, NULL,&timeout)>0){
+      if(FD_ISSET(replay->update_read_fd,&in_fds)){
+	if(read(replay->update_read_fd,&buf,sizeof(uint64_t))==-1){
+	  perror("read");
+	}
+	replay_get_value(replay,&vl);
+      }
+    }
+  }
+
+  unsigned i;
+  hwloc_obj_t obj;
+  double old_val, val;
+  unsigned topo_depth = hwloc_topology_get_depth(replay->topology);
+  unsigned n_obj = topo_depth * hwloc_get_nbobjs_by_depth(replay->topology,topo_depth-1);
+  unsigned long max_depth=0;
+
+  output_draw(methods, logical, legend, topology, c);
+  for(i=0;i<n_obj;i++){
+    obj = replay->nodes[i];
+    if(obj && obj->userdata){
+      old_val = ((double*)obj->userdata)[1];
+      val = ((double*)obj->userdata)[0];
+      obj=hwloc_get_obj_by_depth(topology,obj->depth,obj->logical_index);
+      perf_box_draw(topology, methods, obj, c, obj->depth, 
+		    val, old_val, 
+		    replay->max[obj->depth], 
+		    replay->min[obj->depth],
+		    1);
+      max_depth = obj->depth>max_depth? obj->depth : max_depth;
+    }
+  }
+  for(i=max_depth+1;i<topo_depth;i++){
+    n_obj = hwloc_get_nbobjs_by_depth(topology,topo_depth);
+    while(n_obj--){
+      obj = hwloc_get_obj_by_depth(topology,i,n_obj);
+      obj_draw_again(topology, obj, methods, 0, c);
+    }
+  }
+  cairo_show_page(c);
+  cairo_destroy(c);
+
+  cairo_surface_flush(cs);
+  if(methods == &png_draw_methods)
+    cairo_surface_write_to_png_stream(cs, topo_cairo_write, output);
+  cairo_surface_destroy(cs);
+
+  if (output != stdout)
+    fclose(output);
+
+}
+
 #if CAIRO_HAS_PNG_FUNCTIONS
 /* PNG back-end */
 void
@@ -298,6 +375,14 @@ output_png_perf(hwloc_topology_t topology, const char *filename, int overwrite, 
 
   cairo_surface_write_to_png_stream(cs, topo_cairo_write, output);
 }
+
+
+inline void 
+output_png_perf_replay(hwloc_topology_t topology, const char *filename, int overwrite, int logical, int legend, int verbose_mode, replay_t replay)
+{
+  static_replay(topology, filename, overwrite, logical, legend, verbose_mode, replay, &png_draw_methods);
+}
+
 #endif /* CAIRO_HAS_PNG_FUNCTIONS */
 
 #if CAIRO_HAS_PDF_SURFACE
@@ -317,6 +402,13 @@ output_pdf_perf(hwloc_topology_t topology, const char *filename __hwloc_attribut
   if (output != stdout)
     fclose(output);
 }
+
+inline void 
+output_pdf_perf_replay(hwloc_topology_t topology, const char *filename, int overwrite, int logical, int legend, int verbose_mode, replay_t replay)
+{
+  static_replay(topology, filename, overwrite, logical, legend, verbose_mode, replay, &pdf_draw_methods);
+}
+
 #endif /* CAIRO_HAS_PDF_SURFACE */
 
 #if CAIRO_HAS_PS_SURFACE
@@ -336,6 +428,12 @@ output_ps_perf(hwloc_topology_t topology, const char *filename, int overwrite, i
   cairo_surface_destroy(cs);
   if (output != stdout)
     fclose(output);
+}
+
+inline void 
+output_ps_perf_replay(hwloc_topology_t topology, const char *filename, int overwrite, int logical, int legend, int verbose_mode, replay_t replay)
+{
+  static_replay(topology, filename, overwrite, logical, legend, verbose_mode, replay, &ps_draw_methods);
 }
 #endif /* CAIRO_HAS_PS_SURFACE */
 
@@ -360,5 +458,11 @@ output_svg_perf(hwloc_topology_t topology, const char *filename, int overwrite, 
 
   if (output != stdout)
     fclose(output);
+}
+
+inline void 
+output_svg_perf_replay(hwloc_topology_t topology, const char *filename, int overwrite, int logical, int legend, int verbose_mode, replay_t replay)
+{
+  static_replay(topology, filename, overwrite, logical, legend, verbose_mode, replay, &svg_draw_methods);
 }
 #endif /* CAIRO_HAS_SVG_SURFACE */
