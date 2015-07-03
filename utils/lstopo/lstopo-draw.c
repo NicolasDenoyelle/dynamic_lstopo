@@ -1337,6 +1337,7 @@ output_draw(struct draw_methods *methods, int logical, int legend, hwloc_topolog
 
 #ifdef HWLOC_HAVE_MONITOR
 #define PERF_MIN(x,y) x<y? x:y;
+extern int perf_logscale;
 
 void
 perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj_t level, void *output, unsigned depth, double value, double variation, double max, double min, int active){
@@ -1416,9 +1417,11 @@ perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj
 
 /* log scale */
   variation/=(2*(max - min)); /* normalized variation in [-1/2, 1/2]*/
-  max = log(max);
-  min = log(min);
-  value = log(value);
+  if(perf_logscale){
+    max = log(max);
+    min = log(min);
+    value = log(value);
+  }
   value=(value - min)/(max - min);     /* normalized value in [0,1]*/
 
   /* overflow may happen when nodes values are set for the first time and no variation can be defined */
