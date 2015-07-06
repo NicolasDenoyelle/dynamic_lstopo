@@ -143,7 +143,7 @@ void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_att
   timerfd_settime(itimer_fd,0,&itimer,NULL);
   while(pid ? waitpid(pid, NULL, WNOHANG)==0 : 1){
     in_fds = in_fds_original;
-    timeout.tv_sec=10;
+    timeout.tv_sec=1;
     timeout.tv_usec=0;
     if(select(nfds, &in_fds, NULL, NULL,&timeout)>0){
       if(FD_ISSET(x11_fd,&in_fds)){
@@ -166,16 +166,7 @@ void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_att
   waitpid(pid,NULL,0);
 
   if(!user_stopped){
-    FD_ZERO(&in_fds_original);  
-    FD_SET(x11_fd, &in_fds_original);
-    while(select(nfds, &in_fds, NULL, NULL,&timeout)>0){
-      if(FD_ISSET(x11_fd,&in_fds)){
-	timeout.tv_sec=10;
-	timeout.tv_usec=0;
-	if(handle_xDisplay(disp,topology,logical,legend,&lastx,&lasty))
-	  break;
-      }
-    }
+    while(!handle_xDisplay(disp,topology,logical,legend,&lastx,&lasty));
   }
 
 
@@ -234,16 +225,7 @@ void output_x11_perf_replay(hwloc_topology_t topology, const char *filename __hw
     }
   }
   if(!user_stopped){
-    FD_ZERO(&in_fds_original);  
-    FD_SET(x11_fd, &in_fds_original);
-    while(select(nfds, &in_fds, NULL, NULL,&timeout)>0){
-      if(FD_ISSET(x11_fd,&in_fds)){
-	timeout.tv_sec=10;
-	timeout.tv_usec=0;
-	if(handle_xDisplay(disp,topology,logical,legend,&lastx,&lasty))
-	  break;
-      }
-    }
+    while(handle_xDisplay(disp,topology,logical,legend,&lastx,&lasty));
   }
 
     
