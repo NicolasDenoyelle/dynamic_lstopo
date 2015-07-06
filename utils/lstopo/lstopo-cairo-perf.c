@@ -39,7 +39,7 @@ void topo_cairo_perf_boxes(hwloc_topology_t topology,
       val = box->val;
       variation = val - box->val1;
       if(!monitors->pw)
-	perf_box_draw(topology, methods, obj, c, obj->depth, val, variation, monitors->max[i], monitors->min[i], 0);
+	perf_box_draw(topology, methods, obj, c, obj->depth, val, variation, monitors->max[i], monitors->min[i], 1);
       else{
 	proc_watch_get_watched_in_cpuset(monitors->pw,obj->cpuset,active);
 	if(hwloc_bitmap_iszero(active)){
@@ -169,7 +169,7 @@ void output_x11_perf(hwloc_topology_t topology, const char *filename __hwloc_att
     FD_ZERO(&in_fds_original);  
     FD_SET(x11_fd, &in_fds_original);
     while(select(nfds, &in_fds, NULL, NULL,&timeout)>0){
-      if(FD_ISSET(itimer_fd,&in_fds)){
+      if(FD_ISSET(x11_fd,&in_fds)){
 	timeout.tv_sec=10;
 	timeout.tv_usec=0;
 	if(handle_xDisplay(disp,topology,logical,legend,&lastx,&lasty))
@@ -210,7 +210,8 @@ void output_x11_perf_replay(hwloc_topology_t topology, const char *filename __hw
   FD_SET(x11_fd, &in_fds_original);
   FD_SET(replay->update_read_fd, &in_fds_original);
   int nfds = x11_fd > replay->update_read_fd ? x11_fd+1 : replay->update_read_fd+1;  
-  
+  int user_stopped = 0;
+
   replay_start(replay);
   while(!replay_is_finished(replay)){
     in_fds = in_fds_original;
@@ -218,8 +219,10 @@ void output_x11_perf_replay(hwloc_topology_t topology, const char *filename __hw
     timeout.tv_usec=0;
     if(select(nfds, &in_fds, NULL, NULL,&timeout)>0){
       if(FD_ISSET(x11_fd,&in_fds)){
-	if(handle_xDisplay(disp,topology,logical,legend,&lastx,&lasty))
+	if(handle_xDisplay(disp,topology,logical,legend,&lastx,&lasty)){
+	  user_stopped=1;
 	  break;
+	}
       }
       if(FD_ISSET(replay->update_read_fd,&in_fds)){
 	if(read(replay->update_read_fd,&buf,sizeof(uint64_t))==-1){
@@ -230,6 +233,19 @@ void output_x11_perf_replay(hwloc_topology_t topology, const char *filename __hw
       }
     }
   }
+  if(!user_stopped){
+    FD_ZERO(&in_fds_original);  
+    FD_SET(x11_fd, &in_fds_original);
+    while(select(nfds, &in_fds, NULL, NULL,&timeout)>0){
+      if(FD_ISSET(x11_fd,&in_fds)){
+	timeout.tv_sec=10;
+	timeout.tv_usec=0;
+	if(handle_xDisplay(disp,topology,logical,legend,&lastx,&lasty))
+	  break;
+      }
+    }
+  }
+
     
  exit:;
   cairo_destroy(c);
@@ -263,6 +279,7 @@ static_app_monitor(monitors_t m,int r, int whole_machine, char * executable, cha
       usleep(r);   
     }
     waitpid(pid,NULL,0);
+    Monitors_update_counters(m);
   }
   else{
     Monitors_start(m);
