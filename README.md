@@ -9,49 +9,44 @@ high-performance computing (HPC) applications, but is also applicable to any
 project seeking to exploit code and/or data locality on modern computing
 platforms.
 
-hwloc is actually made of two subprojects distributed together:
+For more informations about hwloc, please read the original hwloc's README from the openmpi project.
 
-  * The original hwloc project for describing the internals of computing nodes.
- It is described in details between sections Hardware Locality (hwloc)
- Introduction and Network Locality (netloc) Introduction.
-  * The network-oriented companion called netloc (Network Locality), described
- in details starting at section Network Locality (netloc) Introduction.
- Netloc may be disabled, but the original hwloc cannot. Both hwloc and
- netloc APIs are documented after these sections.
-
-This version also contains a new version of lstopo utility to display or record performance counters.
-The counters collected with PAPI are aggregated into upper levels of the hierarchy to display live a consistent view of the machine state.
+This specific version contain a custom version of lstopo utility to display and/or record performance counters.
+The counters collected with PAPI are summed into upper levels of the hierarchy to display live a consistent view of the machine state.
 
 ### Installation
 
-hwloc (http://www.open-mpi.org/projects/hwloc/) is available under the BSD
-license. It is hosted as a sub-project of the overall Open MPI project (http://
-www.open-mpi.org/). Note that hwloc does not require any functionality from
-Open MPI -- it is a wholly separate (and much smaller!) project and code base.
-It just happens to be hosted as part of the overall Open MPI project.
+The original hwloc hwloc (http://www.open-mpi.org/projects/hwloc/) is available under the BSD
+license. This version inherit the license.
+Awaiting to be merged with the original project, this fork is hosted on github at 
+```
+https://github.com/NicolasDenoyelle/dynamic_lstopo
+```
 
-Nightly development snapshots are available on the web site. Additionally, the
-code can be directly cloned from Git:
-
+The original code can be directly cloned from Git:
 ```
 git clone https://github.com/open-mpi/hwloc.git
 cd hwloc
 ./autogen.sh
 ```
 
-Note that GNU Autoconf >=2.63, Automake >=1.11 and Libtool >=2.2.6 are required
-when building from a Git clone.
+This version with performance monitoring has to be cloned from Git:
+```
+git clone https://github.com/NicolasDenoyelle/dynamic_lstopo.git
+cd hwloc
+./autogen.sh
+```
 
-Installation by itself is the fairly common GNU-based process:
+Note that GNU Autoconf >=2.63, Automake >=1.11 and Libtool >=2.2.6, and recent version of PAPI are required
+when building.
+
+Installation by itself is the fairly common GNU-based process excepted that it requires to append the option `--enable-monitor` to the configure command line if you want to build enable the performance monitoring version:
 
 ```
-./configure --prefix=...
+./configure --prefix=... --enable-monitor
 make
 make install
 ```
-
-hwloc- and netloc-specific configure options and requirements are documented in
-sections hwloc Installation and Netloc Installation respectively.
 
 Also note that if you install supplemental libraries in non-standard locations,
 hwloc's configure script may not be able to find them without some help. You
@@ -87,12 +82,6 @@ echo "-1" > /proc/sys/kernel/perf_event_paranoid" as root.
 PAPI, bison and lex must be installed.
 If you use a custom installation of these, you have to append CPPFLAGS for includes and LDFLAGS for lib to configure command line.
 
-#### Installation
-	
-Simply install hwloc.
-Use configure option `--enable-monitor` to force monitor compilation.
-The configure summary shows if monitors is enabled.
-
 #### Usage
         
 lstopo man page contains every extra perf option.
@@ -100,7 +89,7 @@ lstopo man page contains every extra perf option.
 
 Use lstopo the same way as usual + append perf options:
 `lstopo --perf` will display random availables counters on random topology nodes.
-You can describe which counter(s) to display on a specific topology node with `--perf-input`.
+You can describe which counter(s) to display on a specific topology node in a file and give it to `lstopo` with the option `--perf-input`.
 Performance input files syntax is the same as follow:
 
 ```
