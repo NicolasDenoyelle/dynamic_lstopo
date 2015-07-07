@@ -11,7 +11,7 @@ platforms.
 
 For more informations about hwloc, please read the original hwloc's README from the openmpi project.
 
-This specific version contain a custom version of lstopo utility to display and/or record performance counters.
+This specific version contains a custom version of lstopo utility to display and/or record performance counters.
 The counters collected with PAPI are summed into upper levels of the hierarchy to display live a consistent view of the machine state.
 
 ### Installation
@@ -40,7 +40,7 @@ cd hwloc
 Note that GNU Autoconf >=2.63, Automake >=1.11 and Libtool >=2.2.6, and recent version of PAPI are required
 when building.
 
-Installation by itself is the fairly common GNU-based process excepted that it requires to append the option `--enable-monitor` to the configure command line if you want to build enable the performance monitoring version:
+Installation by itself is the fairly common GNU-based process excepted that it requires to append the option `--enable-monitor` to the configure command line if you want to build the performance monitoring version:
 
 ```
 ./configure --prefix=... --enable-monitor
@@ -80,7 +80,7 @@ You must ave permission to read every performance counters. It can be achieved b
 echo "-1" > /proc/sys/kernel/perf_event_paranoid" as root.
 ```
 PAPI, bison and lex must be installed.
-If you use a custom installation of these, you have to append CPPFLAGS for includes and LDFLAGS for lib to configure command line.
+If you use a custom installation of these, you have to append CPPFLAGS for includes and LDFLAGS for libraries to configure command line.
 
 #### Usage
         
