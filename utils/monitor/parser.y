@@ -8,6 +8,8 @@
 #include "hwloc.h"
 #include "monitor_utils.h"
 
+#define N_COMPULSORY 2
+
   hwloc_topology_t topology;
   int yyerror(const char * s);
   char * concat_expr(char* expr1, char * expr2, char* expr3);
@@ -21,7 +23,7 @@
   double * max, * min;
   int * logscale;
   FILE * tmp;
-  int skip_monitor;
+  int skip_monitor, check_compulsory;
   char * ctr_expr;
 %}
 
@@ -45,7 +47,10 @@ monitor_list
 monitor
 : NAME '{' field_list '}' {
   if(!skip_monitor){
-    if(nb_monitors==0 || 
+    if(check_compulsory<N_COMPULSORY){
+      fprintf(stderr,"monitor \"%s\" miss a compulsory field\n",$1);
+    }
+    else if(nb_monitors==0 || 
        strsearch($1, monitor_names,nb_monitors)==-1){
       print_func($1,ctr_expr);
       monitor_names[nb_monitors]=$1;
@@ -54,8 +59,9 @@ monitor
     else{
       fprintf(stderr,"monitor \"%s\" ignored because its name is already used by another one\n",$1);
     }
-    free(ctr_expr);
   }
+  free(ctr_expr);
+  check_compulsory=0;
  }
 ;
 
@@ -70,13 +76,14 @@ field
     skip_monitor=0;
     monitor_obj[nb_monitors]=$3;
     check_hwloc_obj_name($3);
+    check_compulsory++;
   }
   else{
     skip_monitor=1;
     fprintf(stderr,"hwloc obj \"%s\" cannot be used to display several monitors\n",$3);
   } 
 }
-| CTR '=' add_expr ';'     {ctr_expr=$3;}
+| CTR '=' add_expr ';'     {ctr_expr=$3; check_compulsory++;}
 | LOGSCALE '=' INTEGER ';' {logscale[nb_monitors]=atoi($3); free($3);}
 | MAX '=' REAL ';'         {max[nb_monitors]=atof($3); free($3);}
 | MAX '=' INTEGER ';'      {max[nb_monitors]=atof($3); free($3);}
