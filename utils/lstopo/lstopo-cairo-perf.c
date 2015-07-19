@@ -39,17 +39,17 @@ void topo_cairo_perf_boxes(hwloc_topology_t topology,
       val = box->val;
       variation = val - box->val1;
       if(!monitors->pw)
-	perf_box_draw(topology, methods, obj, c, obj->depth, val, variation, monitors->max[i], monitors->min[i], 1);
+	perf_box_draw(topology, methods, obj, c, obj->depth, val, variation, monitors->max[i], monitors->min[i], 1, monitors->logscale[i]);
       else{
 	proc_watch_get_watched_in_cpuset(monitors->pw,obj->cpuset,active);
 	if(hwloc_bitmap_iszero(active)){
 	  if(box->userdata == (void*)0) //not already drawn unactive
-	    perf_box_draw(topology, methods, obj, c, obj->depth, val, variation, monitors->max[i], monitors->min[i],0);
+	    perf_box_draw(topology, methods, obj, c, obj->depth, val, variation, monitors->max[i], monitors->min[i],0,monitors->logscale[i]);
 	  box->userdata == (void*)1;
 	}
 	else{
 	  box->userdata = (void*)0;
-	  perf_box_draw(topology, methods, obj, c, obj->depth, val, variation, monitors->max[i], monitors->min[i],!hwloc_bitmap_iszero(active));
+	  perf_box_draw(topology, methods, obj, c, obj->depth, val, variation, monitors->max[i], monitors->min[i],!hwloc_bitmap_iszero(active),monitors->logscale[i]);
 	}
       }
     }
@@ -80,7 +80,8 @@ replay_t replay, cairo_t *c, struct draw_methods * methods)
 		vl.value, vl.value-old_val, 
 		replay->max[obj->depth], 
 		replay->min[obj->depth],
-		1);
+		1,
+		replay->logscale[obj->depth]);
   cairo_show_page(c);
 }
 
@@ -333,7 +334,8 @@ static_replay(hwloc_topology_t topology, const char *filename, int overwrite, in
 		    val, old_val, 
 		    replay->max[obj->depth], 
 		    replay->min[obj->depth],
-		    1);
+		    1,
+		    replay->logscale[obj->depth]);
       max_depth = obj->depth>max_depth? obj->depth : max_depth;
     }
   }
