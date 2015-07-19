@@ -1420,10 +1420,7 @@ perf_box_draw(hwloc_topology_t topology, struct draw_methods *methods, hwloc_obj
     max = log(max);
     min = log(min);
     value = log(value);
-    printf("log\n");
   }
-  else
-    printf("pas log\n");
   value=(value - min)/(max - min);     /* normalized value in [0,1]*/
 
   /* overflow may happen when nodes values are set for the first time and no variation can be defined */
