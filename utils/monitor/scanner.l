@@ -12,6 +12,7 @@ mask         {name}={integer}
 COLON        ":"
 mask_sep     {COLON}*
 %%
+"="          { count(); return('='); };
 "-"          { count(); return('-'); };
 "+"          { count(); return('+'); };
 "*"          { count(); return('*'); };
@@ -20,7 +21,12 @@ mask_sep     {COLON}*
 ")"          { count(); return(')'); };
 "}"          { count(); return('}'); };
 "{"          { count(); return('{'); };
-","          { count(); return(','); };
+";"          { count(); return(';'); };
+"OBJ"        { count(); return(OBJ); };
+"CTR"        { count(); return(CTR); };
+"MAX"        { count(); return(MAX); };
+"MIN"        { count(); return(MIN); };
+"LOGSCALE"   { count(); return(LOGSCALE); };
 {integer}    { count(); yylval.str = strdup(yytext); return(INTEGER); };
 {real}       { count(); yylval.str = strdup(yytext); return(REAL);    };
 {name}       { count(); yylval.str = strdup(yytext); return(NAME);    };
