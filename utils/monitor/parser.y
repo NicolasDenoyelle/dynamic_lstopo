@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>     
+#include <float.h>
 #include <dlfcn.h>
 #include <papi.h>
 #include "hwloc.h"
@@ -16,14 +17,17 @@
   void print_func(char * name,char* code);
   unsigned int nb_counters, nb_monitors, topodepth, i;
   char * err;
-  char ** event_names, ** monitor_names, ** monitor_obj;  
+  char ** event_names, ** monitor_names, ** monitor_obj;
+  double * max, * min;
+  int * logscale;
   FILE * tmp;
-
+  int skip_monitor;
+  char * ctr_expr;
 %}
 
 %error-verbose
-%token <str> NAME MASK MASK_SEPARATOR REAL INTEGER
-%type  <str> hwloc_obj masked_counter primary_expr add_expr mul_expr 
+%token <str> NAME MASK MASK_SEPARATOR REAL INTEGER OBJ CTR MAX MIN LOGSCALE
+%type  <str> masked_counter field_list field primary_expr add_expr mul_expr 
 
 
 %union{
@@ -39,18 +43,45 @@ monitor_list
 ;
 
 monitor
-: NAME '{' hwloc_obj add_expr '}' {
-  if(nb_monitors==0 || 
-     strsearch($1, monitor_names,nb_monitors)==-1){
-    print_func($1,$4);
-    monitor_names[nb_monitors]=$1;
-    nb_monitors++;
+: NAME '{' field_list '}' {
+  if(!skip_monitor){
+    if(nb_monitors==0 || 
+       strsearch($1, monitor_names,nb_monitors)==-1){
+      print_func($1,ctr_expr);
+      monitor_names[nb_monitors]=$1;
+      nb_monitors++;
+    }
+    else{
+      fprintf(stderr,"monitor \"%s\" ignored because its name is already used by another one\n",$1);
+    }
+    free(ctr_expr);
+  }
+ }
+;
+
+field_list
+: field
+| field field_list
+;
+
+field
+: OBJ '=' NAME ';' {
+  if(nb_monitors==0 || strsearch($3, monitor_obj,nb_monitors)==-1){
+    skip_monitor=0;
+    monitor_obj[nb_monitors]=$3;
+    check_hwloc_obj_name($3);
   }
   else{
-    fprintf(stderr,"monitor \"%s\" ignored because its name is already used by another one\n",$1);
-  }
-  free($4);
- }
+    skip_monitor=1;
+    fprintf(stderr,"hwloc obj \"%s\" cannot be used to display several monitors\n",$3);
+  } 
+}
+| CTR '=' add_expr ';'     {ctr_expr=$3;}
+| LOGSCALE '=' INTEGER ';' {logscale[nb_monitors]=atoi($3); free($3);}
+| MAX '=' REAL ';'         {max[nb_monitors]=atof($3); free($3);}
+| MAX '=' INTEGER ';'      {max[nb_monitors]=atof($3); free($3);}
+| MIN '=' REAL ';'         {min[nb_monitors]=atof($3); free($3);}
+| MIN '=' INTEGER ';'      {min[nb_monitors]=atof($3); free($3);}
 ;
 
 add_expr
@@ -98,10 +129,6 @@ primary_expr
   }
 | REAL    {$$ = $1;}
 | INTEGER {$$ = $1;}
-;
-
-hwloc_obj
-: NAME ',' {$$=$1; monitor_obj[nb_monitors]=$1; check_hwloc_obj_name($1);}
 ;
 
 masked_counter
@@ -190,9 +217,19 @@ struct parsed_names * parser(const char * file_name) {
 
 
   monitor_names = malloc(sizeof(char*)*topodepth);
-  monitor_obj  = malloc(sizeof(char*)*topodepth);
-  event_names   = malloc(sizeof(char*)*PAPI_MAX_MPX_CTRS);
-  if(event_names==NULL || monitor_names==NULL || monitor_obj==NULL){
+  monitor_obj = malloc(sizeof(char*)*topodepth);
+  event_names  = malloc(sizeof(char*)*PAPI_MAX_MPX_CTRS);
+  max = malloc(sizeof(double)*topodepth);
+  min = malloc(sizeof(double)*topodepth);
+  logscale = malloc(sizeof(int)*topodepth);
+  for(i=0;i<topodepth;i++){
+    max[i]=DBL_MIN;
+    min[i]=DBL_MAX;
+    logscale[i]=1;
+  }
+  if(event_names==NULL || monitor_names==NULL || monitor_obj==NULL ||
+     max == NULL || min == NULL){
+    perror("malloc");
     exit(1);
   }
 
@@ -255,7 +292,9 @@ struct parsed_names * parser(const char * file_name) {
   pn->monitor_names = monitor_names;
   pn->event_names = event_names;
   pn->monitor_obj = monitor_obj;
-
+  pn->max = max;
+  pn->min = min;
+  pn->logscale = logscale;
   /* create shared library with monitors.c */
   char command[1024]; command[0]='\0'; 
   sprintf(command,"gcc -shared -fpic -rdynamic %s -o %s",tmp_name, pn->libso_path);
