@@ -12,6 +12,8 @@ struct parsed_names{
   unsigned int n_monitors;
   char ** monitor_names;
   char ** monitor_obj;
+  double * max, * min;
+  int * logscale;
 };
 
 struct parsed_names * parser(const char * file_name);
@@ -22,6 +24,7 @@ struct header_line{
   int id;
   char level[10];
   unsigned sibling;
+  int logscale;
 };
 
 struct value_line{
