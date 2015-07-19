@@ -94,8 +94,14 @@ Performance input files syntax is the same as follow:
 
 ```
 #commentary
-#counter_name{hwloc_obj_name,PAPI_COUNTER1*3.14159265359/PAPI_COUNTER2}`
-my_counter{L1i,PAPI_FP_OPS*PAPI_L1_ICM/100}`
+#counter_name{
+#  OBJ=hwloc_obj_name;                            #compulsory field
+#  CTR=PAPI_COUNTER1*3.14159265359/PAPI_COUNTER2; #compulsory field
+#  MAX=3.14159265;                                #optional field
+#  MIN=0;                                         #optional field
+#  LOGSCALE=1;                                    #optional field
+#}
+my_counter{OBJ=L1i; CTR=PAPI_FP_OPS*PAPI_L1_ICM/100;}
 ```
 
 If an object or a counter isn't available on your system, a list of 
