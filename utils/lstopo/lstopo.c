@@ -77,7 +77,6 @@ static int perf_accumulate = 0;
 static int perf_whole_machine = 0;
 static int perf_no_display_opt = 0;
 static int perf_replay_opt = 0;
-int perf_logscale = 0;
 static int replay_phase = 0;
 static float replay_speed=1;
 static char * perf_output = NULL;
@@ -333,7 +332,6 @@ void usage(const char *name, FILE *where)
 #ifdef HWLOC_HAVE_MONITOR
   fprintf (where, "  --perf                Display live performance counters on topology\n");
   fprintf (where, "  --perf-accumulate     Specify if samples should be accumulated\n");
-  fprintf (where, "  --perf-logscale       Node color logscales to its value\n");
   fprintf (where, "  --perf-output         Choose a file to keep monitors_t trace\n");
   fprintf (where, "  --perf-no-display     Record counters without direct printing for later display.\n");
   fprintf (where, "  --perf-whole-machine  Record every PU counter even when monitoring an application.\n");
@@ -859,9 +857,6 @@ main (int argc, char *argv[])
       else if (!strcmp (argv[0], "--perf-accumulate")){
 	perf_opt = 1;
 	perf_accumulate = 1;
-      }
-      else if (!strcmp (argv[0], "--perf-logscale")){
-	perf_logscale = 1;
       }
       else if (!strcmp (argv[0], "--perf-whole-machine")){
 	perf_whole_machine = 1;
