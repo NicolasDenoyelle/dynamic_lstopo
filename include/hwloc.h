@@ -215,7 +215,8 @@ typedef enum {
 
   HWLOC_OBJ_MISC,	/**< \brief Miscellaneous objects.
 			  * Objects without particular meaning, that can e.g. be
-			  * added by the application for its own use.
+			  * added by the application for its own use, or by hwloc
+			  * for miscellaneous objects such as MemoryDevice.
 			  * These objects are not listed in the main children list,
 			  * but rather in the dedicated misc children list.
 			  * Misc objects may only have Misc objects as children,
@@ -1167,7 +1168,7 @@ HWLOC_DECLSPEC int hwloc_get_proc_last_cpu_location(hwloc_topology_t topology, h
  *
  * \code
  * hwloc_alloc_membind_policy(topology, size, set,
- *                            HWLOC_MEMBIND_DEFAULT, 0);
+ *                            HWLOC_MEMBIND_BIND, 0);
  * \endcode
  *
  * Each hwloc memory binding function is available in two forms: one
@@ -1198,6 +1199,9 @@ HWLOC_DECLSPEC int hwloc_get_proc_last_cpu_location(hwloc_topology_t topology, h
  */
 typedef enum {
   /** \brief Reset the memory allocation policy to the system default.
+   * Depending on the operating system, this may correspond to
+   * HWLOC_MEMBIND_FIRSTTOUCH (Linux),
+   * or HWLOC_MEMBIND_BIND (AIX, HP-UX, OSF, Solaris, Windows).
    * \hideinitializer */
   HWLOC_MEMBIND_DEFAULT =	0,
 
@@ -1658,8 +1662,11 @@ HWLOC_DECLSPEC int hwloc_free(hwloc_topology_t topology, void *addr, size_t len)
  * if the application did not modify it already.
  * Setting HWLOC_XMLFILE in the environment enforces the discovery from a XML
  * file as if hwloc_topology_set_xml() had been called.
- * HWLOC_FSROOT switches to reading the topology from the specified Linux
- * filesystem root as if hwloc_topology_set_fsroot() had been called.
+ * Setting HWLOC_SYNTHETIC enforces a synthetic topology as if
+ * hwloc_topology_set_synthetic() had been called.
+ * Setting HWLOC_FSROOT switches to reading the topology from the specified Linux
+ * filesystem root.
+ *
  * Finally, HWLOC_THISSYSTEM enforces the return value of
  * hwloc_topology_is_thissystem().
  *
@@ -1682,34 +1689,6 @@ HWLOC_DECLSPEC int hwloc_free(hwloc_topology_t topology, void *addr, size_t len)
  */
 HWLOC_DECLSPEC int hwloc_topology_set_pid(hwloc_topology_t __hwloc_restrict topology, hwloc_pid_t pid);
 
-/** \brief Change the file-system root path when building the topology from sysfs/procfs.
- *
- * On Linux system, use sysfs and procfs files as if they were mounted on the given
- * \p fsroot_path instead of the main file-system root. Setting the environment
- * variable HWLOC_FSROOT may also result in this behavior.
- * Not using the main file-system root causes hwloc_topology_is_thissystem()
- * to return 0.
- *
- * Note that this function does not actually load topology
- * information; it just tells hwloc where to load it from.  You'll
- * still need to invoke hwloc_topology_load() to actually load the
- * topology information.
- *
- * \return -1 with errno set to ENOSYS on non-Linux and on Linux systems that
- * do not support it.
- * \return -1 with the appropriate errno if \p fsroot_path cannot be used.
- *
- * \note For convenience, this backend provides empty binding hooks which just
- * return success.  To have hwloc still actually call OS-specific hooks, the
- * HWLOC_TOPOLOGY_FLAG_IS_THISSYSTEM has to be set to assert that the loaded
- * file is really the underlying system.
- *
- * \note On success, the Linux component replaces the previously enabled
- * component (if any), but the topology is not actually modified until
- * hwloc_topology_load().
- */
-HWLOC_DECLSPEC int hwloc_topology_set_fsroot(hwloc_topology_t __hwloc_restrict topology, const char * __hwloc_restrict fsroot_path);
-
 /** \brief Enable synthetic topology.
  *
  * Gather topology information from the given \p description,
@@ -1720,6 +1699,9 @@ HWLOC_DECLSPEC int hwloc_topology_set_fsroot(hwloc_topology_t __hwloc_restrict t
  * choose the other types according to usual topologies, but it may fail
  * and you may have to specify more level types manually.
  * See also the \ref synthetic.
+ *
+ * Setting the environment variable HWLOC_SYNTHETIC
+ * may also result in this behavior.
  *
  * If \p description was properly parsed and describes a valid topology
  * configuration, this function returns 0.
@@ -1852,6 +1834,7 @@ enum hwloc_topology_flags_e {
    * detection using the pci backend. Only the common PCI devices (GPUs,
    * NICs, block devices, ...) and host bridges (objects that connect the host
    * objects to an I/O subsystem) will be added to the topology.
+   * Additionally it also enables MemoryDevice misc objects.
    * Uncommon devices and other bridges (such as PCI-to-PCI bridges) will be
    * ignored.
    * \hideinitializer
@@ -1872,6 +1855,7 @@ enum hwloc_topology_flags_e {
    * This flag enables detection of all I/O devices (even the uncommon ones)
    * and bridges (even those that have no device behind them) using the pci
    * backend.
+   * This implies HWLOC_TOPOLOGY_FLAG_IO_DEVICES.
    * \hideinitializer
    */
   HWLOC_TOPOLOGY_FLAG_WHOLE_IO = (1UL<<4),
@@ -2013,7 +1997,8 @@ HWLOC_DECLSPEC int hwloc_topology_ignore_type(hwloc_topology_t topology, hwloc_o
  * The bottom-level type HWLOC_OBJ_PU and the HWLOC_OBJ_NUMANODE level may not be ignored.
  * I/O objects may not be ignored, topology flags should be used to configure
  * their discovery instead.
- * Group objects are always ignored in this case.
+ * Group objects are always ignored if they do not bring any structure
+ * since they are designed to add structure to the topology.
  * Misc objects cannot be ignored based on the structure since they are only annotations
  * outside of the main topology structure.
  */
@@ -2144,7 +2129,7 @@ HWLOC_DECLSPEC hwloc_obj_t hwloc_topology_insert_misc_object(hwloc_topology_t to
  * See hwloc_topology_insert_group_object().
  *
  * Custom name/value info pairs may be added with hwloc_obj_add_info() after
- * insertion. For instance the GroupType info key allows to display something else
+ * insertion. For instance the Type info key allows to display something else
  * than "Group" as the type name for this object in lstopo.
  *
  * It is recommended not to set any other object attribute before insertion,

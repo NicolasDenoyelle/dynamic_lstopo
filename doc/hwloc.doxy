@@ -13,9 +13,9 @@
 <hr>
 
 \htmlonly
-<div class="section" id="hwloc-introduction">
+<div class="section" id="hwloc_summary">
 \endhtmlonly
-\section Introduction
+\section hwloc_summary hwloc Summary
 
 hwloc provides command line tools and a C API to obtain the
 hierarchical map of key computing elements within a node, such as: NUMA memory
@@ -49,7 +49,8 @@ hwloc supports the following operating systems:
 <ul>
 <li>Linux (including old kernels not having sysfs topology
 information, with knowledge of cpusets, offline CPUs, ScaleMP vSMP,
-and NumaScale NumaConnect) on all supported hardware, including Intel Xeon Phi.</li>
+and NumaScale NumaConnect) on all supported hardware, including Intel Xeon Phi
+(either standalone or as a coprocessor).</li>
 <li>Solaris</li>
 <li>AIX</li>
 <li>Darwin / OS X</li>
@@ -126,14 +127,10 @@ The hwloc core may also benefit from the following development packages:
 <li>libnuma for memory binding and migration support on Linux
     (<tt>numactl-devel</tt> or <tt>libnuma-dev</tt> package).
 </li>
-<li>hwloc can use one of two different libraries for full I/O device
-discovery:
-<ol>
-<li>libpciaccess (BSD).  The relevant development package is usually
-<tt>libpciaccess-devel</tt> or <tt>libpciaccess-dev</tt>.  </li>
-</ol>
-On Linux, PCI discovery may still be performed
-even if none of the above libraries can be used.
+<li>libpciaccess for full I/O device discovery
+    (<tt>libpciaccess-devel</tt> or <tt>libpciaccess-dev</tt> package).
+    On Linux, PCI discovery may still be performed (without vendor/device names)
+    even if libpciaccess cannot be used.
 </li>
 
 <li>the AMD OpenCL implementation for OpenCL device discovery.
@@ -151,7 +148,8 @@ even if none of the above libraries can be used.
     The relevant development package is usually <tt>libxml2-devel</tt>
     or <tt>libxml2-dev</tt>.
 </li>
-<li>libudev on Linux for easier discovery of OS device information.
+<li>libudev on Linux for easier discovery of OS device information
+    (otherwise hwloc will try to manually parse udev raw files).
     The relevant development package is usually <tt>libudev-devel</tt>
     or <tt>libudev-dev</tt>.
 </li>
@@ -175,7 +173,7 @@ that hwloc is BSD-licensed).
 \endhtmlonly
 \section cli_examples CLI Examples
 
-On a 4-package 2-core machine with hyperthreading, the \c lstopo tool
+On a 4-package 2-core machine with hyper-threading, the \c lstopo tool
 may show the following graphical output:
 
 \image html dudley.png
@@ -494,6 +492,7 @@ The documentation chapters include
 <li> \ref envvar
 <li> \ref cpu_mem_bind
 <li> \ref iodevices
+<li> \ref miscobjs
 <li> \ref attributes
 <li> \ref xml
 <li> \ref synthetic
@@ -662,7 +661,7 @@ tools.
 
 lstopo (also known as hwloc-ls) displays the
 hierarchical topology map of the current system.  The output may be
-graphical or textual, and can also be exported to numerous file
+graphical, ascii-art or textual, and can also be exported to numerous file
 formats such as PDF, PNG, XML, and others.
 Advanced graphical outputs require the "Cairo" development package
 (usually <tt>cairo-devel</tt> or <tt>libcairo2-dev</tt>).
@@ -728,13 +727,18 @@ currently running on the local machine.  By default, hwloc-ps only
 lists processes that are bound; unbound process (and Linux kernel
 threads) are not displayed.
 
-\section cli_hwloc_gather hwloc-gather-topology
+\section cli_hwloc_gather hwloc-gather-topology and hwloc-gather-cpuid
 
 hwloc-gather-topology is a Linux-specific tool that saves the
 relevant topology files of the current machine into a tarball
-(and the corresponding lstopo output). These files may be used
-later (possibly offline) for simulating or debugging a machine
-without actually running on it.
+(and the corresponding lstopo output).
+
+hwloc-gather-cpuid is a x86-specific tool that dumps the
+result of CPUID instructions on the current machine into
+a directory.
+
+These files may be used later (possibly offline) for simulating
+or debugging a machine without actually running on it.
 
 \section cli_hwloc_distances hwloc-distances
 
@@ -786,6 +790,32 @@ following environment variables.
   See also \ref xml.
   </dd>
 
+<dt>HWLOC_SYNTHETIC=synthetic_description</dt>
+  <dd>enforces the discovery through a synthetic description string
+  as if hwloc_topology_set_synthetic() had been called.
+  For convenience, this backend provides empty binding hooks which just
+  return success.
+  See also \ref synthetic.
+  </dd>
+
+<dt>HWLOC_FSROOT=/path/to/linux/filesystem-root/</dt>
+  <dd>switches to reading the topology from the specified
+  Linux filesystem root instead of the main file-system root.
+  Not using the main file-system root causes hwloc_topology_is_thissystem()
+  to return 0.
+  For convenience, this backend provides empty binding hooks which just
+  return success.  To have hwloc still actually call OS-specific hooks,
+  HWLOC_THISSYSTEM should be set 1 in the environment too, to assert that
+  the loaded file is really the underlying system.
+  </dd>
+
+<dt>HWLOC_CPUID_PATH=/path/to/cpuid/</dt>
+  <dd>forces the x86 backend to read dumped CPUIDs from the given directory
+  instead of executing actual x86 CPUID instructions.
+  This directory may have been saved previously from another machine
+  with <tt>hwloc-gather-cpuid</tt>.
+  </dd>
+
 <dt>HWLOC_XML_VERBOSE=1</dt>
 <dt>HWLOC_SYNTHETIC_VERBOSE=1</dt>
   <dd>enables verbose messages in the XML or synthetic topology backends.
@@ -796,18 +826,6 @@ following environment variables.
   Similarly, enabling verbose messages in the synthetic topology
   backend can help understand why the description string is invalid.
   See also \ref synthetic.
-  </dd>
-
-<dt>HWLOC_FSROOT=/path/to/linux/filesystem-root/</dt>
-  <dd>switches to reading the topology from the specified
-  Linux filesystem root instead of the main file-system root, as if
-  hwloc_topology_set_fsroot() had been called.
-  Not using the main file-system root causes hwloc_topology_is_thissystem()
-  to return 0.
-  For convenience, this backend provides empty binding hooks which just
-  return success.  To have hwloc still actually call OS-specific hooks,
-  HWLOC_THISSYSTEM should be set 1 in the environment too, to assert that
-  the loaded file is really the underlying system.
   </dd>
 
 <dt>HWLOC_THISSYSTEM=1</dt>
@@ -921,17 +939,22 @@ following environment variables.
   list.
   If <tt>stop</tt> is met, the enabling loop immediately stops, no
   more component is enabled.
-  If the variable is set to an empty string, no specific component is
-  loaded first, all components are loaded in priority order,
-  this is strictly identical to not specifying any variable.
-  The <tt>xml</tt> component name may be followed by a XML file to
-  load (<tt>xml=file.xml</tt>).
-  The synthetic component may be followed by a basic synthetic topology
-  description (<tt>synthetic=node:2 pu:3</tt>, see \ref synthetic).
-  This variable does not take precedence over the application
-  selecting components with functions such as
-  hwloc_topology_set_xml().
-  See \ref plugins for details.
+
+  If <tt>xml</tt> or <tt>synthetic</tt> components are selected,
+  the corresponding XML filename or synthetic description string
+  should be pass in <tt>HWLOC_XMLFILE</tt> or <tt>HWLOC_SYNTHETIC</tt>
+  respectively.
+
+  Since this variable is the low-level and more generic way to
+  select components, it takes precedence over the application
+  selecting components with functions such as hwloc_topology_set_xml()
+  (or with environment variables).
+
+  If the variable is set to an empty string (or set to a single comma),
+  no specific component is loaded first, all components are loaded
+  in priority order.
+
+  See \ref plugins_select for details.
   </dd>
 
 <dt>HWLOC_COMPONENTS_VERBOSE=1</dt>
@@ -945,9 +968,6 @@ following environment variables.
 </dl>
 
 <!-- not documented:
- HWLOC_FORCE_FSROOT/XMLFILE
-  force backend anyway (while variables without FORCE in their name do not
-  force the backend if the default was already changed)
  HWLOC_LINUX_USE_CPUINFO
   uses /proc/cpuinfo instead of sysfs.
   may be useful in the doc for debugging?
@@ -967,6 +987,9 @@ following environment variables.
  HWLOC_NO_LIBXML_EXPORT
  HWLOC_NO_LIBXML_IMPORT
   forces the use of the nolibxml XML backend instead of libxml2 if available
+ HWLOC_LIBXML_CLEANUP
+  cleanup libxml when ending import, to make valgrind happy
+  not enabled by default because somebody else may be using libxml
 -->
 
 
@@ -1265,6 +1288,58 @@ Machine (24GB)
 
 
 
+\page miscobjs Miscellaneous objects
+
+hwloc topologies may be annotated with Misc objects
+(of type <tt>HWLOC_OBJ_MISC</tt>)
+either automatically or by the user.
+This is an flexible way to annotate topologies with
+large sets of information since Misc objects may be inserted
+anywhere in the topology (to annotate specific objects or
+parts of the topology), even below other Misc objects, and each
+of them may contain multiple attributes (ee also \ref faq_annotate).
+
+These Misc objects may have a <tt>Type</tt> info attribute
+to replace <tt>Misc</tt> with something else in the lstopo
+output.
+
+\section miscobjs_auto Misc objects added by hwloc
+
+hwloc only uses Misc objects when other object types are not sufficient.
+This currently includes:
+<ul>
+<li>
+Memory devices (DIMMs), on Linux when privileged, and when I/O discovery is enabled.
+These objects have a <tt>Type</tt> info attribute of value <tt>MemoryDevice</tt>.
+They are currently always attached to the root object.
+Their attributes describe the DIMM vendor, model, etc.
+<tt>lstopo -v</tt> displays them as:
+\code
+Misc(MemoryModule) (P#1 Type=MemoryModule DeviceLocation="Bottom-Slot 2(right)" BankLocation="BANK 2" Vendor=Elpida SerialNumber=21733667 AssetTag=9876543210 PartNumber="EBJ81UG8EFU0-GN-F ")
+\endcode
+</li>
+<li>
+Displaying process binding in <tt>lstopo --top</tt>.
+These objects have a <tt>Type</tt> info attribute of value <tt>Process</tt>
+and a name attribute made of their PID and program name.
+They are attached below the object they are bound to.
+The textual <tt>lstopo</tt> displays them as:
+\code
+  PU L#0 (P#0)
+    Misc(Process) 4445 myprogram
+\endcode
+</li>
+</ul>
+
+\section miscobjs_annotate Annotating topologies with Misc objects
+
+The user may annotate hwloc topologies with its own Misc objects.
+This can be achieved with <tt>hwloc_topology_insert_misc_object()</tt>
+as well as hwloc-annotate command-line tool.
+
+
+
+
 \page attributes Object attributes
 
 \section attributes_normal Normal attributes
@@ -1353,8 +1428,8 @@ hwloc failed to discover any package.
 <dt>PCISlot</dt>
 <dd>The name/number of the physical slot where the PCI device is plugged.
 </dd>
-<dt>Vendor, Model, Revision, SerialNumber</dt>
-<dd>The vendor and model names, and revision and serial numbers of a Block OS device.
+<dt>Vendor, Model, Revision, SerialNumber, Size</dt>
+<dd>The vendor and model names, revision, serial number, and size (in kB) of a Block OS device.
 </dd>
 <dt>LinuxDeviceID</dt>
 <dd>The major/minor device number such as 8:0 on Linux for a Block OS device.
@@ -1389,12 +1464,14 @@ hwloc failed to discover any package.
 <dt>MICSerialNumber</dt>
 <dd>
  The serial number of an Intel Xeon Phi (MIC) coprocessor.
+ hwloc may run either inside the coprocessor itself, or on the host processor.
+ That attribute is set in both cases, so that the exact same coprocessor may be
+ identified from both point of views, even if there are multiple nodes with
+ multiple MICs.
  When running hwloc on the host, each hwloc OS device object that
  corresponds to a Xeon Phi gets such an attribute.
- When running hwloc inside a Xeon Phi, the root object of the topology
+ When running hwloc inside a Xeon Phi coprocessor, the root object of the topology
  gets this attribute.
- It enables easy identification of devices and topologies when multiples
- nodes and MICs are involved.
 </dd>
 <dt>MICFamily, MICSKU, MICActiveCores, MICMemorySize</dt>
 <dd>The family, SKU (model),
@@ -1417,10 +1494,17 @@ the state of a port #1 (value is 4 when active),
 the LID and LID mask count of port #2,
 and GID #1 of port #3.
 </dd>
-<dt>GroupType (Groups)</dt>
-<dd>A better type name than <em>Group</em>.
-This may be used to specify what a Group actually corresponds to.
-For instance Linux s390 books appear as <em>Book</em> instead of <em>Group</em> in lstopo.
+<dt>Type</dt>
+<dd>A better type name than the usual one.
+This may be used to specify where Groups come from.
+For instance Linux s390 <em>books</em> appear as Groups of type <em>Book</em>.
+Block OS devices may have a Type of "Disk", "Tape", "Removable Media Device"
+or "Other".
+The Type attribute value is displayed instead of the default object type name in lstopo.
+</dd>
+<dt>Vendor, AssetTag, PartNumber, DeviceLocation, BankLocation (MemoryDevice Misc objects)</dt>
+<dd>
+Information about memory devices (DIMMs) extracted from SMBIOS.
 </dd>
 <dt>hwlocVersion</dt>
 <dd>The version number of the hwloc library that was used to generate
@@ -1625,9 +1709,9 @@ ability by passing the synthetic description string to
 ::hwloc_topology_set_synthetic() before hwloc_topology_load().
 
 Synthetic topologies are created by the <tt>synthetic</tt> component.
-This component may be enabled by force by setting the HWLOC_COMPONENTS
+This component may be enabled by force by setting the HWLOC_SYNTHETIC
 environment variable to something such as
-<tt>synthetic="node:2 core:3 pu:4"</tt>.
+<tt>node:2 core:3 pu:4</tt>.
 
 Loading a synthetic topology disables binding support since the
 topology usually does not match the underlying hardware.
@@ -1881,14 +1965,14 @@ Usually the native operating system component
 is enabled first.
 Then hwloc looks for an architecture specific component
 (e.g. <tt>x86</tt>).
-Finally these also exist a basic component (<tt>no_os</tt>)
+Finally there also exist a basic component (<tt>no_os</tt>)
 that just tries to discover the number of PUs in the system.
 
 Each component discovers as much topology information as possible.
 Most of them, including most native OS components, do nothing
 unless the topology is still empty.
 Some others, such as <tt>x86</tt> and <tt>pci</tt>,
-can complete and annotate what other backends still earlier.
+can complete and annotate what other backends found earlier.
 
 Default priorities ensure that clever components are invoked first.
 Native operating system components have higher priorities,
@@ -1904,7 +1988,7 @@ Then, as usual, hwloc enables any other component (based on
 priorities) that does not conflict.
 
 Certain components that manage a virtual topology, for instance XML
-topology import, synthetic topology description, or custom building,
+topology import or synthetic topology description,
 conflict with all other components.
 Therefore, one of them may only be loaded
 (e.g. with <tt>hwloc_topology_set_xml()</tt>)
@@ -1916,14 +2000,20 @@ may be set to get verbose messages about component registration
 
 \section plugins_select Selecting which components to use
 
-Once topology configuration functions such as
-<tt>hwloc_topology_set_synthetic()</tt> have been taken care of,
-the priority order of the remaining components may be changed
-through the  <tt>HWLOC_COMPONENTS</tt> environment
-variable (component names must be separated by commas).
+If no topology configuration functions such as
+<tt>hwloc_topology_set_synthetic()</tt> have been called,
+plugins may be selected with environment variables such as
+<tt>HWLOC_XMLFILE</tt>, <tt>HWLOC_SYNTHETIC</tt> or
+<tt>HWLOC_FSROOT</tt> (see \ref envvar).
 
-Specifying <tt>x86</tt> in this variable will cause the <tt>x86</tt>
-component to take precedence over any other component,
+Finally, the environment variable <tt>HWLOC_COMPONENTS</tt>
+resets the list of selected components.
+If the variable is set and empty (or set to a single comma separating nothing,
+since some operating systems do not accept empty variables),
+the normal plugin priority order is used.
+
+If the variable is set to <tt>x86</tt> in this variable will cause
+the <tt>x86</tt> component to take precedence over any other component,
 including the native operating system component.
 It is therefore loaded first, before hwloc tries to load all remaining
 non-conflicting components.
@@ -1939,12 +2029,6 @@ name with <tt>-</tt> in the list. For instance <tt>x86,-pci</tt> will load the
 It is possible to prevent all remaining components from being loaded
 by placing <tt>stop</tt> in the environment variable.
 Only the components listed before this keyword will be enabled.
-
-Certain component names (<tt>xml</tt> and <tt>synthetic</tt>)
-accept an argument (e.g. <tt>xml=file.xml</tt>).
-These arguments behave exactly as if the corresponding string had
-been passed to <tt>hwloc_topology_set_xml()</tt>
-or <tt>hwloc_topology_set_synthetic()</tt>.
 
 \section plugins_load Loading components from plugins
 
@@ -2439,7 +2523,8 @@ in your environment.
 hwloc discovers the topology by querying the operating system.
 Some minor features may require privileged access to the operation
 system.
-For instance PCI link speed discovery on Linux is reserved to root,
+For instance memory device and PCI link speed discovery on Linux
+is reserved to root,
 and the entire PCI discovery on FreeBSD requires access to the
 /dev/pci special file.
 
@@ -2475,21 +2560,49 @@ the latencies between any pairs of NUMA nodes if the BIOS and/or operating
 system reports them.
 
 
-\section faq_smt How may I ignore symmetric multithreading, hyper-threading, ... ?
+\section faq_nosmt What happens to my topology if I disable symmetric multithreading, hyper-threading, etc. ?
 
 hwloc creates one PU (processing unit) object per hardware thread.
 If your machine supports symmetric multithreading, for instance Hyper-Threading,
-each Core object may contain multiple PU objects.
+each Core object may contain multiple PU objects:
 \verbatim
 $ lstopo -
 ...
+  Core L#0
+    PU L#0 (P#0)
+    PU L#1 (P#2)
   Core L#1
     PU L#2 (P#1)
     PU L#3 (P#3)
 \endverbatim
 
-If you need to ignore symmetric multithreading, you should likely manipulate
-hwloc Core objects directly:
+x86 machines usually offer the ability to disable hyper-threading in the BIOS.
+Or it can be disabled on the Linux kernel command-line at boot time,
+or later by writing in sysfs virtual files.
+
+If you do so, the hwloc topology structure does not significantly change,
+but some PU objects will not appear anymore.
+No level will disappear, you will see the same number of Core objects,
+but each of them will contain a single PU now.
+The PU level does not disappear either
+(remember that hwloc topologies always contain a PU level at the bottom of the topology)
+even if there is a single PU object per Core parent.
+\verbatim
+$ lstopo -
+...
+  Core L#0
+    PU L#0 (P#0)
+  Core L#1
+    PU L#1 (P#1)
+\endverbatim
+
+
+\section faq_smt How may I ignore symmetric multithreading, hyper-threading, etc. ?
+
+First, see \ref faq_nosmt for more information about multithreading.
+
+If you need to ignore symmetric multithreading in software,
+you should likely manipulate hwloc Core objects directly:
 \verbatim
 /* get the number of cores */
 unsigned nbcores = hwloc_get_nbobjs_by_type(topology, HWLOC_OBJ_CORE);
@@ -2592,11 +2705,13 @@ attributes may exist for each object, even with the same name.
 These attributes are always exported to XML.
 However only character strings may be used as key names and values.
 
-It is also possible to insert Misc objects with custom names anywhere
-as a leaf of the topology (<tt>hwloc_topology_insert_misc_object()</tt>).
+It is also possible to insert Misc objects with a custom name
+anywhere as a leaf of the topology (see \ref miscobjs).
+And Misc objects may have their own userdata and info attributes
+just like any other object.
 
-Misc objects and info attributes may also be added with the
-hwloc-annotate command-line tool.
+The hwloc-annotate command-line tool may be used for adding
+Misc objects and info attributes.
 
 There is also a topology-specific userdata pointer that can be used
 to recognize different topologies by storing a custom pointer.
@@ -2697,17 +2812,18 @@ sysctl variable must be set to 1 to do so.
 Otherwise, only the number of logical processors will be detected.
 
 
-\section faq_phi How do I build for Intel Xeon Phi?
+\section faq_phi How do I build for Intel Xeon Phi coprocessor?
 
-Intel Xeon Phi usually runs a Linux environment but cross-compiling from the host is required.
-hwloc uses standard autotools options for cross-compiling:
+Intel Xeon Phi coprocessors usually runs a Linux environment but cross-compiling from the host is required.
+hwloc uses standard autotools options for cross-compiling.
+For instance, to build for a <em>Knights Corner (KNC)</em> coprocessor:
 
 If building with <tt>icc</tt>:
 \verbatim
 ./configure CC="icc -mmic" --host=x86_64-k1om-linux --build=x86_64-unknown-linux-gnu
 \endverbatim
 
-If building with the Xeon Phi-specific GCC that comes with the MPSS environment\n
+If building with the Xeon Phi-specific GCC that comes with the MPSS environment,
 for instance <tt>/usr/linux-k1om-4.7/bin/x86_64-k1om-linux-gcc</tt>:
 \verbatim
 export PATH=$PATH:/usr/linux-k1om-4.7/bin/

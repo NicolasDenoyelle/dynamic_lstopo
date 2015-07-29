@@ -3,7 +3,7 @@
  *                         All rights reserved.
  * Copyright © 2014 Cisco Systems, Inc.  All rights reserved.
  *
- * Copyright © 2014 Inria.  All rights reserved.
+ * Copyright © 2014-2015 Inria.  All rights reserved.
  * See COPYING in top-level directory.
  *
  * $HEADER$
@@ -18,9 +18,9 @@
 
 <!-- ********************************************* -->
 \htmlonly
-<div class="section" id="netloc_introduction">
+<div class="section" id="netloc_summary">
 \endhtmlonly
-\section netloc_introduction Netloc Introduction
+\section netloc_summary Netloc Summary
 
 The Portable Network Locality (netloc) software package provides network
 topology discovery tools, and an abstract representation of those networks
@@ -106,12 +106,12 @@ discovery mechanism in a privileged mode.
 
 Follow the link(s) below that best suit your intended use of netloc:
 <ul>
-  <li> \ref termsanddefs (A good place to start)
-  <li> \ref apiuser : For developers integrating netloc topology data into
+  <li> \ref netloc_termsanddefs (A good place to start)
+  <li> \ref netloc_apiuser : For developers integrating netloc topology data into
   their application(s).
-  <li> \ref apicli : For information on how to discover network topology data
+  <li> \ref netloc_apicli : For information on how to discover network topology data
   for your network.
-  <li> \ref apireader : For developers interested in supporting a new type of
+  <li> \ref netloc_apireader : For developers interested in supporting a new type of
   network or extend support for existing networks in netloc.
 </ul>
 
@@ -137,7 +137,7 @@ There are a series of steps that a user must move through to gain access to the
 network topology information.
 <ol start="0">
   <li> Run a netloc Reader tool to generate the \c .ndat file containing the
-  network information (\ref apicli). You will need to know the directory in
+  network information (\ref netloc_apicli). You will need to know the directory in
   which the \c .ndat files are contained.
   <li> Access \ref netloc_apiusermetadata <br>
   This provides a lightweight discovery mechanism for choosing the network(s)
@@ -894,8 +894,8 @@ addressable network endpoing (e.g., MAC address, GUID).
 they
 <ul>
  <li> \ref netloc_node_t : Node type.
- <li> \ref netloc_dt_node_t_construct : Constructor for the node type.
- <li> \ref netloc_dt_node_t_destruct : Destructor for the node type.
+ <li> netloc_dt_node_t_construct() : Constructor for the node type.
+ <li> netloc_dt_node_t_destruct() : Destructor for the node type.
  <li> \ref netloc_encode_node_type : Encode the node type (e.g., Switch, Host)
 </ul>
 
@@ -944,7 +944,8 @@ representing the links between nodes.
 they
 <ul>
  <li> \ref netloc_edge_t : Netloc edge type.
- <li> \ref netloc_dt_edge_t_construct : Edge constructor.
+ <li> netloc_dt_edge_t_construct() : Edge constructor.
+ <li> netloc_dt_edge_t_destruct() : Edge destructor.
 </ul>
 
 \code
