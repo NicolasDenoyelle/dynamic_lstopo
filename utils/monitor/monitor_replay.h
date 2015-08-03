@@ -34,6 +34,7 @@ struct replay_t{
   pthread_mutex_t mtx;
 
   double    * max, * min; /* topo_depth */    
+  int       * logscale;   /* topo_depth */    
   int accumulate;
 
   hwloc_obj_t * nodes;  /* index correspond to the value_line.id. userdata contain double[3] history of values*/

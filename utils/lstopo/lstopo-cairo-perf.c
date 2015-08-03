@@ -27,17 +27,17 @@ topo_cairo_perf_boxes(struct lstopo_cairo_output * coutput, monitors_t monitors,
       val = box->val;
       variation = val - box->val1;
       if(!monitors->pw)
-	perf_box_draw(&coutput->loutput, coutput, obj, obj->depth, val, variation, monitors->max[i], monitors->min[i], 1);
+	perf_box_draw(&coutput->loutput, coutput, obj, obj->depth, val, variation, monitors->max[i], monitors->min[i], 1, monitors->logscale[i]);
       else{
 	proc_watch_get_watched_in_cpuset(monitors->pw,obj->cpuset,active);
 	if(hwloc_bitmap_iszero(active)){
 	  if(box->userdata == (void*)0) //not already drawn unactive
-	    perf_box_draw(&coutput->loutput, coutput, obj, obj->depth, val, variation, monitors->max[i], monitors->min[i],0);
+	    perf_box_draw(&coutput->loutput, coutput, obj, obj->depth, val, variation, monitors->max[i], monitors->min[i],0, monitors->logscale[i]);
 	  box->userdata == (void*)1;
 	}
 	else{
 	  box->userdata = (void*)0;
-	  perf_box_draw(&coutput->loutput, coutput, obj, obj->depth, val, variation, monitors->max[i], monitors->min[i],!hwloc_bitmap_iszero(active));
+	  perf_box_draw(&coutput->loutput, coutput, obj, obj->depth, val, variation, monitors->max[i], monitors->min[i],!hwloc_bitmap_iszero(active), monitors->logscale[i]);
 	}
       }
     }
@@ -67,7 +67,7 @@ topo_cairo_perf_replay_boxes(struct lstopo_cairo_output * coutput, replay_t repl
 		vl.value, vl.value-old_val, 
 		replay->max[obj->depth], 
 		replay->min[obj->depth],
-		1);
+		1, replay->logscale[obj->depth]);
 }
 
 

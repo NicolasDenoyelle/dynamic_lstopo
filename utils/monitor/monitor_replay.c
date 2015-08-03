@@ -34,12 +34,13 @@ output_header_paje(monitors_t m)
   dprintf(m->output_fd,"%%   Level             string\n");
   dprintf(m->output_fd,"%%   Sibling           int\n");
   dprintf(m->output_fd,"%%   Name              string\n");
+  dprintf(m->output_fd,"%%   Logscale          int\n");
   dprintf(m->output_fd,"%%EndEventDef\n\n");
 
   for(i=0;i<m->count;i++){
     for(j=0;j<hwloc_get_nbobjs_by_depth(m->topology,m->depths[i]);j++){
       obj = hwloc_get_obj_by_depth(m->topology,m->depths[i],j);
-      dprintf(m->output_fd,"1 %d %s %d %s\n",((struct monitor_node*)obj->userdata)->id, m->depth_names[i], j, m->names[i]);
+      dprintf(m->output_fd,"1 %d %s %d %s %d\n",((struct monitor_node*)obj->userdata)->id, m->depth_names[i], j, m->names[i], m->logscale[i]);
     }
   }
 
@@ -75,7 +76,7 @@ int replay_input_paje_line(replay_t r, union input_line * line){
     }
     if(read[0]=='1'){
       if(line!=NULL)
-	sscanf(read,"%*d %d %10s %d %*20s",&(line->hl.id),line->hl.level,&(line->hl.sibling));
+	sscanf(read,"%*d %d %10s %d %*20s %d",&(line->hl.id),line->hl.level,&(line->hl.sibling), &(line->hl.logscale));
       free(read);
       return HL;
     }
@@ -287,6 +288,7 @@ new_replay(const char * filename, hwloc_topology_t topology, int phase, float sp
 
   M_alloc(rp->max,topo_depth,sizeof(double));
   M_alloc(rp->min,topo_depth,sizeof(double));
+  M_alloc(rp->logscale,topo_depth,sizeof(int));
   M_alloc(rp->nodes,topo_depth*hwloc_get_nbobjs_by_depth(rp->topology,topo_depth-1),sizeof(hwloc_obj_t));
   
   for(j=0;j<hwloc_get_nbobjs_by_depth(rp->topology,topo_depth-1)*topo_depth;j++){
@@ -296,6 +298,7 @@ new_replay(const char * filename, hwloc_topology_t topology, int phase, float sp
   for(i=0;i<topo_depth;i++){
     rp->max[i] = DBL_MIN;
     rp->min[i] = DBL_MAX;
+    rp->logscale[i] = 1;
   }
 
   i=0;
@@ -326,6 +329,7 @@ new_replay(const char * filename, hwloc_topology_t topology, int phase, float sp
       if(rp->nodes[il.hl.id]==NULL){
 	M_alloc(obj->userdata,1,3*sizeof(double));
 	rp->nodes[il.hl.id] = obj;
+	rp->logscale[obj->depth]=il.hl.logscale;
       }
     }
     if(err==VL && il.vl.phase == rp->phase){

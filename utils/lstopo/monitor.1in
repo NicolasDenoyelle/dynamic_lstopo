@@ -24,9 +24,11 @@ Use a description \fIfile\fR as input to map counters on topology. The syntax mu
 
 # a comment line
 
-AN_identification_name0{a_valid_hwloc_obj_name, an_arithmetic_expression_of_valid_PAPI_counters_name}
+AN_identification_name0{OBJ=a_valid_hwloc_obj_name; CTR=an_arithmetic_expression_of_valid_PAPI_counters_name; MAX=a_real; MIN=a_real; LOGSCALE=an_integer}
 
-my_monitor0{L2, PAPI_L2_TCM/PAPI_TOT_CYC}
+my_counter{OBJ=L1i; CTR=PAPI_FP_OPS*PAPI_L1_ICM/100; MAX=0; MIN=0;}
+
+The brackets must contain an object where to display the monitor, and an expression of counters. The other fields are optional.
 
 #The parser skips new lines and spaces.
 .TP

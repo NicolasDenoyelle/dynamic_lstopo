@@ -254,6 +254,7 @@ new_Monitors(hwloc_topology_t topology, unsigned int n_events, char ** event_nam
     m->depths[i]=0;
     m->min[i] = DBL_MAX;
     m->max[i] = DBL_MIN;
+    m->logscale[i] = 1;
   }
   /* allocate event names and eventset*/
   m->n_events = n_events;
@@ -265,7 +266,7 @@ new_Monitors(hwloc_topology_t topology, unsigned int n_events, char ** event_nam
 
 static int 
 add_Monitor(monitors_t m, const char * name, char * hwloc_obj_name, 
-	    double (*fun)(long long *))
+	    double (*fun)(long long *), double max, double min, int logscale)
 {
   unsigned int i,j, n_obj;
   hwloc_obj_t node;
@@ -308,6 +309,7 @@ add_Monitor(monitors_t m, const char * name, char * hwloc_obj_name,
     m->depth_names[j] = m->depth_names[j-1];
     m->max[j] = m->max[j-1];
     m->min[j] = m->min[j-1];
+    m->logscale[j] = m->logscale[j-1];
     m->compute[j] = m->compute[j-1];
   }
 
@@ -315,8 +317,9 @@ add_Monitor(monitors_t m, const char * name, char * hwloc_obj_name,
   m->depths[i] = depth;
   m->depth_names[i] = strdup(hwloc_obj_name);
   m->compute[i] = fun;
-  m->min[j] = DBL_MAX;
-  m->max[j] = DBL_MIN;
+  m->min[j] = min;
+  m->max[j] = max;
+  m->logscale[i] = logscale;
   m->count++;
 
   n_obj=hwloc_get_nbobjs_by_depth(m->topology,depth);
@@ -623,7 +626,7 @@ new_default_Monitors(hwloc_topology_t topology, const char * output, int accum)
   }
   m->libsopath=NULL;
   for(i=0;i<count;i++){
-    add_Monitor(m,event_names[i],obj_names[i],default_fun);
+    add_Monitor(m,event_names[i],obj_names[i],default_fun,DBL_MIN,DBL_MAX,1);
     free(event_names[i]);
     free(obj_names[i]);
   }
@@ -667,16 +670,20 @@ load_Monitors_from_config(hwloc_topology_t topology, const char * perf_group_fil
     fun = dlsym(m->dlhandle,(pn->monitor_names)[i]);
     if(fun==NULL){
       fprintf(stderr,"could not load monitor function %s : %s\n",(pn->monitor_names)[i],dlerror());
-      add_Monitor(m,(pn->monitor_names)[i],(pn->monitor_obj)[i],no_fun);
+      add_Monitor(m,(pn->monitor_names)[i],(pn->monitor_obj)[i],no_fun, pn->max[i], pn->min[i], pn->logscale[i]);
     }
     else
-      add_Monitor(m,(pn->monitor_names)[i],(pn->monitor_obj)[i],*fun);
+      add_Monitor(m,(pn->monitor_names)[i],(pn->monitor_obj)[i],*fun,pn->max[i], pn->min[i], pn->logscale[i]);
+    
     free(pn->monitor_names[i]);
     free(pn->monitor_obj[i]);
   }
   
   free(pn->monitor_names);
   free(pn->event_names);
+  free(pn->min);
+  free(pn->max);
+  free(pn->logscale);
   free(pn->monitor_obj);
   free(pn->libso_path);
   free(pn);

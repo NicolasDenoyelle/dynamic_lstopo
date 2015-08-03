@@ -130,6 +130,10 @@ struct monitors{
    */
   double           *max, *min;         /* nb_monitors */
   /**
+   * An arrays to store whether thedisplayed color should be logscaled.
+   */
+  int           *logscale;          /* nb_monitors */
+  /**
    * An integer printed to trace file used to replay a part of the recorded execution.
    */
   int phase;
