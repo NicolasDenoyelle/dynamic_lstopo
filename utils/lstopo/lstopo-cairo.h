@@ -48,28 +48,35 @@
 #include "lstopo.h"
 
 #if (CAIRO_HAS_XLIB_SURFACE + CAIRO_HAS_PNG_FUNCTIONS + CAIRO_HAS_PDF_SURFACE + CAIRO_HAS_PS_SURFACE + CAIRO_HAS_SVG_SURFACE)
-/* Cairo methods */
 
+struct lstopo_cairo_output {
+  struct lstopo_output loutput; /* must be at the beginning */
+  cairo_surface_t *surface;
+  cairo_t *context;
+  unsigned max_x;
+  unsigned max_y;
+  int drawing;
+};
+
+/* Cairo methods */
 void topo_cairo_box(void *output, int r, int g, int b, unsigned depth __hwloc_attribute_unused, unsigned x, unsigned width, unsigned y, unsigned height, int highlight);
 void topo_cairo_line(void *output, int r, int g, int b, unsigned depth __hwloc_attribute_unused, unsigned x1, unsigned y1, unsigned x2, unsigned y2);
 void topo_cairo_text(void *output, int r, int g, int b, int size, unsigned depth __hwloc_attribute_unused, unsigned x, unsigned y, const char *text);
+void topo_cairo_textsize(void *_output, const char *text, unsigned textlength __hwloc_attribute_unused, unsigned fontsize __hwloc_attribute_unused, unsigned *width);
 
 #if (CAIRO_HAS_PNG_FUNCTIONS + CAIRO_HAS_PDF_SURFACE + CAIRO_HAS_PS_SURFACE + CAIRO_HAS_SVG_SURFACE)
 cairo_status_t topo_cairo_write(void *closure, const unsigned char *data, unsigned int length);
-
 #endif /* (CAIRO_HAS_PNG_FUNCTIONS + CAIRO_HAS_PDF_SURFACE + CAIRO_HAS_PS_SURFACE + CAIRO_HAS_SVG_SURFACE) */
 
-void topo_cairo_paint(struct draw_methods *methods, int logical, int legend, hwloc_topology_t topology, cairo_surface_t *cs);
-
-void null_declare_color (void *output __hwloc_attribute_unused, int r __hwloc_attribute_unused, int g __hwloc_attribute_unused, int b __hwloc_attribute_unused);
+void topo_cairo_paint(struct lstopo_cairo_output *coutput);
 #endif /* (CAIRO_HAS_XLIB_SURFACE + CAIRO_HAS_PNG_FUNCTIONS + CAIRO_HAS_PDF_SURFACE + CAIRO_HAS_PS_SURFACE + CAIRO_HAS_SVG_SURFACE) */
 
 #if CAIRO_HAS_XLIB_SURFACE
-/* X11 back-end */
-struct display {
+struct draw_methods x11_draw_methods;
+struct lstopo_x11_output {
+  struct lstopo_cairo_output coutput; /* must be at the beginning */
   Display *dpy;
   int scr;
-  cairo_surface_t *cs;
   Window top, win;
   Cursor hand;
   unsigned int orig_fontsize, orig_gridsize;
@@ -79,41 +86,40 @@ struct display {
   int x, y;					/** top left corner of the visible part */
 };
 
-void x11_create(struct display *disp, int width, int height);
-void x11_destroy(struct display *disp);
-void * x11_start(void *output __hwloc_attribute_unused, int width, int height);
+void x11_create(struct lstopo_x11_output *disp, int width, int height);
+void x11_destroy(struct lstopo_x11_output *disp);
+void x11_init(void *_disp);
+void move_x11(struct lstopo_x11_output *disp);
+int handle_xDisplay(struct lstopo_x11_output  *disp, int* lastx, int* lasty, int * state);
 
-struct draw_methods x11_draw_methods;
-
-void move_x11(struct display *disp, int logical, int legend, hwloc_topology_t topology);
-int handle_xDisplay(struct display *disp, hwloc_topology_t topology, int logical, int legend, int * lastx, int* lasty);
 #endif /* CAIRO_HAS_XLIB_SURFACE */
 
 #if CAIRO_HAS_PNG_FUNCTIONS
 /* PNG back-end */
-void * png_start(void *output __hwloc_attribute_unused, int width, int height);
 struct draw_methods png_draw_methods;
-
+void png_init(void *_coutput);
 #endif /* CAIRO_HAS_PNG_FUNCTIONS */
 
 #if CAIRO_HAS_PDF_SURFACE
 /* PDF back-end */
-void * pdf_start(void *output, int width, int height);
 struct draw_methods pdf_draw_methods;
+void pdf_init(void *_coutput);
 #endif /* CAIRO_HAS_PDF_SURFACE */
 
 #if CAIRO_HAS_PS_SURFACE
 /* PS back-end */
-void * ps_start(void *output, int width, int height);
 struct draw_methods ps_draw_methods;
-
+void ps_init(void *_coutput);
 #endif /* CAIRO_HAS_PS_SURFACE */
 
 #if CAIRO_HAS_SVG_SURFACE
 /* SVG back-end */
-void * svg_start(void *output, int width, int height);
 struct draw_methods svg_draw_methods;
+void svg_init(void *_coutput);
 #endif /* CAIRO_HAS_SVG_SURFACE */
 
-void obj_draw_again(hwloc_topology_t topology, hwloc_obj_t obj, struct draw_methods * methods, int logical, void * output);
+#if HWLOC_HAVE_MONITOR
+void perf_box_draw(struct lstopo_output *loutput, void * output, hwloc_obj_t level, unsigned depth, double value, double variation, double max, double min, int active);
+#endif
+void obj_draw_again(struct lstopo_output * loutput, void* output, hwloc_obj_t obj, int logical);
 

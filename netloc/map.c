@@ -40,7 +40,7 @@ netloc_map_create(netloc_map_t *mapp)
     if (!map)
         goto out;
 
-    char *verbose_env;
+    const char *verbose_env;
     verbose_env = getenv("NETLOC_MAP_VERBOSE");
     if (verbose_env)
         map->verbose_flags = strtoul(verbose_env, NULL, 0);
@@ -941,7 +941,9 @@ int netloc_map_netloc2port(netloc_map_t _map,
         return -1;
     }
 
-    subnet = netloc_map__get_subnet_by_id(map, nnode->network_type, nnode->subnet_id);
+    subnet = netloc_map__get_subnet_by_id(map,
+					  nnode ? nnode->network_type : nedge->src_node->network_type,
+					  nnode ? nnode->subnet_id : nedge->src_node->subnet_id);
     if (!subnet)
         return -1;
 

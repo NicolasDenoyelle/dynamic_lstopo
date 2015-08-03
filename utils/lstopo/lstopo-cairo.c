@@ -1,6 +1,6 @@
 /*
  * Copyright © 2009 CNRS
- * Copyright © 2009-2014 Inria.  All rights reserved.
+ * Copyright © 2009-2015 Inria.  All rights reserved.
  * Copyright © 2009-2010, 2014 Université Bordeaux
  * Copyright © 2009-2011 Cisco Systems, Inc.  All rights reserved.
  * See COPYING in top-level directory.
@@ -10,11 +10,24 @@
 
 #if (CAIRO_HAS_XLIB_SURFACE + CAIRO_HAS_PNG_FUNCTIONS + CAIRO_HAS_PDF_SURFACE + CAIRO_HAS_PS_SURFACE + CAIRO_HAS_SVG_SURFACE)
 /* Cairo methods */
-
 void
-topo_cairo_box(void *output, int r, int g, int b, unsigned depth __hwloc_attribute_unused, unsigned x, unsigned width, unsigned y, unsigned height, int highlight)
+topo_cairo_box(void *_output, int r, int g, int b, unsigned depth __hwloc_attribute_unused, unsigned x, unsigned width, unsigned y, unsigned height, int highlight)
 {
-  cairo_t *c = output;
+  struct lstopo_cairo_output *coutput = _output;
+  cairo_t *c = coutput->context;
+
+  if (!coutput->drawing) {
+    if (x > coutput->max_x)
+      coutput->max_x = x;
+    if (x + width > coutput->max_x)
+      coutput->max_x = x + width;
+    if (y > coutput->max_y)
+      coutput->max_y = y;
+    if (y + height > coutput->max_y)
+      coutput->max_y = y + height;
+    return;
+  }
+
   cairo_rectangle(c, x, y, width, height);
   cairo_set_source_rgb(c, (float)r / 255, (float) g / 255, (float) b / 255);
   cairo_fill(c);
@@ -29,9 +42,23 @@ topo_cairo_box(void *output, int r, int g, int b, unsigned depth __hwloc_attribu
 }
 
 void
-topo_cairo_line(void *output, int r, int g, int b, unsigned depth __hwloc_attribute_unused, unsigned x1, unsigned y1, unsigned x2, unsigned y2)
+topo_cairo_line(void *_output, int r, int g, int b, unsigned depth __hwloc_attribute_unused, unsigned x1, unsigned y1, unsigned x2, unsigned y2)
 {
-  cairo_t *c = output;
+  struct lstopo_cairo_output *coutput = _output;
+  cairo_t *c = coutput->context;
+
+  if (!coutput->drawing) {
+    if (x1 > coutput->max_x)
+      coutput->max_x = x1;
+    if (x2 > coutput->max_x)
+      coutput->max_x = x2;
+    if (y1 > coutput->max_y)
+      coutput->max_y = y1;
+    if (y2 > coutput->max_y)
+      coutput->max_y = y2;
+    return;
+  }
+
   cairo_move_to(c, x1, y1);
   cairo_set_source_rgb(c, (float) r / 255, (float) g / 255, (float) b / 255);
   cairo_set_line_width(c, 1);
@@ -40,14 +67,29 @@ topo_cairo_line(void *output, int r, int g, int b, unsigned depth __hwloc_attrib
 }
 
 void
-topo_cairo_text(void *output, int r, int g, int b, int size, unsigned depth __hwloc_attribute_unused, unsigned x, unsigned y, const char *text)
+topo_cairo_text(void *_output, int r, int g, int b, int fontsize, unsigned depth __hwloc_attribute_unused, unsigned x, unsigned y, const char *text)
 {
-  cairo_t *c = output;
-  cairo_move_to(c, x, y + size);
-  cairo_set_font_size(c, size);
+  struct lstopo_cairo_output *coutput = _output;
+  cairo_t *c = coutput->context;
+
+  if (!coutput->drawing)
+    return;
+
+  cairo_move_to(c, x, y + fontsize);
   cairo_set_source_rgb(c, (float)r / 255, (float) g / 255, (float) b / 255);
   cairo_show_text(c, text);
 }
+
+void
+topo_cairo_textsize(void *_output, const char *text, unsigned textlength __hwloc_attribute_unused, unsigned fontsize __hwloc_attribute_unused, unsigned *width)
+{
+  struct lstopo_cairo_output *coutput = _output;
+  cairo_t *c = coutput->context;
+  cairo_text_extents_t extents;
+  cairo_text_extents(c, text, &extents);
+  *width = extents.width;
+}
+
 
 #if (CAIRO_HAS_PNG_FUNCTIONS + CAIRO_HAS_PDF_SURFACE + CAIRO_HAS_PS_SURFACE + CAIRO_HAS_SVG_SURFACE)
 cairo_status_t
@@ -60,24 +102,33 @@ topo_cairo_write(void *closure, const unsigned char *data, unsigned int length)
 #endif /* (CAIRO_HAS_PNG_FUNCTIONS + CAIRO_HAS_PDF_SURFACE + CAIRO_HAS_PS_SURFACE + CAIRO_HAS_SVG_SURFACE) */
 
 void
-topo_cairo_paint(struct draw_methods *methods, int logical, int legend, hwloc_topology_t topology, cairo_surface_t *cs)
+topo_cairo_paint(struct lstopo_cairo_output *coutput)
 {
-  cairo_t *c;
-  c = cairo_create(cs);
-  output_draw(methods, logical, legend, topology, c);
-  cairo_show_page(c);
-  cairo_destroy(c);
+  coutput->context = cairo_create(coutput->surface);
+  cairo_set_font_size(coutput->context, fontsize);
+  output_draw(&coutput->loutput);
+  cairo_show_page(coutput->context);
+  cairo_destroy(coutput->context);
 }
 
 void null_declare_color (void *output __hwloc_attribute_unused, int r __hwloc_attribute_unused, int g __hwloc_attribute_unused, int b __hwloc_attribute_unused) {}
 #endif /* (CAIRO_HAS_XLIB_SURFACE + CAIRO_HAS_PNG_FUNCTIONS + CAIRO_HAS_PDF_SURFACE + CAIRO_HAS_PS_SURFACE + CAIRO_HAS_SVG_SURFACE) */
 
-
+
 #if CAIRO_HAS_XLIB_SURFACE
 /* X11 back-end */
 
+struct draw_methods x11_draw_methods = {
+  x11_init,
+  null_declare_color,
+  topo_cairo_box,
+  topo_cairo_line,
+  topo_cairo_text,
+  topo_cairo_textsize,
+};
+
 void
-x11_create(struct display *disp, int width, int height)
+x11_create(struct lstopo_x11_output *disp, int width, int height)
 {
   disp->win = XCreateSimpleWindow(disp->dpy, disp->top, 0, 0, width, height, 0, WhitePixel(disp->dpy, disp->scr), WhitePixel(disp->dpy, disp->scr));
   disp->hand = XCreateFontCursor(disp->dpy, XC_fleur);
@@ -88,73 +139,76 @@ x11_create(struct display *disp, int width, int height)
       PointerMotionMask |
       ExposureMask);
   XMapWindow(disp->dpy, disp->win);
-  disp->cs = cairo_xlib_surface_create(disp->dpy, disp->win, DefaultVisual(disp->dpy, disp->scr), width, height);
-
+  disp->coutput.surface = cairo_xlib_surface_create(disp->dpy, disp->win, DefaultVisual(disp->dpy, disp->scr), width, height);
 }
 
 void
-x11_destroy(struct display *disp)
+x11_destroy(struct lstopo_x11_output *disp)
 {
-  cairo_surface_destroy(disp->cs);
+  cairo_surface_destroy(disp->coutput.surface);
   XDestroyWindow(disp->dpy, disp->win);
 }
 
-void *
-x11_start(void *output __hwloc_attribute_unused, int width, int height)
+void
+x11_init(void *_disp)
 {
+  struct lstopo_x11_output *disp = _disp;
+  struct lstopo_cairo_output *coutput = &disp->coutput;
   Display *dpy;
   Window root, top;
   int scr;
   Screen *screen;
-  int screen_width = width, screen_height = height;
-  struct display *disp;
+  int screen_width, screen_height;
 
+  /* create the toplevel window */
   if (!(dpy = XOpenDisplay(NULL))) {
     fprintf(stderr, "couldn't connect to X\n");
     exit(EXIT_FAILURE);
   }
 
-  disp = malloc(sizeof(*disp));
   disp->dpy = dpy;
   disp->scr = scr = DefaultScreen(dpy);
-
   screen = ScreenOfDisplay(dpy, scr);
+
+  /* compute the maximal needed size using the root window */
+  root = RootWindow(dpy, scr);
+  disp->top = root;
+  coutput->drawing = 0;
+  x11_create(disp, 1, 1);
+  topo_cairo_paint(coutput);
+  x11_destroy(disp);
+  coutput->drawing = 1;
+
+  /* now create the actual window with the computed max size */
+  screen_width = coutput->max_x;
+  screen_height = coutput->max_y;
+
+  disp->top = top = XCreateSimpleWindow(dpy, root, 0, 0, screen_width, screen_height, 0, WhitePixel(dpy, scr), WhitePixel(dpy, scr));
+  XStoreName(dpy, top, "lstopo");
+  XSetIconName(dpy, top, "lstopo");
+  XSelectInput(dpy,top, StructureNotifyMask);
+
   if (screen_width >= screen->width)
     screen_width = screen->width;
   if (screen_height >= screen->height)
     screen_height = screen->height;
   disp->screen_width = screen_width;
   disp->screen_height = screen_height;
-  disp->width = width;
-  disp->height = height;
+  disp->width = coutput->max_x;
+  disp->height = coutput->max_y;
   disp->orig_fontsize = fontsize;
   disp->orig_gridsize = gridsize;
   disp->x = 0;
   disp->y = 0;
 
-  root = RootWindow(dpy, scr);
-  disp->top = top = XCreateSimpleWindow(dpy, root, 0, 0, screen_width, screen_height, 0, WhitePixel(dpy, scr), WhitePixel(dpy, scr));
-  XStoreName(dpy, top, "lstopo");
-  XSetIconName(dpy, top, "lstopo");
-  XSelectInput(dpy,top, StructureNotifyMask);
+  x11_create(disp, coutput->max_x, coutput->max_y);
+
   XMapWindow(dpy, top);
-
-  x11_create(disp, width, height);
-
-  return disp;
 }
-
-struct draw_methods x11_draw_methods = {
-  x11_start,
-  null_declare_color,
-  topo_cairo_box,
-  topo_cairo_line,
-  topo_cairo_text,
-};
 
 /** Clip coordinates of the visible part. */
 void
-move_x11(struct display *disp, int logical, int legend, hwloc_topology_t topology)
+move_x11(struct lstopo_x11_output *disp)
 {
   if (disp->width <= disp->screen_width) {
     disp->x = 0;
@@ -196,16 +250,44 @@ move_x11(struct display *disp, int logical, int legend, hwloc_topology_t topolog
 
     x11_destroy(disp);
     x11_create(disp, disp->screen_width, disp->screen_height);
-    topo_cairo_paint(&x11_draw_methods, logical, legend, topology, disp->cs);
+    topo_cairo_paint(&disp->coutput);
   }
 }
 
-int handle_xDisplay(struct display *disp, hwloc_topology_t topology, int logical, int legend, int * lastx, int* lasty){
+
+void
+output_x11(struct lstopo_output *loutput, const char *filename)
+{
+  struct lstopo_x11_output _disp, *disp = &_disp;
+  struct lstopo_cairo_output *coutput;
+  int lastx, lasty;
+  int state = 0;
+  
+  coutput = &disp->coutput;
+  memset(coutput, 0, sizeof(*coutput));
+  memcpy(&coutput->loutput, loutput, sizeof(*loutput));
+  coutput->loutput.methods = &x11_draw_methods;
+  output_draw_start(&coutput->loutput);
+  lastx = disp->x;
+  lasty = disp->y;
+  coutput->context = cairo_create(coutput->surface);
+  topo_cairo_paint(coutput);
+  while (!handle_xDisplay(disp, &lastx, &lasty, &state));
+  x11_destroy(disp);
+  XDestroyWindow(disp->dpy, disp->top);
+  XFreeCursor(disp->dpy, disp->hand);
+  XCloseDisplay(disp->dpy);
+  
+}
+
+
+int 
+handle_xDisplay(struct lstopo_x11_output  *disp, int * lastx, int * lasty, int * state)
+{
   XEvent e;
   int finish=0;
-  int state = 0;
   int x = 0, y = 0; /* shut warning down */
-  
+    
   if (!XEventsQueued(disp->dpy, QueuedAfterFlush)) {
     /* No pending event, flush moving windows before waiting for next event */
     if (disp->x != *lastx || disp->y != *lasty) {
@@ -213,41 +295,39 @@ int handle_xDisplay(struct display *disp, hwloc_topology_t topology, int logical
       *lastx = disp->x;
       *lasty = disp->y;
     }
-    //return 0;
   }
-
   XNextEvent(disp->dpy, &e);
   switch (e.type) {
   case Expose:
     if (e.xexpose.count < 1)
-      topo_cairo_paint(&x11_draw_methods, logical, legend, topology, disp->cs);
+      topo_cairo_paint(&disp->coutput);
     break;
   case MotionNotify:
-    if (state) {
+    if (*state) {
       disp->x -= e.xmotion.x_root - x;
       disp->y -= e.xmotion.y_root - y;
       x = e.xmotion.x_root;
       y = e.xmotion.y_root;
-      move_x11(disp, logical, legend, topology);
+      move_x11(disp);
     }
     break;
   case ConfigureNotify:
     disp->screen_width = e.xconfigure.width;
     disp->screen_height = e.xconfigure.height;
-    move_x11(disp, logical, legend, topology);
+    move_x11(disp);
     if (disp->x != *lastx || disp->y != *lasty)
       XMoveWindow(disp->dpy, disp->win, -disp->x, -disp->y);
     break;
   case ButtonPress:
     if (e.xbutton.button == Button1) {
-      state = 1;
+      *state = 1;
       x = e.xbutton.x_root;
       y = e.xbutton.y_root;
     }
     break;
   case ButtonRelease:
     if (e.xbutton.button == Button1)
-      state = 0;
+      *state = 0;
     break;
   case MappingNotify:
     XRefreshKeyboardMapping(&e.xmapping);
@@ -263,106 +343,110 @@ int handle_xDisplay(struct display *disp, hwloc_topology_t topology, int logical
       break;
     case XK_Left:
       disp->x -= disp->screen_width/10;
-      move_x11(disp, logical, legend, topology);
+      move_x11(disp);
       break;
     case XK_Right:
       disp->x += disp->screen_width/10;
-      move_x11(disp, logical, legend, topology);
+      move_x11(disp);
       break;
     case XK_Up:
       disp->y -= disp->screen_height/10;
-      move_x11(disp, logical, legend, topology);
+      move_x11(disp);
       break;
     case XK_Down:
       disp->y += disp->screen_height/10;
-      move_x11(disp, logical, legend, topology);
+      move_x11(disp);
       break;
     case XK_Page_Up:
       if (e.xkey.state & ControlMask) {
 	disp->x -= disp->screen_width;
-	move_x11(disp, logical, legend, topology);
+	move_x11(disp);
       } else {
 	disp->y -= disp->screen_height;
-	move_x11(disp, logical, legend, topology);
+	move_x11(disp);
       }
       break;
     case XK_Page_Down:
       if (e.xkey.state & ControlMask) {
 	disp->x += disp->screen_width;
-	move_x11(disp, logical, legend, topology);
+	move_x11(disp);
       } else {
 	disp->y += disp->screen_height;
-	move_x11(disp, logical, legend, topology);
+	move_x11(disp);
       }
       break;
     case XK_Home:
       disp->x = 0;
       disp->y = 0;
-      move_x11(disp, logical, legend, topology);
+      move_x11(disp);
       break;
     case XK_End:
       disp->x = INT_MAX;
       disp->y = INT_MAX;
-      move_x11(disp, logical, legend, topology);
+      move_x11(disp);
       break;
     }
     break;
   }
-  default:
-    break;
   }
-    return finish;
+  return finish;
 }
 
-
-void
-output_x11(hwloc_topology_t topology, const char *filename __hwloc_attribute_unused, int overwrite __hwloc_attribute_unused, int logical, int legend, int verbose_mode __hwloc_attribute_unused)
-{
-  struct display *disp = output_draw_start(&x11_draw_methods, logical, legend, topology, NULL);
-  topo_cairo_paint(&x11_draw_methods, logical, legend, topology, disp->cs);
-  int lastx = disp->x, lasty = disp->y;
-  while (!handle_xDisplay(disp,topology,logical,legend,&lastx,&lasty));
- 
-  x11_destroy(disp);
-  XDestroyWindow(disp->dpy, disp->top);
-  XFreeCursor(disp->dpy, disp->hand);
-  XCloseDisplay(disp->dpy);
-  free(disp);
-}
 #endif /* CAIRO_HAS_XLIB_SURFACE */
 
 #if CAIRO_HAS_PNG_FUNCTIONS
 /* PNG back-end */
-void *
-png_start(void *output __hwloc_attribute_unused, int width, int height)
-{
-  return cairo_image_surface_create(CAIRO_FORMAT_ARGB32, width, height);
-}
-
 struct draw_methods png_draw_methods = {
-  png_start,
+  png_init,
   null_declare_color,
   topo_cairo_box,
   topo_cairo_line,
   topo_cairo_text,
+  topo_cairo_textsize,
 };
 
-void
-output_png(hwloc_topology_t topology, const char *filename, int overwrite, int logical, int legend, int verbose_mode __hwloc_attribute_unused)
-{
-  FILE *output = open_output(filename, overwrite);
-  cairo_surface_t *cs;
 
+void
+png_init(void *_coutput)
+{
+  struct lstopo_cairo_output *coutput = _coutput;
+  cairo_surface_t *fakecs, *cs;
+
+  /* create a fake surface */
+  fakecs = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 1, 1);
+  coutput->surface = fakecs;
+
+  /* compute the maximal size using the fake surface */
+  coutput->drawing = 0;
+  topo_cairo_paint(coutput);
+  coutput->drawing = 1;
+  cairo_surface_destroy(fakecs);
+
+  /* create the actual surface with the right size */
+  cs = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, coutput->max_x, coutput->max_y);
+  coutput->surface = cs;
+}
+
+void
+output_png(struct lstopo_output *loutput, const char *filename)
+{
+  struct lstopo_cairo_output coutput;
+  FILE *output;
+
+  output = open_output(filename, loutput->overwrite);
   if (!output) {
     fprintf(stderr, "Failed to open %s for writing (%s)\n", filename, strerror(errno));
     return;
   }
 
-  cs = output_draw_start(&png_draw_methods, logical, legend, topology, output);
-
-  topo_cairo_paint(&png_draw_methods, logical, legend, topology, cs);
-  cairo_surface_write_to_png_stream(cs, topo_cairo_write, output);
-  cairo_surface_destroy(cs);
+  memset(&coutput, 0, sizeof(coutput));
+  memcpy(&coutput.loutput, loutput, sizeof(*loutput));
+  coutput.loutput.file = output;
+  coutput.loutput.methods = &png_draw_methods;
+  output_draw_start(&coutput.loutput);
+  topo_cairo_paint(&coutput);
+  cairo_surface_write_to_png_stream(coutput.surface, topo_cairo_write, output);
+  cairo_surface_destroy(coutput.surface);
 
   if (output != stdout)
     fclose(output);
@@ -372,36 +456,56 @@ output_png(hwloc_topology_t topology, const char *filename, int overwrite, int l
 
 #if CAIRO_HAS_PDF_SURFACE
 /* PDF back-end */
-void *
-pdf_start(void *output, int width, int height)
-{
-  return cairo_pdf_surface_create_for_stream(topo_cairo_write, output, width, height);
-}
-
 struct draw_methods pdf_draw_methods = {
-  pdf_start,
+  pdf_init,
   null_declare_color,
   topo_cairo_box,
   topo_cairo_line,
   topo_cairo_text,
+  topo_cairo_textsize,
 };
 
 void
-output_pdf(hwloc_topology_t topology, const char *filename, int overwrite, int logical, int legend, int verbose_mode __hwloc_attribute_unused)
+pdf_init(void *_coutput)
 {
-  FILE *output = open_output(filename, overwrite);
-  cairo_surface_t *cs;
+  struct lstopo_cairo_output *coutput = _coutput;
+  cairo_surface_t *fakecs, *cs;
 
+  /* create a fake surface */
+  fakecs = cairo_pdf_surface_create_for_stream(NULL, NULL, 1, 1);
+  coutput->surface = fakecs;
+
+  /* compute the maximal size using the fake surface */
+  coutput->drawing = 0;
+  topo_cairo_paint(coutput);
+  coutput->drawing = 1;
+  cairo_surface_destroy(fakecs);
+
+  /* create the actual surface with the right size */
+  cs = cairo_pdf_surface_create_for_stream(topo_cairo_write, coutput->loutput.file, coutput->max_x, coutput->max_y);
+  coutput->surface = cs;
+}
+
+void
+output_pdf(struct lstopo_output *loutput, const char *filename)
+{
+  struct lstopo_cairo_output coutput;
+  FILE *output;
+
+  output = open_output(filename, loutput->overwrite);
   if (!output) {
     fprintf(stderr, "Failed to open %s for writing (%s)\n", filename, strerror(errno));
     return;
   }
 
-  cs = output_draw_start(&pdf_draw_methods, logical, legend, topology, output);
-
-  topo_cairo_paint(&pdf_draw_methods, logical, legend, topology, cs);
-  cairo_surface_flush(cs);
-  cairo_surface_destroy(cs);
+  memset(&coutput, 0, sizeof(coutput));
+  memcpy(&coutput.loutput, loutput, sizeof(*loutput));
+  coutput.loutput.file = output;
+  coutput.loutput.methods = &pdf_draw_methods;
+  output_draw_start(&coutput.loutput);
+  topo_cairo_paint(&coutput);
+  cairo_surface_flush(coutput.surface);
+  cairo_surface_destroy(coutput.surface);
 
   if (output != stdout)
     fclose(output);
@@ -411,36 +515,56 @@ output_pdf(hwloc_topology_t topology, const char *filename, int overwrite, int l
 
 #if CAIRO_HAS_PS_SURFACE
 /* PS back-end */
-void *
-ps_start(void *output, int width, int height)
-{
-  return cairo_ps_surface_create_for_stream(topo_cairo_write, output, width, height);
-}
-
 struct draw_methods ps_draw_methods = {
-  ps_start,
+  ps_init,
   null_declare_color,
   topo_cairo_box,
   topo_cairo_line,
   topo_cairo_text,
+  topo_cairo_textsize,
 };
 
 void
-output_ps(hwloc_topology_t topology, const char *filename, int overwrite, int logical, int legend, int verbose_mode __hwloc_attribute_unused)
+ps_init(void *_coutput)
 {
-  FILE *output = open_output(filename, overwrite);
-  cairo_surface_t *cs;
+  struct lstopo_cairo_output *coutput = _coutput;
+  cairo_surface_t *fakecs, *cs;
 
+  /* create a fake surface */
+  fakecs = cairo_ps_surface_create_for_stream(NULL, NULL, 1, 1);
+  coutput->surface = fakecs;
+
+  /* compute the maximal size using the fake surface */
+  coutput->drawing = 0;
+  topo_cairo_paint(coutput);
+  coutput->drawing = 1;
+  cairo_surface_destroy(fakecs);
+
+  /* create the actual surface with the right size */
+  cs = cairo_ps_surface_create_for_stream(topo_cairo_write, coutput->loutput.file, coutput->max_x, coutput->max_y);
+  coutput->surface = cs;
+}
+
+void
+output_ps(struct lstopo_output *loutput, const char *filename)
+{
+  struct lstopo_cairo_output coutput;
+  FILE *output;
+
+  output = open_output(filename, loutput->overwrite);
   if (!output) {
     fprintf(stderr, "Failed to open %s for writing (%s)\n", filename, strerror(errno));
     return;
   }
 
-  cs = output_draw_start(&ps_draw_methods, logical, legend, topology, output);
-
-  topo_cairo_paint(&ps_draw_methods, logical, legend, topology, cs);
-  cairo_surface_flush(cs);
-  cairo_surface_destroy(cs);
+  memset(&coutput, 0, sizeof(coutput));
+  memcpy(&coutput.loutput, loutput, sizeof(*loutput));
+  coutput.loutput.file = output;
+  coutput.loutput.methods = &ps_draw_methods;
+  output_draw_start(&coutput.loutput);
+  topo_cairo_paint(&coutput);
+  cairo_surface_flush(coutput.surface);
+  cairo_surface_destroy(coutput.surface);
 
   if (output != stdout)
     fclose(output);
@@ -450,37 +574,58 @@ output_ps(hwloc_topology_t topology, const char *filename, int overwrite, int lo
 
 #if CAIRO_HAS_SVG_SURFACE
 /* SVG back-end */
-void *
-svg_start(void *output, int width, int height)
-{
-  return cairo_svg_surface_create_for_stream(topo_cairo_write, output, width, height);
-}
-
 struct draw_methods svg_draw_methods = {
-  svg_start,
+  svg_init,
   null_declare_color,
   topo_cairo_box,
   topo_cairo_line,
   topo_cairo_text,
+  topo_cairo_textsize,
 };
 
 void
-output_svg(hwloc_topology_t topology, const char *filename, int overwrite, int logical, int legend, int verbose_mode __hwloc_attribute_unused)
+svg_init(void *_coutput)
 {
-  FILE *output;
-  cairo_surface_t *cs;
+  struct lstopo_cairo_output *coutput = _coutput;
+  cairo_surface_t *fakecs, *cs;
 
-  output = open_output(filename, overwrite);
+  /* create a fake surface */
+  fakecs = cairo_svg_surface_create_for_stream(NULL, NULL, 1, 1);
+  coutput->surface = fakecs;
+
+  /* compute the maximal size using the fake surface */
+  coutput->drawing = 0;
+  topo_cairo_paint(coutput);
+  coutput->drawing = 1;
+  cairo_surface_destroy(fakecs);
+
+  /* create the actual surface with the right size */
+  cs = cairo_svg_surface_create_for_stream(topo_cairo_write, coutput->loutput.file, coutput->max_x, coutput->max_y);
+  coutput->surface = cs;
+}
+
+void
+output_svg(struct lstopo_output *loutput, const char *filename)
+{
+  struct lstopo_cairo_output coutput;
+  FILE *output;
+
+  output = open_output(filename, loutput->overwrite);
   if (!output) {
     fprintf(stderr, "Failed to open %s for writing (%s)\n", filename, strerror(errno));
     return;
   }
 
-  cs = output_draw_start(&svg_draw_methods, logical, legend, topology, output);
+  memset(&coutput, 0, sizeof(coutput));
+  memcpy(&coutput.loutput, loutput, sizeof(*loutput));
+  coutput.loutput.file = output;
+  coutput.loutput.methods = &svg_draw_methods;
 
-  topo_cairo_paint(&svg_draw_methods, logical, legend, topology, cs);
-  cairo_surface_flush(cs);
-  cairo_surface_destroy(cs);
+  output_draw_start(&coutput.loutput);
+
+  topo_cairo_paint(&coutput);
+  cairo_surface_flush(coutput.surface);
+  cairo_surface_destroy(coutput.surface);
 
   if (output != stdout)
     fclose(output);

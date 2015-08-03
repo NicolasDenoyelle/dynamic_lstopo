@@ -421,7 +421,7 @@ hwloc_linux_find_kernel_nr_cpus(hwloc_topology_t topology)
     /* start from scratch, the topology isn't ready yet (complete_cpuset is missing (-1) or empty (0))*/
     nr_cpus = 1;
 
-  possible = fopen("/sys/devices/system/cpu/possible", "r");
+  possible = fopen("/sys/devices/system/cpu/possible", "r"); /* binding only supported in real fsroot, no need for data->root_fd */
   if (possible) {
     hwloc_bitmap_t possible_bitmap = hwloc_bitmap_alloc();
     if (hwloc_linux_parse_cpuset_file(possible, possible_bitmap) == 0) {
@@ -2012,7 +2012,7 @@ hwloc_get_procfs_meminfo_info(struct hwloc_topology *topology,
   uint64_t meminfo_hugepages_count, meminfo_hugepages_size = 0;
   struct stat st;
   int has_sysfs_hugepages = 0;
-  char *pagesize_env = getenv("HWLOC_DEBUG_PAGESIZE");
+  const char *pagesize_env = getenv("HWLOC_DEBUG_PAGESIZE");
   int types = 2;
   int err;
 
@@ -2166,10 +2166,10 @@ hwloc_parse_node_distance(const char *distancepath, unsigned nbnodes, float *dis
 }
 
 static void
-hwloc__get_dmi_one_info(struct hwloc_linux_backend_data_s *data,
-			hwloc_obj_t obj,
-			char *path, unsigned pathlen,
-			const char *dmi_name, const char *hwloc_name)
+hwloc__get_dmi_id_one_info(struct hwloc_linux_backend_data_s *data,
+			   hwloc_obj_t obj,
+			   char *path, unsigned pathlen,
+			   const char *dmi_name, const char *hwloc_name)
 {
   char dmi_line[64];
   char *tmp;
@@ -2194,7 +2194,7 @@ hwloc__get_dmi_one_info(struct hwloc_linux_backend_data_s *data,
 }
 
 static void
-hwloc__get_dmi_info(struct hwloc_linux_backend_data_s *data, hwloc_obj_t obj)
+hwloc__get_dmi_id_info(struct hwloc_linux_backend_data_s *data, hwloc_obj_t obj)
 {
   char path[128];
   unsigned pathlen;
@@ -2216,26 +2216,201 @@ hwloc__get_dmi_info(struct hwloc_linux_backend_data_s *data, hwloc_obj_t obj)
 
   path[pathlen++] = '/';
 
-  hwloc__get_dmi_one_info(data, obj, path, pathlen, "product_name", "DMIProductName");
-  hwloc__get_dmi_one_info(data, obj, path, pathlen, "product_version", "DMIProductVersion");
-  hwloc__get_dmi_one_info(data, obj, path, pathlen, "product_serial", "DMIProductSerial");
-  hwloc__get_dmi_one_info(data, obj, path, pathlen, "product_uuid", "DMIProductUUID");
-  hwloc__get_dmi_one_info(data, obj, path, pathlen, "board_vendor", "DMIBoardVendor");
-  hwloc__get_dmi_one_info(data, obj, path, pathlen, "board_name", "DMIBoardName");
-  hwloc__get_dmi_one_info(data, obj, path, pathlen, "board_version", "DMIBoardVersion");
-  hwloc__get_dmi_one_info(data, obj, path, pathlen, "board_serial", "DMIBoardSerial");
-  hwloc__get_dmi_one_info(data, obj, path, pathlen, "board_asset_tag", "DMIBoardAssetTag");
-  hwloc__get_dmi_one_info(data, obj, path, pathlen, "chassis_vendor", "DMIChassisVendor");
-  hwloc__get_dmi_one_info(data, obj, path, pathlen, "chassis_type", "DMIChassisType");
-  hwloc__get_dmi_one_info(data, obj, path, pathlen, "chassis_version", "DMIChassisVersion");
-  hwloc__get_dmi_one_info(data, obj, path, pathlen, "chassis_serial", "DMIChassisSerial");
-  hwloc__get_dmi_one_info(data, obj, path, pathlen, "chassis_asset_tag", "DMIChassisAssetTag");
-  hwloc__get_dmi_one_info(data, obj, path, pathlen, "bios_vendor", "DMIBIOSVendor");
-  hwloc__get_dmi_one_info(data, obj, path, pathlen, "bios_version", "DMIBIOSVersion");
-  hwloc__get_dmi_one_info(data, obj, path, pathlen, "bios_date", "DMIBIOSDate");
-  hwloc__get_dmi_one_info(data, obj, path, pathlen, "sys_vendor", "DMISysVendor");
+  hwloc__get_dmi_id_one_info(data, obj, path, pathlen, "product_name", "DMIProductName");
+  hwloc__get_dmi_id_one_info(data, obj, path, pathlen, "product_version", "DMIProductVersion");
+  hwloc__get_dmi_id_one_info(data, obj, path, pathlen, "product_serial", "DMIProductSerial");
+  hwloc__get_dmi_id_one_info(data, obj, path, pathlen, "product_uuid", "DMIProductUUID");
+  hwloc__get_dmi_id_one_info(data, obj, path, pathlen, "board_vendor", "DMIBoardVendor");
+  hwloc__get_dmi_id_one_info(data, obj, path, pathlen, "board_name", "DMIBoardName");
+  hwloc__get_dmi_id_one_info(data, obj, path, pathlen, "board_version", "DMIBoardVersion");
+  hwloc__get_dmi_id_one_info(data, obj, path, pathlen, "board_serial", "DMIBoardSerial");
+  hwloc__get_dmi_id_one_info(data, obj, path, pathlen, "board_asset_tag", "DMIBoardAssetTag");
+  hwloc__get_dmi_id_one_info(data, obj, path, pathlen, "chassis_vendor", "DMIChassisVendor");
+  hwloc__get_dmi_id_one_info(data, obj, path, pathlen, "chassis_type", "DMIChassisType");
+  hwloc__get_dmi_id_one_info(data, obj, path, pathlen, "chassis_version", "DMIChassisVersion");
+  hwloc__get_dmi_id_one_info(data, obj, path, pathlen, "chassis_serial", "DMIChassisSerial");
+  hwloc__get_dmi_id_one_info(data, obj, path, pathlen, "chassis_asset_tag", "DMIChassisAssetTag");
+  hwloc__get_dmi_id_one_info(data, obj, path, pathlen, "bios_vendor", "DMIBIOSVendor");
+  hwloc__get_dmi_id_one_info(data, obj, path, pathlen, "bios_version", "DMIBIOSVersion");
+  hwloc__get_dmi_id_one_info(data, obj, path, pathlen, "bios_date", "DMIBIOSDate");
+  hwloc__get_dmi_id_one_info(data, obj, path, pathlen, "sys_vendor", "DMISysVendor");
 }
 
+struct hwloc_firmware_dmi_mem_device_header {
+  unsigned char type;
+  unsigned char length;
+  unsigned char handle[2];
+  unsigned char phy_mem_handle[2];
+  unsigned char mem_err_handle[2];
+  unsigned char tot_width[2];
+  unsigned char dat_width[2];
+  unsigned char size[2];
+  unsigned char ff;
+  unsigned char dev_set;
+  unsigned char dev_loc_str_num;
+  unsigned char bank_loc_str_num;
+  unsigned char mem_type;
+  unsigned char type_detail[2];
+  unsigned char speed[2];
+  unsigned char manuf_str_num;
+  unsigned char serial_str_num;
+  unsigned char asset_tag_str_num;
+  unsigned char part_num_str_num;
+  /* don't include the following fields since we don't need them,
+   * some old implementations may miss them.
+   */
+};
+
+static int check_dmi_entry(const char *buffer)
+{
+  /* reject empty strings */
+  if (!*buffer)
+    return 0;
+  /* reject strings of spaces (at least Dell use this for empty memory slots) */
+  if (strspn(buffer, " ") == strlen(buffer))
+    return 0;
+  return 1;
+}
+
+static void
+hwloc__get_firmware_dmi_memory_info_one(struct hwloc_topology *topology,
+					unsigned idx, const char *path, FILE *fd,
+					struct hwloc_firmware_dmi_mem_device_header *header)
+{
+  unsigned slen;
+  char buffer[256]; /* enough for memory device strings, or at least for each of them */
+  unsigned foff; /* offset in raw file */
+  unsigned boff; /* offset in buffer read from raw file */
+  unsigned i;
+  struct hwloc_obj_info_s *infos = NULL;
+  unsigned infos_count = 0;
+  hwloc_obj_t misc;
+  int foundinfo = 0;
+
+  hwloc__add_info(&infos, &infos_count, "Type", "MemoryModule");
+
+  /* start after the header */
+  foff = header->length;
+  i = 1;
+  while (1) {
+    /* read one buffer */
+    if (fseek(fd, foff, SEEK_SET) < 0)
+      break;
+    if (!fgets(buffer, sizeof(buffer), fd))
+      break;
+    /* read string at the beginning of the buffer */
+    boff = 0;
+    while (1) {
+      /* stop on empty string */
+      if (!buffer[boff])
+        goto done;
+      /* stop if this string goes to the end of the buffer */
+      slen = strlen(buffer+boff);
+      if (boff + slen+1 == sizeof(buffer))
+        break;
+      /* string didn't get truncated, should be OK */
+      if (i == header->manuf_str_num) {
+	if (check_dmi_entry(buffer+boff)) {
+	  hwloc__add_info(&infos, &infos_count, "Vendor", buffer+boff);
+	  foundinfo = 1;
+	}
+      }	else if (i == header->serial_str_num) {
+	if (check_dmi_entry(buffer+boff)) {
+	  hwloc__add_info(&infos, &infos_count, "SerialNumber", buffer+boff);
+	  foundinfo = 1;
+	}
+      } else if (i == header->asset_tag_str_num) {
+	if (check_dmi_entry(buffer+boff)) {
+	  hwloc__add_info(&infos, &infos_count, "AssetTag", buffer+boff);
+	  foundinfo = 1;
+	}
+      } else if (i == header->part_num_str_num) {
+	if (check_dmi_entry(buffer+boff)) {
+	  hwloc__add_info(&infos, &infos_count, "PartNumber", buffer+boff);
+	  foundinfo = 1;
+	}
+      } else if (i == header->dev_loc_str_num) {
+	if (check_dmi_entry(buffer+boff)) {
+	  hwloc__add_info(&infos, &infos_count, "DeviceLocation", buffer+boff);
+	  /* only a location, not an actual info about the device */
+	}
+      } else if (i == header->bank_loc_str_num) {
+	if (check_dmi_entry(buffer+boff)) {
+	  hwloc__add_info(&infos, &infos_count, "BankLocation", buffer+boff);
+	  /* only a location, not an actual info about the device */
+	}
+      } else {
+	goto done;
+      }
+      /* next string in buffer */
+      boff += slen+1;
+      i++;
+    }
+    /* couldn't read a single full string from that buffer, we're screwed */
+    if (!boff) {
+      fprintf(stderr, "hwloc could read a DMI firmware entry #%u in %s\n",
+	      i, path);
+      break;
+    }
+    /* reread buffer after previous string */
+    foff += boff;
+  }
+
+done:
+  if (!foundinfo) {
+    /* found no actual info about the device. if there's only location info, the slot may be empty */
+    goto out_with_infos;
+  }
+
+  misc = hwloc_alloc_setup_object(HWLOC_OBJ_MISC, idx);
+  if (!misc)
+    goto out_with_infos;
+
+  hwloc__move_infos(&misc->infos, &misc->infos_count, &infos, &infos_count);
+  /* FIXME: find a way to identify the corresponding NUMA node and attach these objects there.
+   * but it means we need to parse DeviceLocation=DIMM_B4 but these vary significantly
+   * with the vendor, and it's hard to be 100% sure 'B' is second socket.
+   * Examples at http://sourceforge.net/p/edac-utils/code/HEAD/tree/trunk/src/etc/labels.db
+   * or https://github.com/grondo/edac-utils/blob/master/src/etc/labels.db
+   */
+  hwloc_insert_object_by_parent(topology, hwloc_get_root_obj(topology), misc);
+  return;
+
+ out_with_infos:
+  hwloc__free_infos(infos, infos_count);
+}
+
+static void
+hwloc__get_firmware_dmi_memory_info(struct hwloc_topology *topology,
+				    struct hwloc_linux_backend_data_s *data)
+{
+  char path[128];
+  unsigned i;
+
+  for(i=0; ; i++) {
+    FILE *fd;
+    struct hwloc_firmware_dmi_mem_device_header header;
+    int err;
+
+    snprintf(path, sizeof(path), "/sys/firmware/dmi/entries/17-%u/raw", i);
+    fd = hwloc_fopen(path, "r", data->root_fd);
+    if (!fd)
+      break;
+
+    err = fread(&header, sizeof(header), 1, fd);
+    if (err != 1)
+      break;
+    if (header.length < sizeof(header)) {
+      /* invalid, or too old entry/spec that doesn't contain what we need */
+      fclose(fd);
+      break;
+    }
+
+    hwloc__get_firmware_dmi_memory_info_one(topology, i, path, fd, &header);
+
+    fclose(fd);
+  }
+}
 
 
 /***********************************
@@ -2247,18 +2422,12 @@ hwloc__get_dmi_info(struct hwloc_linux_backend_data_s *data, hwloc_obj_t obj)
 static void *
 hwloc_read_raw(const char *p, const char *p1, size_t *bytes_read, int root_fd)
 {
-  char *fname = NULL;
+  char fname[256];
   char *ret = NULL;
   struct stat fs;
   int file = -1;
-  unsigned len;
 
-  len = strlen(p) + 1 + strlen(p1) + 1;
-  fname = malloc(len);
-  if (NULL == fname) {
-      return NULL;
-  }
-  snprintf(fname, len, "%s/%s", p, p1);
+  snprintf(fname, sizeof(fname), "%s/%s", p, p1);
 
   file = hwloc_open(fname, root_fd);
   if (-1 == file) {
@@ -2283,9 +2452,6 @@ hwloc_read_raw(const char *p, const char *p1, size_t *bytes_read, int root_fd)
  out:
   close(file);
  out_no_close:
-  if (NULL != fname) {
-      free(fname);
-  }
   return ret;
 }
 
@@ -2454,53 +2620,36 @@ look_powerpc_device_tree(struct hwloc_topology *topology,
 			 struct hwloc_linux_backend_data_s *data)
 {
   device_tree_cpus_t cpus;
-  const char *ofroot;
-  size_t ofrootlen;
+  const char ofroot[] = "/proc/device-tree/cpus";
   unsigned int i;
   int root_fd = data->root_fd;
-  DIR *dt;
+  DIR *dt = hwloc_opendir(ofroot, root_fd);
   struct dirent *dirent;
 
-  ofroot = "/sys/firmware/devicetree/base/cpus";
-  ofrootlen = 34;
-  dt = hwloc_opendir(ofroot, root_fd);
-  if (NULL == dt) {
-    ofroot = "/proc/device-tree/cpus";
-    ofrootlen = 22;
-    dt = hwloc_opendir(ofroot, root_fd);
-    if (NULL == dt)
-      return;
-  }
+  if (NULL == dt)
+    return;
+
+  /* only works for Power so far, and not useful on ARM */
+  if (strncmp(data->utsname.machine, "ppc", 3))
+    return;
 
   cpus.n = 0;
   cpus.p = NULL;
   cpus.allocated = 0;
 
   while (NULL != (dirent = readdir(dt))) {
-    struct stat statbuf;
-    int err;
-    char *cpu;
+    char cpu[256];
     char *device_type;
     uint32_t reg = -1, l2_cache = -1, phandle = -1;
-    unsigned len;
 
     if ('.' == dirent->d_name[0])
       continue;
 
-    len = ofrootlen + 1 + strlen(dirent->d_name) + 1;
-    cpu = malloc(len);
-    if (NULL == cpu) {
-      continue;
-    }
-    snprintf(cpu, len, "%s/%s", ofroot, dirent->d_name);
-
-    err = hwloc_stat(cpu, &statbuf, root_fd);
-    if (err < 0 || !S_ISDIR(statbuf.st_mode))
-      goto cont;
+    snprintf(cpu, sizeof(cpu), "%s/%s", ofroot, dirent->d_name);
 
     device_type = hwloc_read_str(cpu, "device_type", root_fd);
     if (NULL == device_type)
-      goto cont;
+      continue;
 
     hwloc_read_unit32be(cpu, "reg", &reg, root_fd);
     if (hwloc_read_unit32be(cpu, "next-level-cache", &l2_cache, root_fd) == -1)
@@ -2527,6 +2676,10 @@ look_powerpc_device_tree(struct hwloc_topology *topology,
         }
         free(threads);
       } else if ((unsigned int)-1 != reg) {
+        /* Doesn't work on ARM because cpu "reg" do not start at 0.
+	 * We know the first cpu "reg" is the lowest. The others are likely
+	 * in order assuming the device-tree shows objects in order.
+	 */
         cpuset = hwloc_bitmap_alloc();
         hwloc_bitmap_set(cpuset, reg);
       }
@@ -2549,8 +2702,6 @@ look_powerpc_device_tree(struct hwloc_topology *topology,
       }
     }
     free(device_type);
-cont:
-    free(cpu);
   }
   closedir(dt);
 
@@ -2584,18 +2735,9 @@ cont:
     cpuset = hwloc_bitmap_alloc();
     if (0 == look_powerpc_device_tree_discover_cache(&cpus,
           cpus.p[i].phandle, &level, cpuset)) {
-      char *cpu;
-      unsigned len;
-
-      len = ofrootlen + 1 + strlen(cpus.p[i].name) + 1;
-      cpu = malloc(len);
-      if (NULL == cpu) {
-          return;
-      }
-      snprintf(cpu, len, "%s/%s", ofroot, cpus.p[i].name);
-
+      char cpu[256];
+      snprintf(cpu, sizeof(cpu), "%s/%s", ofroot, cpus.p[i].name);
       try_add_cache_from_device_tree_cpu(topology, data, cpu, level, cpuset);
-      free(cpu);
     }
     hwloc_bitmap_free(cpuset);
   }
@@ -2926,7 +3068,7 @@ package_done:
       if (coreset) {
        hwloc_bitmap_andnot(coreset, coreset, unknownset);
        if (hwloc_bitmap_weight(coreset) > 1) {
-	/* check if this is hyperthreading or different coreids */
+	/* check if this is hyper-threading or different coreids */
 	unsigned siblingid, siblingcoreid;
 	hwloc_bitmap_t set = hwloc_bitmap_dup(coreset);
 	hwloc_bitmap_clr(set, i);
@@ -2967,7 +3109,7 @@ package_done:
           book->cpuset = bookset;
           hwloc_debug_1arg_bitmap("os book %u has cpuset %s\n",
                        mybookid, bookset);
-	  hwloc_obj_add_info(book, "GroupType", "Book");
+          hwloc_obj_add_info(book, "Type", "Book");
           hwloc_insert_object_by_cpuset(topology, book);
           bookset = NULL; /* don't free it */
 	 }
@@ -3640,7 +3782,7 @@ hwloc_gather_system_info(struct hwloc_topology *topology,
 {
   FILE *file;
   char line[128]; /* enough for utsname fields */
-  char *env;
+  const char *env;
 
   /* initialize to something sane */
   memset(&data->utsname, 0, sizeof(data->utsname));
@@ -3779,8 +3921,10 @@ hwloc_look_linuxfs(struct hwloc_backend *backend)
       hwloc_linux_free_cpuinfo(Lprocs, numprocs, global_infos, global_infos_count);
     }
 
-    /* Gather DMI info */
-    hwloc__get_dmi_info(data, topology->levels[0][0]);
+  /* Gather DMI info */
+  hwloc__get_dmi_id_info(data, topology->levels[0][0]);
+  if (hwloc_topology_get_flags(topology) & (HWLOC_TOPOLOGY_FLAG_IO_DEVICES|HWLOC_TOPOLOGY_FLAG_WHOLE_IO))
+    hwloc__get_firmware_dmi_memory_info(topology, data);
 
   hwloc_obj_add_info(topology->levels[0][0], "Backend", "Linux");
   if (cpuset_name) {
@@ -4143,8 +4287,23 @@ hwloc_linux_block_class_fillinfos(struct hwloc_backend *backend,
   char model[64] = "";
   char serial[64] = "";
   char revision[64] = "";
+  char blocktype[64] = "";
   unsigned major_id, minor_id;
   char *tmp;
+
+  snprintf(path, sizeof(path), "%s/size", osdevpath);
+  fd = hwloc_fopen(path, "r", root_fd);
+  if (fd) {
+    char string[20];
+    if (fgets(string, sizeof(string), fd)) {
+      unsigned long long sectors = strtoull(string, NULL, 10);
+      char string[16];
+      /* linux always reports size in 512-byte units, we want kB */
+      snprintf(string, sizeof(string), "%llu", sectors / 2);
+      hwloc_obj_add_info(obj, "Size", string);
+    }
+    fclose(fd);
+  }
 
   snprintf(path, sizeof(path), "%s/dev", osdevpath);
   fd = hwloc_fopen(path, "r", root_fd);
@@ -4183,7 +4342,9 @@ hwloc_linux_block_class_fillinfos(struct hwloc_backend *backend,
     prop = udev_device_get_property_value(dev, "ID_SERIAL_SHORT");
     if (prop)
       strcpy(serial, prop);
-    /* ID_TYPE= seems to always contain "disk" */
+    prop = udev_device_get_property_value(dev, "ID_TYPE");
+    if (prop)
+      strcpy(blocktype, prop);
 
     udev_device_unref(dev);
   } else
@@ -4200,15 +4361,21 @@ hwloc_linux_block_class_fillinfos(struct hwloc_backend *backend,
     if (tmp)
       *tmp = '\0';
     if (!strncmp(line, "E:ID_VENDOR=", strlen("E:ID_VENDOR="))) {
-      strcpy(vendor, line+strlen("E:ID_VENDOR="));
+      strncpy(vendor, line+strlen("E:ID_VENDOR="), sizeof(vendor));
+      vendor[sizeof(vendor)-1] = '\0';
     } else if (!strncmp(line, "E:ID_MODEL=", strlen("E:ID_MODEL="))) {
-      strcpy(model, line+strlen("E:ID_MODEL="));
+      strncpy(model, line+strlen("E:ID_MODEL="), sizeof(model));
+      model[sizeof(model)-1] = '\0';
     } else if (!strncmp(line, "E:ID_REVISION=", strlen("E:ID_REVISION="))) {
-      strcpy(revision, line+strlen("E:ID_REVISION="));
+      strncpy(revision, line+strlen("E:ID_REVISION="), sizeof(revision));
+      revision[sizeof(revision)-1] = '\0';
     } else if (!strncmp(line, "E:ID_SERIAL_SHORT=", strlen("E:ID_SERIAL_SHORT="))) {
-      strcpy(serial, line+strlen("E:ID_SERIAL_SHORT="));
+      strncpy(serial, line+strlen("E:ID_SERIAL_SHORT="), sizeof(serial));
+      serial[sizeof(serial)-1] = '\0';
+    } else if (!strncmp(line, "E:ID_TYPE=", strlen("E:ID_TYPE="))) {
+      strncpy(blocktype, line+strlen("E:ID_TYPE="), sizeof(blocktype));
+      blocktype[sizeof(blocktype)-1] = '\0';
     }
-    /* E:ID_TYPE= seems to always contain "disk" */
   }
   fclose(fd);
  }
@@ -4238,6 +4405,15 @@ hwloc_linux_block_class_fillinfos(struct hwloc_backend *backend,
     hwloc_obj_add_info(obj, "Revision", revision);
   if (*serial)
     hwloc_obj_add_info(obj, "SerialNumber", serial);
+
+  if (!strcmp(blocktype, "disk"))
+    hwloc_obj_add_info(obj, "Type", "Disk");
+  else if (!strcmp(blocktype, "tape"))
+    hwloc_obj_add_info(obj, "Type", "Tape");
+  else if (!strcmp(blocktype, "cd") || !strcmp(blocktype, "floppy") || !strcmp(blocktype, "optical"))
+    hwloc_obj_add_info(obj, "Type", "Removable Media Device");
+  else /* generic, usb mass storage/rbc, usb mass storage/scsi */
+    hwloc_obj_add_info(obj, "Type", "Other");
 }
 
 /* block class objects are in
@@ -4519,7 +4695,7 @@ hwloc_linux_directlookup_mic_class(struct hwloc_backend *backend,
     /* read the entire class and find the max id of mic%u dirents */
     dir = hwloc_opendir("/sys/devices/virtual/mic", root_fd);
     if (!dir) {
-      dir = opendir("/sys/class/mic");
+      dir = hwloc_opendir("/sys/class/mic", root_fd);
       if (!dir)
 	return 0;
     }

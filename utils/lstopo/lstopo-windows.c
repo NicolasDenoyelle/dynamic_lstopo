@@ -1,6 +1,6 @@
 /*
  * Copyright © 2009 CNRS
- * Copyright © 2009-2014 Inria.  All rights reserved.
+ * Copyright © 2009-2015 Inria.  All rights reserved.
  * Copyright © 2009-2010, 2012 Université Bordeaux
  * Copyright © 2011 Cisco Systems, Inc.  All rights reserved.
  * See COPYING in top-level directory.
@@ -27,6 +27,15 @@ static struct color {
   HGDIOBJ brush;
 } *colors;
 
+struct lstopo_windows_output {
+  struct lstopo_output loutput; /* must be at the beginning */
+  int drawing;
+  PAINTSTRUCT ps;
+  HWND toplevel;
+  unsigned max_x;
+  unsigned max_y;
+};
+
 static int numcolors;
 
 static HGDIOBJ
@@ -44,9 +53,7 @@ rgb_to_brush(int r, int g, int b)
 
 struct draw_methods windows_draw_methods;
 
-static hwloc_topology_t the_topology;
-static int the_logical;
-static int the_legend;
+static struct lstopo_windows_output the_output;
 static int state, control;
 static int x, y, x_delta, y_delta;
 static int finish;
@@ -63,12 +70,14 @@ WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
   int redraw = 0;
   switch (message) {
     case WM_PAINT: {
-      HDC hdc;
-      PAINTSTRUCT ps;
-      hdc = BeginPaint(hwnd, &ps);
-      windows_box(&ps, 0xff, 0xff, 0xff, 0, 0, win_width, 0, win_height);
-      output_draw(&windows_draw_methods, the_logical, the_legend, the_topology, &ps);
-      EndPaint(hwnd, &ps);
+      HFONT font;
+      BeginPaint(hwnd, &the_output.ps);
+      font = CreateFont(fontsize, 0, 0, 0, 0, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, NULL);
+      SelectObject(the_output.ps.hdc, (HGDIOBJ) font);
+      windows_box(&the_output, 0xff, 0xff, 0xff, 0, 0, win_width, 0, win_height);
+      output_draw(&the_output.loutput);
+      DeleteObject(font);
+      EndPaint(hwnd, &the_output.ps);
       break;
     }
     case WM_LBUTTONDOWN:
@@ -156,7 +165,9 @@ WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
       }
       break;
     case WM_DESTROY:
-      PostQuitMessage(0);
+      /* only kill the program if closing the actual toplevel, not the fake one */
+      if (hwnd == the_output.toplevel)
+	PostQuitMessage(0);
       return 0;
     case WM_SIZE:
       win_width = LOWORD(lparam);
@@ -194,18 +205,47 @@ WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
   return DefWindowProc(hwnd, message, wparam, lparam);
 }
 
-static void *
-windows_start(void *output_ __hwloc_attribute_unused, int width, int height)
+static void
+windows_init(void *output)
 {
+  struct lstopo_windows_output *woutput = output;
   WNDCLASS wndclass;
-  HWND toplevel;
+  HWND toplevel, faketoplevel;
+  unsigned width, height;
+  HFONT font;
 
+  /* make sure WM_DESTROY on the faketoplevel won't kill the program */
+  woutput->toplevel = NULL;
+
+  /* create the toplevel window, with random size for now */
   memset(&wndclass, 0, sizeof(wndclass));
   wndclass.hbrBackground = (HBRUSH) GetStockObject(WHITE_BRUSH);
   wndclass.hCursor = LoadCursor(NULL, IDC_SIZEALL);
   wndclass.hIcon = LoadIcon(NULL, IDI_APPLICATION);
   wndclass.lpfnWndProc = WndProc;
   wndclass.lpszClassName = "lstopo";
+
+  RegisterClass(&wndclass);
+
+  /* compute the maximal needed size, this may require the toplevel window in the future */
+  woutput->max_x = 0;
+  woutput->max_y = 0;
+  woutput->drawing = 0;
+  faketoplevel = CreateWindow("lstopo", "lstopo", WS_OVERLAPPEDWINDOW,
+			      CW_USEDEFAULT, CW_USEDEFAULT,
+			      10, 10, NULL, NULL, NULL, NULL);
+  BeginPaint(faketoplevel, &woutput->ps);
+  font = CreateFont(fontsize, 0, 0, 0, 0, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, NULL);
+  SelectObject(woutput->ps.hdc, (HGDIOBJ) font);
+  output_draw(&woutput->loutput);
+  DeleteObject(font);
+  EndPaint(faketoplevel, &woutput->ps);
+  DestroyWindow(faketoplevel);
+  woutput->drawing = 1;
+
+  /* now create the actual toplevel with the sizes */
+  width = woutput->max_x;
+  height = woutput->max_y;
 
   win_width = width + 2*GetSystemMetrics(SM_CXSIZEFRAME);
   win_height = height + 2*GetSystemMetrics(SM_CYSIZEFRAME) + GetSystemMetrics(SM_CYCAPTION);
@@ -216,10 +256,10 @@ windows_start(void *output_ __hwloc_attribute_unused, int width, int height)
   if (win_height > GetSystemMetrics(SM_CYFULLSCREEN))
     win_height = GetSystemMetrics(SM_CYFULLSCREEN);
 
-  RegisterClass(&wndclass);
   toplevel = CreateWindow("lstopo", "lstopo", WS_OVERLAPPEDWINDOW,
 		  CW_USEDEFAULT, CW_USEDEFAULT,
 		  win_width, win_height, NULL, NULL, NULL, NULL);
+  woutput->toplevel = toplevel;
 
   the_width = width;
   the_height = height;
@@ -227,17 +267,21 @@ windows_start(void *output_ __hwloc_attribute_unused, int width, int height)
   the_fontsize = fontsize;
   the_gridsize = gridsize;
 
+  /* and display the window */
   ShowWindow(toplevel, SW_SHOWDEFAULT);
-
-  return toplevel;
 }
 
 static void
-windows_declare_color(void *output_ __hwloc_attribute_unused, int r, int g, int b)
+windows_declare_color(void *output, int r, int g, int b)
 {
+  struct lstopo_windows_output *woutput = output;
   HBRUSH brush;
-  COLORREF color = RGB(r, g, b);
+  COLORREF color;
 
+  if (!woutput->drawing)
+    return;
+
+  color = RGB(r, g, b);
   brush = CreateSolidBrush(color);
   if (!brush) {
     fprintf(stderr,"Could not allocate color %02x%02x%02x\n", r, g, b);
@@ -255,7 +299,21 @@ windows_declare_color(void *output_ __hwloc_attribute_unused, int r, int g, int 
 static void
 windows_box(void *output, int r, int g, int b, unsigned depth __hwloc_attribute_unused, unsigned x, unsigned width, unsigned y, unsigned height)
 {
-  PAINTSTRUCT *ps = output;
+  struct lstopo_windows_output *woutput = output;
+  PAINTSTRUCT *ps = &woutput->ps;
+
+  if (!woutput->drawing) {
+    if (x > woutput->max_x)
+      woutput->max_x = x;
+    if (x+width > woutput->max_x)
+      woutput->max_x = x + width;
+    if (y > woutput->max_y)
+      woutput->max_y = y;
+    if (y + height > woutput->max_y)
+      woutput->max_y = y + height;
+    return;
+  }
+
   SelectObject(ps->hdc, rgb_to_brush(r, g, b));
   SetBkColor(ps->hdc, RGB(r, g, b));
   Rectangle(ps->hdc, x - x_delta, y - y_delta, x + width - x_delta, y + height - y_delta);
@@ -264,42 +322,70 @@ windows_box(void *output, int r, int g, int b, unsigned depth __hwloc_attribute_
 static void
 windows_line(void *output, int r, int g, int b, unsigned depth __hwloc_attribute_unused, unsigned x1, unsigned y1, unsigned x2, unsigned y2)
 {
-  PAINTSTRUCT *ps = output;
+  struct lstopo_windows_output *woutput = output;
+  PAINTSTRUCT *ps = &woutput->ps;
+
+  if (!woutput->drawing) {
+    if (x1 > woutput->max_x)
+      woutput->max_x = x1;
+    if (x2 > woutput->max_x)
+      woutput->max_x = x2;
+    if (y1 > woutput->max_y)
+      woutput->max_y = y1;
+    if (y2 > woutput->max_y)
+      woutput->max_y = y2;
+    return;
+  }
+
   SelectObject(ps->hdc, rgb_to_brush(r, g, b));
   MoveToEx(ps->hdc, x1 - x_delta, y1 - y_delta, NULL);
   LineTo(ps->hdc, x2 - x_delta, y2 - y_delta);
 }
 
 static void
-windows_text(void *output, int r, int g, int b, int size, unsigned depth __hwloc_attribute_unused, unsigned x, unsigned y, const char *text)
+windows_text(void *output, int r, int g, int b, int size __hwloc_attribute_unused, unsigned depth __hwloc_attribute_unused, unsigned x, unsigned y, const char *text)
 {
-  PAINTSTRUCT *ps = output;
-  HFONT font;
+  struct lstopo_windows_output *woutput = output;
+  PAINTSTRUCT *ps = &woutput->ps;
+
+  if (!woutput->drawing)
+    return;
+
   SetTextColor(ps->hdc, RGB(r, g, b));
-  font = CreateFont(size, 0, 0, 0, 0, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, NULL);
-  SelectObject(ps->hdc, (HGDIOBJ) font);
   TextOut(ps->hdc, x - x_delta, y - y_delta, text, strlen(text));
-  DeleteObject(font);
+}
+
+static void
+windows_textsize(void *output, const char *text, unsigned textlength, unsigned fontsize __hwloc_attribute_unused, unsigned *width)
+{
+  struct lstopo_windows_output *woutput = output;
+  PAINTSTRUCT *ps = &woutput->ps;
+  SIZE size;
+
+  GetTextExtentPoint32(ps->hdc, text, textlength, &size);
+  *width = size.cx;
 }
 
 struct draw_methods windows_draw_methods = {
-  windows_start,
+  windows_init,
   windows_declare_color,
   windows_box,
   windows_line,
   windows_text,
+  windows_textsize,
 };
 
 void
-output_windows (hwloc_topology_t topology, const char *filename __hwloc_attribute_unused, int overwrite __hwloc_attribute_unused, int logical, int legend, int verbose_mode __hwloc_attribute_unused)
+output_windows (struct lstopo_output *loutput, const char *filename __hwloc_attribute_unused)
 {
-  HWND toplevel;
   MSG msg;
-  the_topology = topology;
-  the_logical = logical;
-  the_legend = legend;
-  toplevel = output_draw_start(&windows_draw_methods, logical, legend, topology, NULL);
-  UpdateWindow(toplevel);
+
+  memset(&the_output, 0, sizeof(the_output));
+  memcpy(&the_output.loutput, loutput, sizeof(*loutput));
+  the_output.loutput.methods = &windows_draw_methods;
+
+  output_draw_start(&the_output.loutput);
+  UpdateWindow(the_output.toplevel);
   while (!finish && GetMessage(&msg, NULL, 0, 0)) {
     TranslateMessage(&msg);
     DispatchMessage(&msg);

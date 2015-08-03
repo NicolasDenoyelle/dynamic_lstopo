@@ -1,4 +1,4 @@
-# Copyright © 2009-2014 Inria.  All rights reserved.
+# Copyright © 2009-2015 Inria.  All rights reserved.
 # Copyright © 2009-2012, 2014 Université Bordeaux
 # Copyright © 2009-2014 Cisco Systems, Inc.  All rights reserved.
 #
@@ -31,6 +31,7 @@ lstopo_no_graphics_SOURCES = \
         lstopo-color.c \
         lstopo-draw.c \
         lstopo-fig.c \
+        lstopo-ascii.c \
         lstopo-text.c \
         lstopo-xml.c
 
@@ -85,7 +86,7 @@ if HWLOC_HAVE_MONITOR
 	@sed -e '/#HWLOC_HAVE_MONITOR#/ {' -e 'r monitor.1in' -e 'd' -e '}' -i $@
 endif
 
-install-exec-hook: install-man
+install-exec-hook:
 	rm -f $(DESTDIR)$(bindir)/hwloc-ls$(EXEEXT)
 	cd $(DESTDIR)$(bindir) && $(LN_S) lstopo-no-graphics$(EXEEXT) hwloc-ls$(EXEEXT)
 if !HWLOC_HAVE_WINDOWS
@@ -94,6 +95,8 @@ if !HWLOC_HAVE_CAIRO
 	cd $(DESTDIR)$(bindir) && $(LN_S) lstopo-no-graphics$(EXEEXT) lstopo$(EXEEXT) || true
 endif
 endif
+
+install-data-hook:
 	rm -f $(DESTDIR)$(man1dir)/hwloc-ls.1
 	cd $(DESTDIR)$(man1dir) && $(LN_S) lstopo-no-graphics.1 hwloc-ls.1
 	rm -f $(DESTDIR)$(man1dir)/lstopo.1

@@ -33,6 +33,9 @@ bin_PROGRAMS = \
         hwloc-info \
         hwloc-patch \
         hwloc-ps
+if HWLOC_HAVE_X86_CPUID
+bin_PROGRAMS += hwloc-gather-cpuid
+endif HWLOC_HAVE_X86_CPUID
 
 hwloc_calc_SOURCES = \
         hwloc-calc.h \
@@ -73,6 +76,10 @@ man1_pages = \
         hwloc-info.1 \
         hwloc-patch.1 \
         hwloc-ps.1
+if HWLOC_HAVE_X86_CPUID
+man1_pages += hwloc-gather-cpuid.1
+endif HWLOC_HAVE_X86_CPUID
+
 EXTRA_DIST += $(man1_pages:.1=.1in)
 nodist_man_MANS += $(man1_pages)
 
@@ -106,7 +113,7 @@ endif HWLOC_HAVE_LINUX
 	  -e 's/#HWLOC_DATE#/@HWLOC_RELEASE_DATE@/g' \
 	  > $@ < $<
 
-install-exec-hook: install-man
+install-exec-hook:
 	$(SED) -e 's/HWLOC_top_builddir\/utils\/hwloc/bindir/' -e 's/HWLOC_top_builddir\/utils\/lstopo/bindir/' -e '/HWLOC_top_builddir/d' $(DESTDIR)$(bindir)/hwloc-compress-dir > $(DESTDIR)$(bindir)/hwloc-compress-dir.tmp && mv -f $(DESTDIR)$(bindir)/hwloc-compress-dir.tmp $(DESTDIR)$(bindir)/hwloc-compress-dir
 	chmod +x $(DESTDIR)$(bindir)/hwloc-compress-dir
 if HWLOC_HAVE_LINUX

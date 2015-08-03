@@ -233,17 +233,17 @@ new_Monitors(hwloc_topology_t topology, unsigned int n_events, char ** event_nam
   depth = hwloc_topology_get_depth(m->topology);
   m->n_PU = hwloc_get_nbobjs_by_depth(m->topology, depth-1);
   pthread_barrier_init(&m->barrier,NULL,m->n_PU+1);
-  m->allocated_count=4;
+  m->allocated_count=depth;
 
-  M_alloc(m->pthreads,m->n_PU,sizeof(pthread_t));
-  M_alloc(m->depths,m->allocated_count,sizeof(int));
-  M_alloc(m->depth_names,m->allocated_count,sizeof(char*));
-  M_alloc(m->compute,m->allocated_count,sizeof(double (*)(long long*)));
-  M_alloc(m->min,m->allocated_count,sizeof(double (*)(long long*)));
-  M_alloc(m->max,m->allocated_count,sizeof(double (*)(long long*)));
-  M_alloc(m->names,m->allocated_count,sizeof(char *));
-  M_alloc(m->event_names,n_events,sizeof(char*));
-  M_alloc(m->PU_vals,m->n_PU,sizeof(struct monitor_node *));
+  M_alloc(m->pthreads,m->n_PU,sizeof(*m->pthreads));
+  M_alloc(m->depths,m->allocated_count,sizeof(*(m->depths)));
+  M_alloc(m->depth_names,m->allocated_count,sizeof(*(m->depth_names)));
+  M_alloc(m->compute,m->allocated_count,sizeof(*(m->compute)));
+  M_alloc(m->min,m->allocated_count,sizeof(*(m->min)));
+  M_alloc(m->max,m->allocated_count,sizeof(*(m->max)));
+  M_alloc(m->names,m->allocated_count,sizeof(*(m->names)));
+  M_alloc(m->event_names,n_events,sizeof(*(m->event_names)));
+  M_alloc(m->PU_vals,m->n_PU,sizeof(*(m->PU_vals)));
 
   for(i=0;i<m->n_PU;i++){
     m->pthreads[i]=0;
@@ -275,17 +275,17 @@ add_Monitor(monitors_t m, const char * name, char * hwloc_obj_name,
   /* realloc necessary space */
   if(m->allocated_count<=m->count){
     m->allocated_count*=2;
-    if((m->names=realloc(m->names, sizeof(char*)*m->allocated_count))==NULL)
+    if((m->names=realloc(m->names, sizeof(*(m->names))*m->allocated_count))==NULL)
       exit(EXIT_FAILURE);
-    if((m->depths=realloc(m->depths, sizeof(int)*m->allocated_count))==NULL)
+    if((m->depths=realloc(m->depths, sizeof(*(m->depths))*m->allocated_count))==NULL)
       exit(EXIT_FAILURE);
-    if((m->depth_names=realloc(m->depth_names, sizeof(char*)*m->allocated_count))==NULL)
+    if((m->depth_names=realloc(m->depth_names, sizeof(*(m->depth_names))*m->allocated_count))==NULL)
       exit(EXIT_FAILURE);
-    if((m->max=realloc(m->max, sizeof(int)*m->allocated_count))==NULL)
+    if((m->max=realloc(m->max, sizeof(*(m->max))*m->allocated_count))==NULL)
       exit(EXIT_FAILURE);
-    if((m->min=realloc(m->min, sizeof(int)*m->allocated_count))==NULL)
+    if((m->min=realloc(m->min, sizeof(*(m->min))*m->allocated_count))==NULL)
       exit(EXIT_FAILURE);
-    if((m->compute=realloc(m->compute, sizeof(double(*)(long long*))*m->allocated_count))==NULL)
+    if((m->compute=realloc(m->compute, sizeof(*(m->compute))*m->allocated_count))==NULL)
       exit(EXIT_FAILURE);
   }
 
@@ -582,7 +582,7 @@ new_default_Monitors(hwloc_topology_t topology, const char * output, int accum)
 {
   unsigned i,depth = hwloc_topology_get_depth(topology)-1;
   int eventset = PAPI_NULL;
-
+  int err;
   PAPI_library_init( PAPI_VER_CURRENT);
   PAPI_create_eventset(&eventset);
 
@@ -596,13 +596,15 @@ new_default_Monitors(hwloc_topology_t topology, const char * output, int accum)
   PAPI_enum_event( &event_code, PAPI_ENUM_FIRST );
   do {
     hwloc_obj_type_snprintf(obj_name,20,hwloc_get_obj_by_depth(topology,depth,0),0);
-    if ( PAPI_get_event_info( event_code, &info ) == PAPI_OK &&
-	 PAPI_add_named_event(eventset,info.symbol) == PAPI_OK
-	 && strcmp(obj_name,"Package") && strcmp(obj_name,"Socket")){
-      obj_names[count] = strdup(obj_name);
-      event_names[count]=strdup(info.symbol);
-      count++;
-    }
+    if ( PAPI_get_event_info( event_code, &info ) != PAPI_OK)
+      continue;
+    if((err=PAPI_add_event(eventset,event_code)) != PAPI_OK)
+      continue;
+    printf("watch event %s at level %s\n",info.symbol,obj_name);
+    //strcmp(obj_name,"Package") && strcmp(obj_name,"Socket")){
+    obj_names[count] = strdup(obj_name);
+    event_names[count]=strdup(info.symbol);
+    count++;
   } while (depth-- && PAPI_enum_event( &event_code, PAPI_PRESET_ENUM_AVAIL ) == PAPI_OK);
   
   PAPI_destroy_eventset(&eventset);
@@ -619,6 +621,7 @@ new_default_Monitors(hwloc_topology_t topology, const char * output, int accum)
     free(event_names);
     return NULL;
   }
+  m->libsopath=NULL;
   for(i=0;i<count;i++){
     add_Monitor(m,event_names[i],obj_names[i],default_fun);
     free(event_names[i]);
@@ -823,9 +826,12 @@ delete_Monitors(monitors_t m)
   if(m->pw!=NULL)
     delete_proc_watch(m->pw);
   unload_monitors_lib(m);
-  remove(m->libsopath);
+  if(m->libsopath && remove(m->libsopath)==-1){
+    perror("remove");
+    fprintf(stderr,"%s\n",m->libsopath);
+  }
   free(m);
-  // hwloc_topology_destroy(m->topology);
+  //hwloc_topology_destroy(m->topology);
   PAPI_shutdown();
 }
 

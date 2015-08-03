@@ -105,6 +105,11 @@ AC_DEFUN([HWLOC_DEFINE_ARGS],[
                   AS_HELP_STRING([--disable-libnuma],
                                  [Disable the Linux libnuma]))
 
+    # LibUdev
+    AC_ARG_ENABLE([libudev],
+                  AS_HELP_STRING([--disable-libudev],
+                                 [Disable the Linux libudev]))
+
     # Plugins
     AC_ARG_ENABLE([plugins],
                   AS_HELP_STRING([--enable-plugins=name,...],
@@ -249,6 +254,43 @@ AC_DEFUN([HWLOC_SETUP_UTILS],[
 ### Configuring hwloc command line utilities
 ###
 EOF
+
+# Monitor support
+hwloc_monitor_happy=no
+papi_lib_happy=no
+papi_header_happy=no
+lex_happy=no
+yacc_happy=no
+no_happy=no
+
+if test "x$enable_monitor" != "xno"; then
+hwloc_monitor_happy=yes     
+AC_CHECK_LIB([papi],[PAPI_library_init],[papi_lib_happy=yes],[hwloc_monitor_happy=no])
+AC_CHECK_HEADER([papi.h],[papi_header_happy=yes],[hwloc_monitor_happy=no])
+AC_PROG_YACC
+if test x"${YACC}" != x":" ; then
+yacc_happy=yes
+else	
+hwloc_monitor_happy=no
+fi
+AC_PROG_LEX
+if test x"${LEX}" != x":" ; then
+lex_happy=yes
+else	
+hwloc_monitor_happy=no
+fi
+fi
+
+if test "$hwloc_monitor_happy" = "yes"; then
+AC_DEFINE([HWLOC_HAVE_MONITOR], [1], [Define to 1 if you are able to compile the 'monitor'.])
+else
+AS_IF([test "$enable_monitor" = "yes"],
+[AS_IF([test "$papi_lib_happy" = "no"],  [AC_MSG_WARN([--enable-monitor requested, but papi lib was not found, LDFLAGS=$LDFLAGS])])
+AS_IF([test "$papi_header_happy" = "no"],[AC_MSG_WARN([--enable-monitor requested, but papi header was not found])])
+AS_IF([test "$lex_happy" = "no"],[AC_MSG_WARN([--enable-monitor requested, but program lex $LEX was not found])])
+AS_IF([test "$yacc_happy" = "no"],[AC_MSG_WARN([--enable-monitor requested, but program yacc $YACC was not found])])
+AC_MSG_ERROR([Cannot continue])])
+fi
 
     AC_REQUIRE([AC_PROG_SED])
 
@@ -437,11 +479,13 @@ int foo(void) {
         hwloc_config_prefix[tests/hwloc/Makefile]
         hwloc_config_prefix[tests/hwloc/linux/Makefile]
         hwloc_config_prefix[tests/hwloc/linux/gather/Makefile]
+        hwloc_config_prefix[tests/hwloc/x86/Makefile]
         hwloc_config_prefix[tests/hwloc/xml/Makefile]
         hwloc_config_prefix[tests/hwloc/ports/Makefile]
         hwloc_config_prefix[tests/hwloc/rename/Makefile]
         hwloc_config_prefix[tests/hwloc/linux/gather/test-gather-topology.sh]
         hwloc_config_prefix[tests/hwloc/linux/test-topology.sh]
+        hwloc_config_prefix[tests/hwloc/x86/test-topology.sh]
         hwloc_config_prefix[tests/hwloc/xml/test-topology.sh]
         hwloc_config_prefix[tests/hwloc/wrapper.sh]
         hwloc_config_prefix[utils/hwloc/hwloc-compress-dir]
@@ -461,6 +505,7 @@ int foo(void) {
 
     AC_CONFIG_COMMANDS([chmoding-scripts], [
 chmod +x ]hwloc_config_prefix[tests/hwloc/linux/test-topology.sh \
+      ]hwloc_config_prefix[tests/hwloc/x86/test-topology.sh \
       ]hwloc_config_prefix[tests/hwloc/xml/test-topology.sh \
       ]hwloc_config_prefix[tests/hwloc/linux/gather/test-gather-topology.sh \
       ]hwloc_config_prefix[tests/hwloc/wrapper.sh \
@@ -496,6 +541,7 @@ chmod +x ]hwloc_config_prefix[tests/hwloc/linux/test-topology.sh \
 	hwloc_config_prefix[tests/hwloc/ports/topology-opencl.c]:hwloc_config_prefix[hwloc/topology-opencl.c]
 	hwloc_config_prefix[tests/hwloc/ports/topology-cuda.c]:hwloc_config_prefix[hwloc/topology-cuda.c]
 	hwloc_config_prefix[tests/hwloc/ports/topology-nvml.c]:hwloc_config_prefix[hwloc/topology-nvml.c]
-	hwloc_config_prefix[tests/hwloc/ports/topology-gl.c]:hwloc_config_prefix[hwloc/topology-gl.c])
+	hwloc_config_prefix[tests/hwloc/ports/topology-gl.c]:hwloc_config_prefix[hwloc/topology-gl.c]
+	hwloc_config_prefix[tests/hwloc/ports/lstopo-windows.c]:hwloc_config_prefix[utils/lstopo/lstopo-windows.c])
     ])
 ])dnl

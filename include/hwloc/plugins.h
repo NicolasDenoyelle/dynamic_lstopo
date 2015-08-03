@@ -224,7 +224,7 @@ struct hwloc_component {
    *
    * \return 0 on success, or a negative code on error.
    *
-   * \node If the component uses ltdl for loading its own plugins,
+   * \note If the component uses ltdl for loading its own plugins,
    * it should load/unload them only in init() and finalize(),
    * to avoid race conditions with hwloc's use of ltdl.
    */
@@ -374,7 +374,7 @@ hwloc_plugin_check_namespace(const char *pluginname __hwloc_attribute_unused, co
     static int verboseenv_checked = 0;
     static int verboseenv_value = 0;
     if (!verboseenv_checked) {
-      char *verboseenv = getenv("HWLOC_PLUGINS_VERBOSE");
+      const char *verboseenv = getenv("HWLOC_PLUGINS_VERBOSE");
       verboseenv_value = atoi(verboseenv);
       verboseenv_checked = 1;
     }
