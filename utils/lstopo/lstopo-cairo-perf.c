@@ -194,7 +194,7 @@ static_replay(struct lstopo_output *loutput, const char *filename, replay_t repl
 		    val, old_val, 
 		    replay->max[obj->depth], 
 		    replay->min[obj->depth],
-		    1);
+		    1, replay->logscale[obj->depth]);
       max_depth = obj->depth>max_depth? obj->depth : max_depth;
     }
   }
@@ -264,22 +264,22 @@ output_x11_perf(struct lstopo_output * loutput, struct perf_attributes * attr, c
   FD_SET(itimer_fd, &in_fds_original);
   int nfds = x11_fd > itimer_fd ? x11_fd+1 : itimer_fd+1;
 
+  /* start timer */
+  timerfd_settime(itimer_fd,0,&itimer,NULL);
+
   /* start executable to watch */
   int pid=0;
   if(attr->executable){
     pid = start_executable(attr->executable,attr->exe_args);
     if(!attr->perf_whole_machine){
       Monitors_watch_pid(monitors,pid);
-      printf("monitoring pid %d\n",pid);
+      printf("monitoring pid %d of %s\n",pid,attr->executable);
     }
   }
 
   /* start monitoring activity */
   Monitors_start(monitors);
-
   int user_stopped=0;
-  /* start timer */
-  timerfd_settime(itimer_fd,0,&itimer,NULL);
 
   while(pid ? waitpid(pid, NULL, WNOHANG)==0 : 1){
     in_fds = in_fds_original;
@@ -300,6 +300,9 @@ output_x11_perf(struct lstopo_output * loutput, struct perf_attributes * attr, c
   	Monitors_update_counters(monitors);
 	coutput->context=c;
 	topo_cairo_perf_boxes(coutput, monitors, active);
+	cairo_show_page(c);
+	cairo_surface_flush(coutput->surface);
+	XFlush(disp->dpy);
       }
     }
   }
@@ -330,15 +333,13 @@ output_x11_perf_replay(struct lstopo_output * loutput, const char *filename __hw
   coutput = &disp->coutput;
   memset(coutput, 0, sizeof(*coutput));
   memcpy(&coutput->loutput, loutput, sizeof(*loutput));
-  cairo_t * c = cairo_create(coutput->surface);
 
   output_draw_start(&coutput->loutput);
-  topo_cairo_paint(&disp->coutput);
   lastx = disp->x;
   lasty = disp->y;
-
-  /* draw initial topology */
   topo_cairo_paint(coutput);
+  cairo_t * c = cairo_create(coutput->surface);
+
 
   /* select between x11event and alarm */
   char buf[sizeof(uint64_t)];
