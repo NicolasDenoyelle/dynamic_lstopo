@@ -244,6 +244,7 @@ new_Monitors(hwloc_topology_t topology, unsigned int n_events, char ** event_nam
   M_alloc(m->names,m->allocated_count,sizeof(*(m->names)));
   M_alloc(m->event_names,n_events,sizeof(*(m->event_names)));
   M_alloc(m->PU_vals,m->n_PU,sizeof(*(m->PU_vals)));
+  M_alloc(m->logscale,m->allocated_count,sizeof(*(m->logscale)));
 
   for(i=0;i<m->n_PU;i++){
     m->pthreads[i]=0;
