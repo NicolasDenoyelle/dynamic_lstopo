@@ -119,7 +119,7 @@ void svg_init(void *_coutput);
 #endif /* CAIRO_HAS_SVG_SURFACE */
 
 #if HWLOC_HAVE_MONITOR
-void perf_box_draw(struct lstopo_output *loutput, void * output, hwloc_obj_t level, unsigned depth, double value, double variation, double max, double min, int active);
+void perf_box_draw(struct lstopo_output *loutput, void * output, hwloc_obj_t level, unsigned depth, double value, double variation, double max, double min, int active, int logscale);
 #endif
 void obj_draw_again(struct lstopo_output * loutput, void* output, hwloc_obj_t obj, int logical);
 
