@@ -370,6 +370,9 @@ output_x11_perf_replay(struct lstopo_output * loutput, const char *filename __hw
 	}
 	coutput->context=c;
 	topo_cairo_perf_replay_boxes(coutput, replay);
+	cairo_show_page(c);
+	cairo_surface_flush(coutput->surface);
+	XFlush(disp->dpy);
       }
     }
   }
