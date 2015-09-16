@@ -1,0 +1,32 @@
+L3_MISS
+{
+OBJ = L3;          #compulsory
+CTR = PAPI_L3_TCM; #compulsory
+LOGSCALE = 1;      #optional
+MAX = 5000000;
+}
+
+L2_MISS
+{
+OBJ = L2;
+CTR = PAPI_L2_TCM;
+LOGSCALE = 1;
+MAX = 10000000;
+}
+
+L1_MISS
+{
+OBJ = L1d;
+CTR = PAPI_L1_DCM;
+LOGSCALE = 1;
+MAX = 13000000;
+}
+
+SINGLE_L3_MISS
+{
+OBJ = PU;
+CTR = PAPI_L3_TCM;
+LOGSCALE = 1;
+MAX = 1500000;
+}
+
