@@ -4,15 +4,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <sched.h>
 #include <string.h>
 #include <omp.h>
-#include <sched.h>
 #include <math.h>
 #include <ncurses.h>
+#include <hwloc.h>
+#include <hwloc/helper.h>
 #include "linked_list.h"
 
 #define RAND 1
+hwloc_topology_t topo;
 uint64_t online_PU;
 uint64_t L1_s, L2_s, L3_s, MEM_s;
 
@@ -21,41 +22,17 @@ void init()
   FILE * cmd_out;
   size_t n;
   char * lineptr;
+  
 
-  cmd_out = popen("getconf -a | awk /L1_DCACHE_S/'{print $2}'","r");
-  lineptr = NULL; n=0;
-  L1_s = getline(&lineptr,&n,cmd_out);
-  L1_s = atol(lineptr);
-  free(lineptr);
-  pclose(cmd_out);
+  hwloc_topology_init(&topo);
+  hwloc_topology_load(topo);
 
-  cmd_out = popen("getconf -a | awk /L2_CACHE_S/'{print $2}'","r");
-  lineptr = NULL; n=0;
-  L2_s = getline(&lineptr,&n,cmd_out);
-  L2_s = atol(lineptr);
-  free(lineptr); n=0;
-  pclose(cmd_out);
+  L1_s = hwloc_get_obj_by_depth(topo, hwloc_get_cache_type_depth (topo, 1, HWLOC_OBJ_CACHE_DATA), 0)->attr->cache.size;
+  L2_s = hwloc_get_obj_by_depth(topo, hwloc_get_cache_type_depth (topo, 2, HWLOC_OBJ_CACHE_DATA), 0)->attr->cache.size;
+  L3_s = hwloc_get_obj_by_depth(topo, hwloc_get_cache_type_depth (topo, 3, HWLOC_OBJ_CACHE_DATA), 0)->attr->cache.size;
+  MEM_s = hwloc_get_obj_by_type (topo, HWLOC_OBJ_NODE , 0)->memory.local_memory;
 
-  cmd_out = popen("getconf -a | awk /L3_CACHE_S/'{print $2}'","r");
-  lineptr = NULL; n=0;
-  L3_s = getline(&lineptr,&n,cmd_out);
-  L3_s = atol(lineptr);
-  free(lineptr); n=0;
-  pclose(cmd_out);
-
-  cmd_out = popen("cat /proc/meminfo | awk /MemTotal/'{print $2*1024}'","r");
-  lineptr = NULL; n=0;
-  MEM_s = getline(&lineptr,&n,cmd_out);
-  MEM_s = atol(lineptr);
-  free(lineptr); n=0;
-  pclose(cmd_out);
-
-  cmd_out = popen("getconf -a | awk /_NPROCESSORS_ONLN/'{print $2}'","r");
-  lineptr = NULL; n=0;
-  online_PU = getline(&lineptr,&n,cmd_out);
-  online_PU = atoi(lineptr);
-  free(lineptr); n=0;
-  pclose(cmd_out);
+  online_PU = hwloc_bitmap_weight(hwloc_topology_get_topology_cpuset(topo));
 
   MEM_s/=(2*online_PU);
 
@@ -287,19 +264,19 @@ main(int argc, char**argv)
 	stop_flag=1;
       }
     else{
-      cpu_set_t mask;
-      CPU_ZERO(&mask);
-      CPU_SET(omp_get_thread_num()%online_PU,&mask);
-      sched_setaffinity(0,sizeof(mask),&mask);
+      hwloc_bitmap_t cpuset = hwloc_bitmap_alloc();
+      hwloc_bitmap_set(cpuset,omp_get_thread_num()%online_PU);
+      hwloc_set_cpubind(topo, cpuset, HWLOC_CPUBIND_THREAD|HWLOC_CPUBIND_STRICT);
       uint64_t marker=0;
       struct control * control = controls->control[omp_get_thread_num()];
       while(!stop_flag){
 	walk_linked_list(control->list, &marker, L3_s);
       }
+      hwloc_bitmap_free(cpuset);
     }
   }
   
-  
+  hwloc_topology_destroy(topo);  
   delete_controls(controls);
   endwin();			/* End curses mode		  */
   return 0;
