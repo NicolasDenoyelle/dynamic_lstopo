@@ -9,25 +9,14 @@ high-performance computing (HPC) applications, but is also applicable to any
 project seeking to exploit code and/or data locality on modern computing
 platforms.
 
-For more informations about hwloc, please read the original hwloc's README from the openmpi project.
-
 This specific version contains a custom version of lstopo utility to display and/or record performance counters.
 The counters collected with PAPI are summed into upper levels of the hierarchy to display live a consistent view of the machine state.
 
 ### Installation
 
-The original hwloc hwloc (http://www.open-mpi.org/projects/hwloc/) is available under the BSD
-license. This version inherit the license.
 Awaiting to be merged with the original project, this fork is hosted on github at 
 ```
 https://github.com/NicolasDenoyelle/dynamic_lstopo
-```
-
-The original code can be directly cloned from Git:
-```
-git clone https://github.com/open-mpi/hwloc.git
-cd hwloc
-./autogen.sh
 ```
 
 This version with performance monitoring has to be cloned from Git:
