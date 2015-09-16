@@ -1020,20 +1020,21 @@ main (int argc, char *argv[])
 
 #ifdef HWLOC_HAVE_MONITOR
 #ifdef HWLOC_HAVE_MONITOR_DEMO
-  if(perf_input)
-    monitors = load_Monitors_from_config(topology,perf_input,perf_output, perf_attributes.perf_accumulate);
-  else
-    monitors = load_Monitors_from_config(topology,HWLOC_MONITOR_DEMO_CONFIG,perf_output, perf_attributes.perf_accumulate);
-  perf_attributes.executable = HWLOC_MONITOR_DEMO_BIN;
-  perf_attributes.exe_args = malloc(2*sizeof(char*));
-  perf_attributes.exe_args[0] = strdup(HWLOC_MONITOR_DEMO_BIN);
-  perf_attributes.exe_args[1] = NULL;
-  output(&loutput, filename, output_format);
-  free(perf_attributes.exe_args[0]);
-  free(perf_attributes.exe_args);
-  delete_Monitors(monitors);
-  goto out_with_topology;
-    
+  if(perf_demo){
+    if(perf_input)
+      monitors = load_Monitors_from_config(topology,perf_input,perf_output, perf_attributes.perf_accumulate);
+    else 
+      monitors = load_Monitors_from_config(topology,HWLOC_MONITOR_DEMO_CONFIG,perf_output, perf_attributes.perf_accumulate);
+    perf_attributes.executable = HWLOC_MONITOR_DEMO_BIN;
+    perf_attributes.exe_args = malloc(2*sizeof(char*));
+    perf_attributes.exe_args[0] = strdup(HWLOC_MONITOR_DEMO_BIN);
+    perf_attributes.exe_args[1] = NULL;
+    output(&loutput, filename, output_format);
+    free(perf_attributes.exe_args[0]);
+    free(perf_attributes.exe_args);
+    delete_Monitors(monitors);
+    goto out_with_topology;
+  }
 #endif /*HWLOC_HAVE_MONITOR_DEMO*/
   int perf_err=0;
   if(perf_replay_opt){
