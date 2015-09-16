@@ -65,6 +65,9 @@ static unsigned int top  = 0;
     }									\
   } while(0)								\
     
+#ifdef HWLOC_HAVE_MONITOR_DEMO
+static int perf_demo = 0;
+#endif /*HWLOC_HAVE_MONITOR_DEMO*/
 static int perf_opt = 0;
 static int perf_no_display_opt = 0;
 struct perf_attributes perf_attributes = {0,0,100000,NULL,NULL};
@@ -75,7 +78,7 @@ static char * perf_output = NULL;
 static char * perf_input = NULL;
 static monitors_t monitors;
 static replay_t replay;
-#endif
+#endif /*HWLOC_HAVE_MONITOR */
 
 FILE *open_output(const char *filename, int overwrite)
 {
@@ -373,7 +376,10 @@ void usage(const char *name, FILE *where)
   fprintf (where, "  --perf-whole-machine  Record every PU counter even when monitoring an application.\n");
   fprintf (where, "                        This option is usefull to reduce recording overhead.\n");
   fprintf (where, "  -r --refresh <r_usec> Refresh display each r_usec when --perf option is used\n");
-#endif
+#ifdef HWLOC_HAVE_MONITOR_DEMO
+  fprintf (where, "  --perf-demo           Starts a demonstration program containing one randomly linked list per PU with threads walking each simultaneously. the program let you change the lists size and see the counters evolution.\n");
+#endif /*HWLOC_HAVE_MONITOR_DEMO*/
+#endif /*HWLOC_HAVE_MONITOR*/
   fprintf (where, "Input options:\n");
   hwloc_utils_input_format_usage(where, 6);
   fprintf (where, "  --thissystem          Assume that the input topology provides the topology\n"
@@ -812,6 +818,12 @@ main (int argc, char *argv[])
       } else if (!strcmp (argv[0], "--ps") || !strcmp (argv[0], "--top"))
         top = 1;
 #ifdef HWLOC_HAVE_MONITOR
+#ifdef HWLOC_HAVE_MONITOR_DEMO
+      else if (!strcmp (argv[0], "--perf-demo")){
+	perf_opt = 1;
+	perf_demo = 1;
+      }
+#endif /* HWLOC_HAVE_MONITOR_DEMO */
       else if (!strcmp (argv[0], "--perf")){
 	perf_opt = 1;
       }
@@ -1007,6 +1019,22 @@ main (int argc, char *argv[])
     lstopo_add_collapse_attributes(topology);
 
 #ifdef HWLOC_HAVE_MONITOR
+#ifdef HWLOC_HAVE_MONITOR_DEMO
+  if(perf_input)
+    monitors = load_Monitors_from_config(topology,perf_input,perf_output, perf_attributes.perf_accumulate);
+  else
+    monitors = load_Monitors_from_config(topology,HWLOC_MONITOR_DEMO_CONFIG,perf_output, perf_attributes.perf_accumulate);
+  perf_attributes.executable = HWLOC_MONITOR_DEMO_BIN;
+  perf_attributes.exe_args = malloc(2*sizeof(char*));
+  perf_attributes.exe_args[0] = strdup(HWLOC_MONITOR_DEMO_BIN);
+  perf_attributes.exe_args[1] = NULL;
+  output(&loutput, filename, output_format);
+  free(perf_attributes.exe_args[0]);
+  free(perf_attributes.exe_args);
+  delete_Monitors(monitors);
+  goto out_with_topology;
+    
+#endif /*HWLOC_HAVE_MONITOR_DEMO*/
   int perf_err=0;
   if(perf_replay_opt){
     replay = new_replay(perf_input,loutput.topology,replay_phase,replay_speed,perf_attributes.perf_accumulate);
