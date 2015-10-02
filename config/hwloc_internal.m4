@@ -267,6 +267,7 @@ if test "x$enable_monitor" != "xno"; then
 hwloc_monitor_happy=yes     
 AC_CHECK_LIB([papi],[PAPI_library_init],[papi_lib_happy=yes],[hwloc_monitor_happy=no])
 AC_CHECK_HEADER([papi.h],[papi_header_happy=yes],[hwloc_monitor_happy=no])
+AC_CHECK_HEADER([time.h],[],[hwloc_monitor_happy=no])
 AC_PROG_YACC
 
 if test x"${YACC}" != x"yacc" ; then
