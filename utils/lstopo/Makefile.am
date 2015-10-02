@@ -20,6 +20,7 @@ LDADD+= $(HWLOC_top_builddir)/utils/monitor/libmonitor.la
 if HWLOC_HAVE_MONITOR_DEMO
 AM_CPPFLAGS+= -DHWLOC_MONITOR_DEMO_CONFIG='"$(datadir)/perf_group.txt"'
 AM_CPPFLAGS+= -DHWLOC_MONITOR_DEMO_BIN='"$(bindir)/hwloc_monitor_demo"'
+AM_LDFLAGS+= -lrt
 endif
 endif
 
