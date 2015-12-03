@@ -101,12 +101,12 @@ new_control(int startx, int starty, int PU){
   return control;
 }
 
-inline void control_enable(struct control * control){
+void control_enable(struct control * control){
   mvwprintw(control->cursor_w,1,2, "*"); 
   wrefresh(control->cursor_w);  
 }
 
-inline void control_disable(struct control * control){
+void control_disable(struct control * control){
   mvwprintw(control->cursor_w,1,2, " "); 
   wrefresh(control->cursor_w);  
 }
@@ -125,11 +125,11 @@ control_gauge_set(struct control * control, uint64_t size)
   resize_linked_list(control->list, old_n_elem, n_elem, RAND);  
 }
 
-inline void control_gauge_fill(struct control * control){
+void control_gauge_fill(struct control * control){
   control_gauge_set(control, control->list_size*2);
 }
 
-inline void control_gauge_empty(struct control * control){
+void control_gauge_empty(struct control * control){
   control_gauge_set(control, control->list_size/2);
 }
 
@@ -211,7 +211,7 @@ delete_controls(struct controls * controls)
   free(controls);
 }
 
-inline void usage(char * argv0){
+void usage(char * argv0){
   fprintf(stdout,"%s -s <data_set (use multiple times) -r <repeat> >\n",argv0);
 }
 
