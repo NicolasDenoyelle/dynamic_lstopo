@@ -33,8 +33,6 @@ struct draw_methods;
 struct lstopo_output {
   hwloc_topology_t topology;
 
-  enum lstopo_drawing_e drawing;
-
   /* file config */
   FILE *file;
   int overwrite;
@@ -64,9 +62,11 @@ struct lstopo_output {
   /* draw config */
   unsigned int gridsize, fontsize;
   enum lstopo_orient_e force_orient[HWLOC_OBJ_TYPE_MAX]; /* orientation of children within an object of the given type */
+  void *backend_data;
   struct draw_methods *methods;
   unsigned width, height; /* total output size */
   unsigned min_pu_textwidth;
+  enum lstopo_drawing_e drawing;
 };
 
 struct lstopo_obj_userdata {
@@ -106,14 +106,14 @@ typedef void output_method_nofile (struct lstopo_output *output);
 extern output_method_nofile output_x11, output_windows;
 
 struct draw_methods {
-  void (*init) (void *output);
+  void (*init) (struct lstopo_output *loutput);
   /* only called when loutput->draw_methods == LSTOPO_DRAWING_DRAW */
-  void (*declare_color) (void *output, int r, int g, int b);
-  void (*box) (void *output, int r, int g, int b, unsigned depth, unsigned x, unsigned width, unsigned y, unsigned height);
-  void (*line) (void *output, int r, int g, int b, unsigned depth, unsigned x1, unsigned y1, unsigned x2, unsigned y2);
-  void (*text) (void *output, int r, int g, int b, int size, unsigned depth, unsigned x, unsigned y, const char *text);
+  void (*declare_color) (struct lstopo_output *loutput, int r, int g, int b);
+  void (*box) (struct lstopo_output *loutput, int r, int g, int b, unsigned depth, unsigned x, unsigned width, unsigned y, unsigned height);
+  void (*line) (struct lstopo_output *loutput, int r, int g, int b, unsigned depth, unsigned x1, unsigned y1, unsigned x2, unsigned y2);
+  void (*text) (struct lstopo_output *loutput, int r, int g, int b, int size, unsigned depth, unsigned x, unsigned y, const char *text);
   /* may be called when loutput->drawing == LSTOPO_DRAWING_PREPARE */
-  void (*textsize) (void *output, const char *text, unsigned textlength, unsigned fontsize, unsigned *width);
+  void (*textsize) (struct lstopo_output *loutput, const char *text, unsigned textlength, unsigned fontsize, unsigned *width);
 };
 
 extern void output_draw_start(struct lstopo_output *output);
