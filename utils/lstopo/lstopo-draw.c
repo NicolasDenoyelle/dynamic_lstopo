@@ -299,7 +299,7 @@ place_children_rect(struct lstopo_output *loutput, hwloc_obj_t parent, unsigned 
   *height = totheight;
 }
 
-/* Recurse into children to get their size.
+/* Recurse into children to get their size and custom infos.
  * Place them.
  * Save their position and the parent total size for later.
  */
@@ -317,6 +317,10 @@ place_children(struct lstopo_output *loutput, hwloc_obj_t parent,
   unsigned nxoff = 0, nyoff = 0;
   hwloc_obj_t child;
   unsigned i;
+
+  /* Callback to set custom options for parent node */
+  if(loutput->lstopo_custom_callback)
+      loutput->lstopo_custom_callback(&plud->custom, parent);
 
   /* system containing machines is drawn as network */
   /* FIXME: we only use the network code for drawing systems of machines.
@@ -498,6 +502,11 @@ lstopo_obj_snprintf(char *text, size_t textlen, hwloc_obj_t obj, int logical)
   char totmemstr[64] = "";
   int attrlen;
 
+  struct lstopo_obj_userdata * plud = obj->userdata;
+  if(strlen(plud->custom.info)>0){
+      return snprintf(text, textlen, "%s", plud->custom.info);
+  }
+
   /* For OSDev, Misc and Group, name replaces type+index+attrs */
   if (obj->name && (obj->type == HWLOC_OBJ_OS_DEVICE || obj->type == HWLOC_OBJ_MISC || obj->type == HWLOC_OBJ_GROUP)) {
     return snprintf(text, textlen, "%s", obj->name);
@@ -536,6 +545,14 @@ lstopo_set_object_color(struct lstopo_output *loutput,
 
   memset(s, 0, sizeof(*s));
 
+  struct lstopo_obj_userdata *plud = obj->userdata;
+  if(plud->custom.r >= 0 && plud->custom.g >= 0 && plud->custom.b >= 0){
+      s->bg.r = plud->custom.r;
+      s->bg.g = plud->custom.g;
+      s->bg.b = plud->custom.b;
+      goto force_style;
+  }
+  
   switch (obj->type) {
 
   case HWLOC_OBJ_MACHINE:
@@ -636,9 +653,10 @@ lstopo_set_object_color(struct lstopo_output *loutput,
     assert(0);
   }
 
+ force_style:
   style = hwloc_obj_get_info_by_name(obj, "lstopoStyle");
   if (style)
-    while (*style != '\0') {
+      while (*style != '\0') {
       if (sscanf(style, "%02x%02x%02x", &forcer, &forceg, &forceb) == 3
 	  || sscanf(style, "Background=#%02x%02x%02x", &forcer, &forceg, &forceb) == 3) {
 	s->bg.r = forcer & 255;

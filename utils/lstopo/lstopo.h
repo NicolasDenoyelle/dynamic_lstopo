@@ -13,88 +13,131 @@
 #include <hwloc.h>
 #include <misc.h>
 
+/*********************************************** Public interface *************************************************/
+
 enum lstopo_drawing_e {
-  LSTOPO_DRAWING_PREPARE,
-  LSTOPO_DRAWING_DRAW
+    LSTOPO_DRAWING_PREPARE,
+    LSTOPO_DRAWING_DRAW
 };
 
 enum lstopo_orient_e {
-  LSTOPO_ORIENT_NONE = 0,
-  LSTOPO_ORIENT_HORIZ,
-  LSTOPO_ORIENT_VERT,
-  LSTOPO_ORIENT_RECT
+    LSTOPO_ORIENT_NONE = 0,
+    LSTOPO_ORIENT_HORIZ,
+    LSTOPO_ORIENT_VERT,
+    LSTOPO_ORIENT_RECT
 };
 
+enum output_format {
+    LSTOPO_OUTPUT_DEFAULT,
+    LSTOPO_OUTPUT_CONSOLE,
+    LSTOPO_OUTPUT_SYNTHETIC,
+    LSTOPO_OUTPUT_ASCII,
+    LSTOPO_OUTPUT_FIG,
+    LSTOPO_OUTPUT_PNG,
+    LSTOPO_OUTPUT_PDF,
+    LSTOPO_OUTPUT_PS,
+    LSTOPO_OUTPUT_SVG,
+    LSTOPO_OUTPUT_XML,
+    LSTOPO_OUTPUT_ERROR
+};
+
+/* customize boxes */
+struct lstopo_custom_box{
+    /* text */
+    char info[256];
+    /* color if supported */
+    int r,g,b;
+    /* userdata */
+    void* userdata;
+};
+
+/* if embedded in backend-specific output structure, must be at the beginning */
+struct lstopo_output {
+    hwloc_topology_t topology;
+
+    enum lstopo_drawing_e drawing;
+
+    /* file config */
+    FILE *file;
+    int overwrite;
+
+    /* misc config */
+    int logical;
+    int verbose_mode;
+    int ignore_pus;
+    int collapse;
+    int pid_number;
+    hwloc_pid_t pid;
+
+    /* synthetic export config */
+    unsigned long export_synthetic_flags;
+
+    /* legend */
+    int legend;
+    char ** legend_append;
+    unsigned legend_append_nr;
+
+    /* text config */
+    int show_distances_only;
+    hwloc_obj_type_t show_only;
+    int show_cpuset;
+    int show_taskset;
+
+    /* draw config */
+    unsigned int gridsize, fontsize;
+    enum lstopo_orient_e force_orient[HWLOC_OBJ_TYPE_MAX]; /* orientation of children within an object of the given type */
+    struct draw_methods *methods;
+    void (* output_method)(struct lstopo_output *, const char *);
+    enum output_format format;
+
+    unsigned width, height; /* total output size */
+    unsigned min_pu_textwidth;
+    
+    /* Callback to fill custom box */
+    void (* lstopo_custom_callback)(struct lstopo_custom_box * output, hwloc_obj_t location);
+};
+
+struct lstopo_output default_output_options(hwloc_topology_t topology, void (*callback)(struct lstopo_custom_box*, hwloc_obj_t));
+int  lstopo_draw_begin(const char *, struct lstopo_output*, enum output_format);
+void lstopo_draw_topology(struct lstopo_output*, const char *);
+void lstopo_draw_end(struct lstopo_output*);
+    
+/*********************************************** Private interface ***********************************************/
+    
+    
 FILE *open_output(const char *filename, int overwrite) __hwloc_attribute_malloc;
 
 struct draw_methods;
 
-/* if embedded in backend-specific output structure, must be at the beginning */
-struct lstopo_output {
-  hwloc_topology_t topology;
-
-  enum lstopo_drawing_e drawing;
-
-  /* file config */
-  FILE *file;
-  int overwrite;
-
-  /* misc config */
-  int logical;
-  int verbose_mode;
-  int ignore_pus;
-  int collapse;
-  int pid_number;
-  hwloc_pid_t pid;
-
-  /* synthetic export config */
-  unsigned long export_synthetic_flags;
-
-  /* legend */
-  int legend;
-  char ** legend_append;
-  unsigned legend_append_nr;
-
-  /* text config */
-  int show_distances_only;
-  hwloc_obj_type_t show_only;
-  int show_cpuset;
-  int show_taskset;
-
-  /* draw config */
-  unsigned int gridsize, fontsize;
-  enum lstopo_orient_e force_orient[HWLOC_OBJ_TYPE_MAX]; /* orientation of children within an object of the given type */
-  struct draw_methods *methods;
-  unsigned width, height; /* total output size */
-  unsigned min_pu_textwidth;
-};
-
 struct lstopo_obj_userdata {
-  /* original common userdata (we replace the first one with this extended structure) */
-  struct hwloc_utils_userdata common;
+    /* original common userdata (we replace the first one with this extended structure) */
+    struct hwloc_utils_userdata common;
 
-  /* object size (including children if they are outside of it, not including borders) */
-  unsigned width;
-  unsigned height;
+    /* object size (including children if they are outside of it, not including borders) */
+    unsigned width;
+    unsigned height;
 
-  /* a child position is: its parent position + parent->children_*rel + child->*rel */
-  /* relative position of first child with respect to top-left corner of this object */
-  unsigned children_xrel;
-  unsigned children_yrel;
-  /* relative position of this object within its parent children zone */
-  unsigned xrel;
-  unsigned yrel;
+    /* a child position is: its parent position + parent->children_*rel + child->*rel */
+    /* relative position of first child with respect to top-left corner of this object */
+    unsigned children_xrel;
+    unsigned children_yrel;
+    /* relative position of this object within its parent children zone */
+    unsigned xrel;
+    unsigned yrel;
+    
+    /* children connected by network? */
+    int network;
+    /* children orientation */
+    enum lstopo_orient_e orient;
 
-  /* children connected by network? */
-  int network;
-  /* children orientation */
-  enum lstopo_orient_e orient;
+    /* User custom content */
+    struct lstopo_custom_box custom;
 };
 
 typedef void output_method (struct lstopo_output *output, const char *filename);
-extern output_method output_console, output_synthetic, output_ascii, output_fig, output_png, output_pdf, output_ps, output_svg, output_xml;
+extern output_method output_console, output_synthetic, output_ascii, output_fig, output_png, output_pdf, output_ps, output_svg, output_xml, output_x11;
 typedef void output_method_nofile (struct lstopo_output *output);
-extern output_method_nofile output_x11, output_windows;
+extern output_method_nofile output_windows;
 
 struct draw_methods {
   void (*init) (void *output);

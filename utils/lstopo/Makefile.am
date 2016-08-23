@@ -23,6 +23,7 @@ EXTRA_DIST = \
 lstopo_no_graphics_SOURCES = \
         lstopo.h \
         lstopo.c \
+        main.c \
         lstopo-color.c \
         lstopo-draw.c \
         lstopo-fig.c \

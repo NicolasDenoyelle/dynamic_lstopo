@@ -311,7 +311,7 @@ move_x11(struct lstopo_x11_output *disp)
 }
 
 void
-output_x11(struct lstopo_output *loutput)
+output_x11(struct lstopo_output *loutput, __attribute__ ((unused)) const char * filename)
 {
   struct lstopo_x11_output _disp, *disp = &_disp;
   struct lstopo_cairo_output *coutput;
