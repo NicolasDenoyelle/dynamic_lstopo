@@ -318,12 +318,15 @@ move_x11(struct lstopo_x11_output *disp)
 void
 output_x11(struct lstopo_output *loutput)
 {
-  struct lstopo_x11_output _disp, *disp = &_disp;
+  struct lstopo_x11_output *disp;
   struct lstopo_cairo_output *coutput;
   int finish = 0;
   int state = 0;
   int x = 0, y = 0; /* shut warning down */
   int lastx, lasty;
+
+  disp = malloc(sizeof(*disp));
+  assert(disp);
 
   coutput = &disp->coutput;
   memset(coutput, 0, sizeof(*coutput));
@@ -470,11 +473,13 @@ output_x11(struct lstopo_output *loutput)
       }
     }
   }
-  x11_destroy(disp);
+}
+
+x11_destroy(disp);
   XDestroyWindow(disp->dpy, disp->top);
   XFreeCursor(disp->dpy, disp->hand);
   XCloseDisplay(disp->dpy);
-}
+
 #endif /* CAIRO_HAS_XLIB_SURFACE */
 
 
