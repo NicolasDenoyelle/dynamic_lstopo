@@ -892,7 +892,11 @@ main (int argc, char *argv[])
   if (loutput.methods && loutput.methods->iloop) {
     while (loutput.methods->iloop(&loutput, 0) >= 0) {
       printf("sleeping 1s\n");
+#ifdef HWLOC_WIN_SYS
+      Sleep(1000);
+#else
       sleep(1);
+#endif
     }
   }
 #endif

@@ -380,9 +380,11 @@ windows_textsize(struct lstopo_output *loutput, const char *text, unsigned textl
   *width = size.cx;
 }
 
+int windows_iloop(struct lstopo_output *loutput, int block);
+
 struct draw_methods windows_draw_methods = {
   windows_init,
-  NULL,
+  windows_iloop,
   NULL,
   windows_declare_color,
   windows_box,
@@ -394,8 +396,6 @@ struct draw_methods windows_draw_methods = {
 void
 output_windows (struct lstopo_output *loutput)
 {
-  MSG msg;
-
   memset(&the_output, 0, sizeof(the_output));
   the_output.loutput = loutput;
   loutput->methods = &windows_draw_methods;
@@ -403,8 +403,18 @@ output_windows (struct lstopo_output *loutput)
 
   output_draw_start(loutput);
   UpdateWindow(the_output.toplevel);
-  while (!finish && GetMessage(&msg, NULL, 0, 0)) {
+}
+
+int windows_iloop(struct lstopo_output *loutput __hwloc_attribute_unused, int block)
+{
+  MSG msg;
+  while (!finish) {
+    if (!block && !PeekMessage(&msg, NULL, 0, 0, PM_NOREMOVE))
+      return 0;
+    if (!GetMessage(&msg, NULL, 0, 0))
+      break;
     TranslateMessage(&msg);
     DispatchMessage(&msg);
   }
+  return -1;
 }
