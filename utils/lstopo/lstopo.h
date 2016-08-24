@@ -107,7 +107,7 @@ extern output_method_nofile output_x11, output_windows;
 
 struct draw_methods {
   void (*init) (struct lstopo_output *loutput);
-  int (*interactive_loop) (struct lstopo_output *loutput); /* handles events, redraws, and returns 0 on success, -1 when exit requested */
+  int (*iloop) (struct lstopo_output *loutput, int block); /* handles graphical events, redraws, and returns 0 when done and !block, -1 when exit requested */
   void (*end) (struct lstopo_output *loutput);
   /* only called when loutput->draw_methods == LSTOPO_DRAWING_DRAW */
   void (*declare_color) (struct lstopo_output *loutput, int r, int g, int b);

@@ -885,6 +885,18 @@ main (int argc, char *argv[])
       goto out_usagefailure;
   }
 
+#if 0
+  if (loutput.methods && loutput.methods->iloop)
+    loutput.methods->iloop(&loutput, 1);
+#else
+  if (loutput.methods && loutput.methods->iloop) {
+    while (loutput.methods->iloop(&loutput, 0) >= 0) {
+      printf("sleeping 1s\n");
+      sleep(1);
+    }
+  }
+#endif
+  
   if (loutput.methods && loutput.methods->end)
     loutput.methods->end(&loutput);
 
