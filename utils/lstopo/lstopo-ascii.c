@@ -452,6 +452,8 @@ ascii_textsize(struct lstopo_output *loutput, const char *text __hwloc_attribute
 
 static struct draw_methods ascii_draw_methods = {
   ascii_init,
+  NULL,
+  NULL,
   ascii_declare_color,
   ascii_box,
   ascii_line,

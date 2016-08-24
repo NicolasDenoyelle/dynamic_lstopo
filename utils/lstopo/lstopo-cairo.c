@@ -249,6 +249,8 @@ x11_init(struct lstopo_output *loutput)
 
 static struct draw_methods x11_draw_methods = {
   x11_init,
+  NULL,
+  NULL,
   topo_cairo_declare_color,
   topo_cairo_box,
   topo_cairo_line,
@@ -503,6 +505,8 @@ png_init(struct lstopo_output *loutput)
 
 static struct draw_methods png_draw_methods = {
   png_init,
+  NULL,
+  NULL,
   topo_cairo_declare_color,
   topo_cairo_box,
   topo_cairo_line,
@@ -567,6 +571,8 @@ pdf_init(struct lstopo_output *loutput)
 
 static struct draw_methods pdf_draw_methods = {
   pdf_init,
+  NULL,
+  NULL,
   topo_cairo_declare_color,
   topo_cairo_box,
   topo_cairo_line,
@@ -631,6 +637,8 @@ ps_init(struct lstopo_output *loutput)
 
 static struct draw_methods ps_draw_methods = {
   ps_init,
+  NULL,
+  NULL,
   topo_cairo_declare_color,
   topo_cairo_box,
   topo_cairo_line,
@@ -695,6 +703,8 @@ svg_init(struct lstopo_output *loutput)
 
 static struct draw_methods svg_draw_methods = {
   svg_init,
+  NULL,
+  NULL,
   topo_cairo_declare_color,
   topo_cairo_box,
   topo_cairo_line,

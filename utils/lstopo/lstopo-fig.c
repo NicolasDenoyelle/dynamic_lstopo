@@ -119,6 +119,8 @@ fig_text(struct lstopo_output *loutput, int r, int g, int b, int size, unsigned 
 
 static struct draw_methods fig_draw_methods = {
   fig_init,
+  NULL,
+  NULL,
   fig_declare_color,
   fig_box,
   fig_line,

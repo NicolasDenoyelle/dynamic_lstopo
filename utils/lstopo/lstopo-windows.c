@@ -382,6 +382,8 @@ windows_textsize(struct lstopo_output *loutput, const char *text, unsigned textl
 
 struct draw_methods windows_draw_methods = {
   windows_init,
+  NULL,
+  NULL,
   windows_declare_color,
   windows_box,
   windows_line,
