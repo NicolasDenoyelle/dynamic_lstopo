@@ -455,6 +455,8 @@ main (int argc, char *argv[])
 
   hwloc_utils_check_api_version(callname);
 
+  loutput.methods = NULL;
+
   loutput.overwrite = 0;
 
   loutput.logical = -1;
@@ -882,6 +884,9 @@ main (int argc, char *argv[])
       fprintf(stderr, "file format not supported\n");
       goto out_usagefailure;
   }
+
+  if (loutput.methods && loutput.methods->end)
+    loutput.methods->end(&loutput);
 
   lstopo_destroy_userdata(hwloc_get_root_obj(topology));
   hwloc_utils_userdata_free_recursive(hwloc_get_root_obj(topology));

@@ -247,10 +247,12 @@ x11_init(struct lstopo_output *loutput)
   printf("\n\n");
 }
 
+static void x11_end(struct lstopo_output *loutput);
+
 static struct draw_methods x11_draw_methods = {
   x11_init,
   NULL,
-  NULL,
+  x11_end,
   topo_cairo_declare_color,
   topo_cairo_box,
   topo_cairo_line,
@@ -475,11 +477,15 @@ output_x11(struct lstopo_output *loutput)
   }
 }
 
-x11_destroy(disp);
+static void
+x11_end(struct lstopo_output *loutput)
+{
+  struct lstopo_x11_output *disp = loutput->backend_data;
+  x11_destroy(disp);
   XDestroyWindow(disp->dpy, disp->top);
   XFreeCursor(disp->dpy, disp->hand);
   XCloseDisplay(disp->dpy);
-
+}
 #endif /* CAIRO_HAS_XLIB_SURFACE */
 
 
