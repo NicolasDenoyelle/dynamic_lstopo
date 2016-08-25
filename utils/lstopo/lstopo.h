@@ -16,90 +16,91 @@
 /*********************************************** Public interface *************************************************/
 
 enum lstopo_drawing_e {
-    LSTOPO_DRAWING_PREPARE,
-    LSTOPO_DRAWING_DRAW
+  LSTOPO_DRAWING_PREPARE,
+  LSTOPO_DRAWING_DRAW
 };
 
 enum lstopo_orient_e {
-    LSTOPO_ORIENT_NONE = 0,
-    LSTOPO_ORIENT_HORIZ,
-    LSTOPO_ORIENT_VERT,
-    LSTOPO_ORIENT_RECT
+  LSTOPO_ORIENT_NONE = 0,
+  LSTOPO_ORIENT_HORIZ,
+  LSTOPO_ORIENT_VERT,
+  LSTOPO_ORIENT_RECT
 };
 
 enum output_format {
-    LSTOPO_OUTPUT_DEFAULT,
-    LSTOPO_OUTPUT_CONSOLE,
-    LSTOPO_OUTPUT_SYNTHETIC,
-    LSTOPO_OUTPUT_ASCII,
-    LSTOPO_OUTPUT_FIG,
-    LSTOPO_OUTPUT_PNG,
-    LSTOPO_OUTPUT_PDF,
-    LSTOPO_OUTPUT_PS,
-    LSTOPO_OUTPUT_SVG,
-    LSTOPO_OUTPUT_XML,
-    LSTOPO_OUTPUT_ERROR
+  LSTOPO_OUTPUT_DEFAULT,
+  LSTOPO_OUTPUT_CONSOLE,
+  LSTOPO_OUTPUT_SYNTHETIC,
+  LSTOPO_OUTPUT_ASCII,
+  LSTOPO_OUTPUT_FIG,
+  LSTOPO_OUTPUT_PNG,
+  LSTOPO_OUTPUT_PDF,
+  LSTOPO_OUTPUT_PS,
+  LSTOPO_OUTPUT_SVG,
+  LSTOPO_OUTPUT_XML,
+  LSTOPO_OUTPUT_ERROR
 };
 
 /* customize boxes */
 struct lstopo_custom_box{
-    /* text */
-    char info[256];
-    /* color if supported */
-    int r,g,b;
-    /* userdata */
-    void* userdata;
+  /* text */
+  char info[256];
+  /* color if supported */
+  int r,g,b;
+  /* userdata */
+  void* userdata;
 };
 
 /* if embedded in backend-specific output structure, must be at the beginning */
 struct lstopo_output {
-    hwloc_topology_t topology;
-
-    enum lstopo_drawing_e drawing;
-
-    /* file config */
-    FILE *file;
-    int overwrite;
-
-    /* misc config */
-    int logical;
-    int verbose_mode;
-    int ignore_pus;
-    int collapse;
-    int pid_number;
-    hwloc_pid_t pid;
-
-    /* synthetic export config */
-    unsigned long export_synthetic_flags;
-
-    /* legend */
-    int legend;
-    char ** legend_append;
-    unsigned legend_append_nr;
-
-    /* text config */
-    int show_distances_only;
-    hwloc_obj_type_t show_only;
-    int show_cpuset;
-    int show_taskset;
-
-    /* draw config */
-    unsigned int gridsize, fontsize;
-    enum lstopo_orient_e force_orient[HWLOC_OBJ_TYPE_MAX]; /* orientation of children within an object of the given type */
-    struct draw_methods *methods;
-    void (* output_method)(struct lstopo_output *, const char *);
-    enum output_format format;
-
-    unsigned width, height; /* total output size */
-    unsigned min_pu_textwidth;
     
-    /* Callback to fill custom box */
-    void (* lstopo_custom_callback)(struct lstopo_custom_box * output, hwloc_obj_t location);
+  hwloc_topology_t topology;
+
+  /* file config */
+  FILE *file;
+  int overwrite;
+
+  /* misc config */
+  int logical;
+  int verbose_mode;
+  int ignore_pus;
+  int collapse;
+  int pid_number;
+  hwloc_pid_t pid;
+
+  /* synthetic export config */
+  unsigned long export_synthetic_flags;
+
+  /* legend */
+  int legend;
+  char ** legend_append;
+  unsigned legend_append_nr;
+
+  /* text config */
+  int show_distances_only;
+  hwloc_obj_type_t show_only;
+  int show_cpuset;
+  int show_taskset;
+
+  /* draw config */
+  unsigned int gridsize, fontsize;
+  enum lstopo_orient_e force_orient[HWLOC_OBJ_TYPE_MAX]; /* orientation of children within an object of the given type */
+  void *backend_data;
+  struct draw_methods *methods;
+  unsigned width, height; /* total output size */
+  unsigned min_pu_textwidth;
+  enum lstopo_drawing_e drawing;
+
+  /* Callback to fill custom box */
+  void (* output_method)(struct lstopo_output *, const char *);
+  enum output_format format;
+  void (* lstopo_custom_callback)(struct lstopo_custom_box * output, hwloc_obj_t location);
 };
 
 struct lstopo_output default_output_options(hwloc_topology_t topology, void (*callback)(struct lstopo_custom_box*, hwloc_obj_t));
 int  lstopo_draw_begin(const char *, struct lstopo_output*, enum output_format);
-void lstopo_draw_topology(struct lstopo_output*, const char *);
+void lstopo_draw_topology(struct lstopo_output*, const char *, int);
+void lstopo_draw_update(struct lstopo_output* loutput);
 void lstopo_draw_end(struct lstopo_output*);
     
 /*********************************************** Private interface ***********************************************/
@@ -110,28 +111,37 @@ FILE *open_output(const char *filename, int overwrite) __hwloc_attribute_malloc;
 struct draw_methods;
 
 struct lstopo_obj_userdata {
-    /* original common userdata (we replace the first one with this extended structure) */
-    struct hwloc_utils_userdata common;
+  /* original common userdata (we replace the first one with this extended structure) */
+  struct hwloc_utils_userdata common;
 
-    /* object size (including children if they are outside of it, not including borders) */
-    unsigned width;
-    unsigned height;
+  /* PCI collapsing */
+  int pci_collapsed; /* 0 if no collapsing, -1 if collapsed with a previous one, >1 if collapsed with several next */
 
-    /* a child position is: its parent position + parent->children_*rel + child->*rel */
-    /* relative position of first child with respect to top-left corner of this object */
-    unsigned children_xrel;
-    unsigned children_yrel;
-    /* relative position of this object within its parent children zone */
-    unsigned xrel;
-    unsigned yrel;
+  /* object size (including children if they are outside of it, not including borders) */
+  unsigned width;
+  unsigned height;
+
+  /* a child position is: its parent position + parent->children_*rel + child->*rel */
+  /* relative position of first child with respect to top-left corner of this object */
+  unsigned children_xrel;
+  unsigned children_yrel;
+  /* relative position of this object within its parent children zone */
+  unsigned xrel;
+  unsigned yrel;
+
+  /* children connected by network? */
+  int network;
+  /* children orientation */
+  enum lstopo_orient_e orient;
+
+  /* text lines within object */
+  char text[4][128]; /* current max number of lines is osdev name + 3 cuda attributes */
+  unsigned ntext;
+  unsigned textwidth;
+  unsigned textxoffset;
     
-    /* children connected by network? */
-    int network;
-    /* children orientation */
-    enum lstopo_orient_e orient;
-
-    /* User custom content */
-    struct lstopo_custom_box custom;
+  /* User custom content */
+  struct lstopo_custom_box custom;
 };
 
 typedef void output_method (struct lstopo_output *output, const char *filename);
@@ -140,14 +150,16 @@ typedef void output_method_nofile (struct lstopo_output *output);
 extern output_method_nofile output_windows;
 
 struct draw_methods {
-  void (*init) (void *output);
+  void (*init) (struct lstopo_output *loutput);
+  int (*iloop) (struct lstopo_output *loutput, int block); /* handles graphical events, redraws, and returns 0 when done and !block, -1 when exit requested */
+  void (*end) (struct lstopo_output *loutput);
   /* only called when loutput->draw_methods == LSTOPO_DRAWING_DRAW */
-  void (*declare_color) (void *output, int r, int g, int b);
-  void (*box) (void *output, int r, int g, int b, unsigned depth, unsigned x, unsigned width, unsigned y, unsigned height);
-  void (*line) (void *output, int r, int g, int b, unsigned depth, unsigned x1, unsigned y1, unsigned x2, unsigned y2);
-  void (*text) (void *output, int r, int g, int b, int size, unsigned depth, unsigned x, unsigned y, const char *text);
+  void (*declare_color) (struct lstopo_output *loutput, int r, int g, int b);
+  void (*box) (struct lstopo_output *loutput, int r, int g, int b, unsigned depth, unsigned x, unsigned width, unsigned y, unsigned height);
+  void (*line) (struct lstopo_output *loutput, int r, int g, int b, unsigned depth, unsigned x1, unsigned y1, unsigned x2, unsigned y2);
+  void (*text) (struct lstopo_output *loutput, int r, int g, int b, int size, unsigned depth, unsigned x, unsigned y, const char *text);
   /* may be called when loutput->drawing == LSTOPO_DRAWING_PREPARE */
-  void (*textsize) (void *output, const char *text, unsigned textlength, unsigned fontsize, unsigned *width);
+  void (*textsize) (struct lstopo_output *loutput, const char *text, unsigned textlength, unsigned fontsize, unsigned *width);
 };
 
 extern void output_draw_start(struct lstopo_output *output);
@@ -176,25 +188,27 @@ static __hwloc_inline int lstopo_pu_running(struct lstopo_output *loutput, hwloc
   return res;
 }
 
-static __hwloc_inline int lstopo_busid_snprintf(char *text, size_t textlen, hwloc_obj_t firstobj, unsigned collapse, unsigned needdomain)
+static __hwloc_inline int lstopo_busid_snprintf(char *text, size_t textlen, hwloc_obj_t firstobj, int collapse, unsigned needdomain)
 {
   hwloc_obj_t lastobj;
   char domain[6] = "";
   unsigned i;
+
+  assert(collapse >= 0); /* should be called on the first object of a collapsed range */
 
   if (needdomain)
     snprintf(domain, sizeof(domain), "%04x:", firstobj->attr->pcidev.domain);
 
   /* single busid */
   if (collapse <= 1) {
-      return snprintf(text, textlen, "%s%02x:%02x.%01x",
-		      domain,
-		      firstobj->attr->pcidev.bus,
-		      firstobj->attr->pcidev.dev,
-		      firstobj->attr->pcidev.func);
+    return snprintf(text, textlen, "%s%02x:%02x.%01x",
+		    domain,
+		    firstobj->attr->pcidev.bus,
+		    firstobj->attr->pcidev.dev,
+		    firstobj->attr->pcidev.func);
   }
 
-  for(lastobj=firstobj, i=1; i<collapse; i++)
+  for(lastobj=firstobj, i=1; i<(unsigned)collapse; i++)
     lastobj = lastobj->next_cousin;
 
   /* multiple busid functions for same busid device */

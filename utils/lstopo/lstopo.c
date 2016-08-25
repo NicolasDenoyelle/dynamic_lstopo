@@ -60,14 +60,12 @@ lstopo_add_collapse_attributes(hwloc_topology_t topology)
 	  && obj->attr->pcidev.subvendor_id == collapser->attr->pcidev.subvendor_id
 	  && obj->attr->pcidev.subdevice_id == collapser->attr->pcidev.subdevice_id) {
 	/* collapse another one */
-	hwloc_obj_add_info(obj, "lstopoCollapse", "0");
+	((struct lstopo_obj_userdata *)obj->userdata)->pci_collapsed = -1;
 	collapsed++;
 	continue;
       } else if (collapsed > 1) {
 	/* end this collapsing */
-	char text[10];
-	snprintf(text, sizeof(text), "%u", collapsed);
-	hwloc_obj_add_info(collapser, "lstopoCollapse", text);
+	((struct lstopo_obj_userdata *)collapser->userdata)->pci_collapsed = collapsed;
 	collapser = NULL;
 	collapsed = 0;
       }
@@ -80,9 +78,7 @@ lstopo_add_collapse_attributes(hwloc_topology_t topology)
   }
   if (collapsed > 1) {
     /* end this collapsing */
-    char text[10];
-    snprintf(text, sizeof(text), "%u", collapsed);
-    hwloc_obj_add_info(collapser, "lstopoCollapse", text);
+    ((struct lstopo_obj_userdata *)collapser->userdata)->pci_collapsed = collapsed;
   }
 }
 
@@ -97,6 +93,7 @@ lstopo_populate_userdata(hwloc_obj_t parent)
   memset(save->custom.info, 0, sizeof(save->custom.info));
   save->custom.r = save->custom.g = save->custom.b = -1;
   save->custom.userdata = NULL;
+  save->pci_collapsed = 0;
   parent->userdata = save;
 
   for(child = parent->first_child; child; child = child->next_sibling)
@@ -131,7 +128,9 @@ lstopo_destroy_userdata(hwloc_obj_t parent)
 struct lstopo_output default_output_options(hwloc_topology_t topology, void (*callback)(struct lstopo_custom_box*, hwloc_obj_t)){
     struct lstopo_output loutput;
     unsigned i;
+    int err;
     
+    loutput.methods = NULL;
     loutput.overwrite = 0;
     loutput.logical = -1;
     loutput.verbose_mode = LSTOPO_VERBOSE_MODE_DEFAULT;
@@ -158,12 +157,22 @@ struct lstopo_output default_output_options(hwloc_topology_t topology, void (*ca
     loutput.format = LSTOPO_OUTPUT_DEFAULT;
     loutput.output_method = NULL;
     loutput.lstopo_custom_callback = callback;
+    if(topology == NULL){
+        if(hwloc_topology_init(&topology)){goto return_loutput;}
+	if(hwloc_topology_load (topology)){
+	    fprintf(stderr, "NULL topology provided to %s and cannot load current one: %s\n", __FUNCTION__, strerror(errno));
+	    goto return_loutput;
+	}
+    }
+
+ return_loutput:
     loutput.topology = topology;
     return loutput;
 }
 
 int  lstopo_draw_begin(const char * callname, struct lstopo_output* loutput, enum output_format format){
   hwloc_utils_check_api_version(callname);
+
   /* enable verbose backends */
   putenv("HWLOC_XML_VERBOSE=1");
   putenv("HWLOC_SYNTHETIC_VERBOSE=1");
@@ -282,10 +291,29 @@ void lstopo_draw_end(struct lstopo_output* loutput){
     for(i=0; i<loutput->legend_append_nr; i++)
 	free(loutput->legend_append[i]);
     free(loutput->legend_append);
+    
+    if (loutput->methods && loutput->methods->end)
+	loutput->methods->end(loutput);
+    
+    lstopo_destroy_userdata(hwloc_get_root_obj(loutput->topology));
+    hwloc_utils_userdata_free_recursive(hwloc_get_root_obj(loutput->topology));
+    hwloc_topology_destroy(loutput->topology);
+    
+    for(i=0; i<loutput->legend_append_nr; i++)
+	free(loutput->legend_append[i]);
+    free(loutput->legend_append);
 }
 
 
-void lstopo_draw_topology(struct lstopo_output* loutput, const char * filename){
+void lstopo_draw_topology(struct lstopo_output* loutput, const char * filename, int block){
     loutput->output_method(loutput, filename);
+    if (loutput->methods && loutput->methods->iloop)
+	loutput->methods->iloop(loutput, block);
+}
+
+
+void lstopo_draw_update(struct lstopo_output* loutput){
+    if (loutput->methods && loutput->methods->iloop)
+	loutput->methods->iloop(loutput, 0);
 }
 

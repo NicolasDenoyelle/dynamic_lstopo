@@ -616,9 +616,8 @@ int main(int argc, char *argv[]){
 
     /* draw topology */
     if(lstopo_draw_begin(callname, &loutput, output_format) != 0) goto failure_usage;
-    lstopo_draw_topology(&loutput, filename);
+    lstopo_draw_topology(&loutput, filename, 1);
     lstopo_draw_end(&loutput);
-    hwloc_topology_destroy(topology);
     return EXIT_SUCCESS;
 
  failure_usage:

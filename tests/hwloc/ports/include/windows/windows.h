@@ -165,7 +165,10 @@ BOOL GetTextExtentPoint32(HDC hdc, LPCTSTR lpString, int c, LPSIZE lpSize);
 LRESULT DispatchMessage(const MSG *lpmsg);
 BOOL TranslateMessage(const MSG *lpMsg);
 BOOL GetMessage(LPMSG lpMsg, HWND hWnd, UINT wMsgFilterMin, UINT wMsgFilterMax);
+BOOL PeekMessage(LPMSG lpMsg, HWND hWnd, UINT wMsgFilterMin, UINT wMsgFilterMax, UINT wRemoveMsg);
 VOID WINAPI PostQuitMessage(int nExitCode);
+
+#define PM_NOREMOVE 0x0000
 
 #define WM_DESTROY 2
 #define WM_SIZE 5
